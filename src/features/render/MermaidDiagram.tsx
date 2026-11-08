@@ -2,8 +2,18 @@ import { useEffect, useState } from 'react'
 import mermaid from 'mermaid'
 import { MermaidFallback } from './MermaidFallback'
 
+/**
+ * Mermaid renderer.
+ *
+ * Mermaid is a singleton with global config, so initialization is keyed to the
+ * active color scheme and only re-runs when that changes. Renders are serialized
+ * through a promise queue: concurrent `mermaid.render` calls collide on the
+ * internal DOM node Mermaid uses, which is what made frequent chats flaky.
+ */
+
 let renderCounter = 0
 let initializedKey = ''
+let queue: Promise<unknown> = Promise.resolve()
 
 function cssVar(name: string, fallback: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -14,40 +24,41 @@ function ensureInitialized(dark: boolean): void {
   const key = dark ? 'dark' : 'light'
   if (initializedKey === key) return
 
-  const accent = cssVar('--accent', '#0d9488')
-  const surface = cssVar('--surface', '#ffffff')
-  const surface2 = cssVar('--surface-2', '#f1f3f6')
-  const border = cssVar('--border', '#e2e6ec')
-  const text = cssVar('--text', '#17202b')
-  const muted = cssVar('--text-muted', '#8491a8')
-  const contrast = cssVar('--accent-contrast', '#ffffff')
-
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
     theme: 'base',
     fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
     themeVariables: {
-      primaryColor: accent,
-      primaryBorderColor: accent,
-      primaryTextColor: contrast,
-      secondaryColor: surface2,
-      tertiaryColor: surface,
-      lineColor: muted,
-      textColor: text,
-      mainBkg: surface,
-      nodeBorder: border,
-      clusterBkg: surface2,
-      clusterBorder: border,
-      titleColor: text,
-      edgeLabelBackground: surface,
-      fontSize: '14px',
+      primaryColor: cssVar('--accent-soft', '#e6f2f0'),
+      primaryBorderColor: cssVar('--accent', '#0f766e'),
+      primaryTextColor: cssVar('--text', '#101828'),
+      secondaryColor: cssVar('--surface-2', '#f4f6f8'),
+      tertiaryColor: cssVar('--surface', '#ffffff'),
+      lineColor: cssVar('--border-strong', '#cbd5e1'),
+      textColor: cssVar('--text', '#101828'),
+      mainBkg: cssVar('--surface', '#ffffff'),
+      nodeBorder: cssVar('--border-strong', '#cbd5e1'),
+      clusterBkg: cssVar('--surface-2', '#f4f6f8'),
+      clusterBorder: cssVar('--border', '#e2e8f0'),
+      titleColor: cssVar('--text', '#101828'),
+      edgeLabelBackground: cssVar('--surface', '#ffffff'),
+      fontSize: '13px',
     },
-    flowchart: { curve: 'basis', padding: 12 },
-    pie: { textPosition: 0.62 },
+    flowchart: { curve: 'basis', padding: 12, useMaxWidth: true },
+    pie: { textPosition: 0.6, useMaxWidth: true },
+    xyChart: { useMaxWidth: true },
   })
 
   initializedKey = key
+}
+
+/** Serializes renders so two charts never fight over Mermaid's scratch DOM. */
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task, task)
+  // Keep the chain alive even when a render rejects.
+  queue = run.catch(() => undefined)
+  return run
 }
 
 export interface MermaidDiagramProps {
@@ -81,12 +92,12 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
     if (source.length === 0) return
 
     ensureInitialized(dark)
-    const id = `tabula-mermaid-${renderCounter++}`
 
     const run = async () => {
+      const id = `tabula-mermaid-${renderCounter++}`
       try {
         await mermaid.parse(source)
-        const rendered = await mermaid.render(id, source)
+        const rendered = await enqueue(() => mermaid.render(id, source))
         if (!active) return
         setResult({ code, svg: rendered.svg, error: null })
       } catch (renderError) {
@@ -94,7 +105,8 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
         setResult({
           code,
           svg: '',
-          error: renderError instanceof Error ? renderError.message : 'Invalid diagram syntax',
+          error:
+            renderError instanceof Error ? renderError.message : 'Invalid diagram syntax',
         })
       }
     }
@@ -105,9 +117,7 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
     }
   }, [code, dark])
 
-  if (code.trim().length === 0) {
-    return <MermaidFallback code={code} />
-  }
+  if (code.trim().length === 0) return <MermaidFallback code={code} />
 
   const current = result !== null && result.code === code ? result : null
 
@@ -116,7 +126,7 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
   }
 
   if (current === null || current.svg.length === 0) {
-    return <MermaidFallback code={code} />
+    return <MermaidFallback />
   }
 
   return (

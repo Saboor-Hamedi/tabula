@@ -1,5 +1,5 @@
 import { stepCountIs, streamText, type ModelMessage } from 'ai'
-import type { ChatMessage, ModelId, Session, ToolTraceEntry } from '../types'
+import type { ChatMessage, DatasetDigest, ModelId, Session, ToolTraceEntry } from '../types'
 import { MAX_AGENT_STEPS } from '../constants'
 import { createDeepSeekModel, buildProviderOptions } from '../deepseek/client'
 import { getDuckDBHandle } from '../duckdb/initDuckDB'
@@ -11,6 +11,8 @@ export interface AgentTurnInput {
   apiKey: string
   model: ModelId
   session: Session
+  /** Live dataset digest, injected into the system prompt each turn. */
+  digest: DatasetDigest | null
   history: ChatMessage[]
   userText: string
   signal: AbortSignal
@@ -22,17 +24,20 @@ export interface AgentTurnResult {
   text: string
 }
 
+/**
+ * Converts stored chat messages into model messages.
+ *
+ * Welcome messages and error messages are dropped: they are UI artifacts, not
+ * conversation. Keeping them out also stops the transcript from growing a
+ * boilerplate preamble on every turn.
+ */
 function toModelMessages(history: ChatMessage[], userText: string): ModelMessage[] {
   const messages: ModelMessage[] = []
 
   for (const message of history) {
     const content = message.content.trim()
-    if (content.length === 0 || message.error) continue
-    if (message.role === 'user') {
-      messages.push({ role: 'user', content })
-    } else {
-      messages.push({ role: 'assistant', content })
-    }
+    if (content.length === 0 || message.error || message.welcome) continue
+    messages.push({ role: message.role, content })
   }
 
   messages.push({ role: 'user', content: userText })
@@ -43,6 +48,7 @@ export async function runAgentTurn({
   apiKey,
   model,
   session,
+  digest,
   history,
   userText,
   signal,
@@ -63,7 +69,11 @@ export async function runAgentTurn({
 
   const result = streamText({
     model: createDeepSeekModel(apiKey, model),
-    system: buildSystemPrompt({ fileName: session.fileName, tables: session.tables }),
+    system: buildSystemPrompt({
+      fileName: session.fileName,
+      tables: session.tables,
+      digest,
+    }),
     messages: toModelMessages(history, userText),
     tools,
     stopWhen: stepCountIs(MAX_AGENT_STEPS),
@@ -82,6 +92,7 @@ export async function runAgentTurn({
     onDelta(delta)
   }
 
+  // `result.text` is the authoritative final value; the stream can be cut short.
   let finalText = ''
   if (!signal.aborted) {
     try {
@@ -94,13 +105,11 @@ export async function runAgentTurn({
   }
 
   if (streamError) throw streamError
-  if (signal.aborted) {
-    return { text }
-  }
+  if (signal.aborted) return { text }
 
   const answer = text.trim().length > 0 ? text : finalText
   if (answer.trim().length === 0) {
-    throw new Error('The model returned an empty response. Try asking the question again.')
+    throw new Error('The model returned an empty response. Try asking again.')
   }
 
   return { text: answer }

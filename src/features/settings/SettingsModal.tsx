@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import { getModelOption, MODEL_OPTIONS } from '../../core/agent/modelOptions'
 import { maskApiKey, validateApiKey } from '../../core/storage/settings'
-import { AlertIcon, CloseIcon, EyeIcon, EyeOffIcon, KeyIcon, SparkIcon } from '../common/Icons'
-import { useSession } from '../SessionProvider'
-import { ModelToggle } from './ModelToggle'
+import { AlertIcon, CloseIcon, EyeIcon, EyeOffIcon, KeyIcon } from '../common/Icons'
+import { IconButton } from '../common/IconButton'
+import { useSessionActions, useSessionState } from '../SessionProvider'
+
+/**
+ * Settings dialog.
+ *
+ * Scope: the API key. The model is switched from the header, so this dialog does
+ * not repeat that control — one concern, one place.
+ */
 
 export function SettingsModal() {
-  const { settingsOpen } = useSession()
+  const { settingsOpen } = useSessionState()
   if (!settingsOpen) return null
   return <SettingsDialog />
 }
 
 function SettingsDialog() {
-  const { closeSettings, apiKey, saveApiKey, clearApiKey, model } = useSession()
+  const { apiKey } = useSessionState()
+  const { closeSettings, saveApiKey, clearApiKey } = useSessionActions()
   const [draftKey, setDraftKey] = useState(apiKey ?? '')
   const [showKey, setShowKey] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,8 +55,6 @@ function SettingsDialog() {
     setError(null)
   }
 
-  const selected = getModelOption(model)
-
   return (
     <div className="modal-overlay" onMouseDown={closeSettings}>
       <div
@@ -59,44 +64,32 @@ function SettingsDialog() {
         aria-labelledby="settings-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="modal-header">
-          <div className="modal-title-wrap">
-            <span className="modal-icon" aria-hidden>
-              <SparkIcon size={18} />
-            </span>
-            <div>
-              <h2 id="settings-title">Settings</h2>
-              <p>Connect Tabula to DeepSeek and choose a model.</p>
-            </div>
-          </div>
-          <button type="button" className="btn-icon" onClick={closeSettings} aria-label="Close settings">
-            <CloseIcon size={18} />
-          </button>
+        <div className="modal-head">
+          <h2 id="settings-title">Settings</h2>
+          <IconButton label="Close settings" size="sm" onClick={closeSettings}>
+            <CloseIcon size={16} />
+          </IconButton>
         </div>
 
         <div className="modal-body">
-          <section className="settings-section">
-            <div className="settings-section-head">
-              <div className="settings-section-title">
-                <KeyIcon size={16} />
-                <span>DeepSeek API key</span>
-              </div>
+          <div className="field">
+            <div className="field-head">
+              <label htmlFor="api-key" className="field-label">
+                <KeyIcon size={14} />
+                DeepSeek API key
+              </label>
               {apiKey ? (
-                <span className="settings-saved">Saved · {maskApiKey(apiKey)}</span>
+                <span className="field-status is-ok">Saved · {maskApiKey(apiKey)}</span>
               ) : (
-                <span className="settings-required">Required</span>
+                <span className="field-status is-warn">Required</span>
               )}
             </div>
-            <p className="settings-help">
-              Your key is stored only in this browser under{' '}
-              <code>data-agent:deepseek-key</code>. It is never written to a server or committed to
-              the repository.
-            </p>
-            <div className={`key-input-row ${error ? 'has-error' : ''}`}>
+
+            <div className={`field-input ${error ? 'has-error' : ''}`}>
               <input
+                id="api-key"
                 ref={inputRef}
                 type={showKey ? 'text' : 'password'}
-                className="text-input"
                 value={draftKey}
                 onChange={(event) => {
                   setDraftKey(event.target.value)
@@ -105,89 +98,52 @@ function SettingsDialog() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') handleSave()
                 }}
-                placeholder="sk-..."
+                placeholder="sk-…"
                 spellCheck={false}
                 autoComplete="off"
-                aria-label="DeepSeek API key"
                 aria-invalid={error !== null}
               />
-              <button
-                type="button"
-                className="btn-icon input-icon-btn"
+              <IconButton
+                label={showKey ? 'Hide key' : 'Show key'}
+                size="sm"
                 onClick={() => setShowKey((visible) => !visible)}
-                aria-label={showKey ? 'Hide API key' : 'Show API key'}
               >
-                {showKey ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-              </button>
+                {showKey ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+              </IconButton>
             </div>
+
             {error ? (
               <div className="field-error" role="alert">
-                <AlertIcon size={14} />
+                <AlertIcon size={13} />
                 <span>{error}</span>
               </div>
             ) : null}
-            <div className="settings-key-actions">
-              <button type="button" className="btn btn-primary" onClick={handleSave}>
-                Save key
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={handleClear}
-                disabled={!apiKey && draftKey.trim().length === 0}
-              >
-                Clear key
-              </button>
-            </div>
-          </section>
 
-          <section className="settings-section">
-            <div className="settings-section-head">
-              <div className="settings-section-title">
-                <SparkIcon size={16} />
-                <span>Model</span>
-              </div>
-              <span className="settings-saved">{selected.label}</span>
-            </div>
-            <p className="settings-help">
-              Stored under <code>data-agent:model</code>. Changes apply on the next agent turn,
-              without resetting the session.
+            <p className="field-help">
+              Stored in this browser only, under <code>data-agent:deepseek-key</code>. Only your
+              questions, the column digest, and the query results the agent requests are sent to
+              DeepSeek. The uploaded file itself stays local.
             </p>
-            <ModelToggle />
-            <div className="model-options">
-              {MODEL_OPTIONS.map((option) => (
-                <div
-                  key={option.id}
-                  className={`model-option ${option.id === model ? 'is-active' : ''}`}
-                >
-                  <div className="model-option-top">
-                    <span className="model-option-name">{option.label}</span>
-                    <span className="model-option-badge">{option.badge}</span>
-                  </div>
-                  <p>{option.description}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="settings-section settings-section-quiet">
-            <div className="settings-section-title">
-              <KeyIcon size={16} />
-              <span>Privacy</span>
-            </div>
-            <p className="settings-help">
-              Uploaded data stays in memory in this tab. Only your questions, the inferred schema,
-              and the query results you or the agent request are sent to DeepSeek for analysis.
-              Closing the tab clears everything.
-            </p>
-          </section>
+          </div>
         </div>
 
-        <div className="modal-footer">
-          <span className="modal-footer-note">Changes take effect immediately.</span>
-          <button type="button" className="btn btn-ghost" onClick={closeSettings}>
-            Done
+        <div className="modal-foot">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={handleClear}
+            disabled={!apiKey && draftKey.trim().length === 0}
+          >
+            Clear key
           </button>
+          <div className="modal-foot-right">
+            <button type="button" className="btn btn-ghost" onClick={closeSettings}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handleSave}>
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>

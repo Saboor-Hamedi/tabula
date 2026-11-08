@@ -1,25 +1,29 @@
-import { useState } from 'react'
 import { getModelOption } from '../../core/agent/modelOptions'
 import { formatCount } from '../../core/utils/format'
-import { BoltIcon, FileIcon, KeyIcon, TableIcon } from '../common/Icons'
+import { CpuIcon, KeyIcon, SheetIcon } from '../common/Icons'
+import { useSessionActions, useSessionState } from '../SessionProvider'
 import { ChatInput } from '../chat/ChatInput'
-import { useSession } from '../SessionProvider'
+import { useComposerDraft } from './useComposerDraft'
+
+/**
+ * Composer.
+ *
+ * The composer is the width reference for the whole conversation: the chat
+ * column and every assistant response share its exact width, so the transcript
+ * reads as one column instead of a stack of differently-sized boxes.
+ *
+ * The draft is kept in a module-level store, so switching datasets or opening
+ * settings never loses what the user was typing.
+ */
 
 export function Composer() {
-  const {
-    activeSession,
-    apiKey,
-    model,
-    isStreaming,
-    sendMessage,
-    stopStreaming,
-    openSettings,
-  } = useSession()
-  const [value, setValue] = useState('')
+  const { activeSession, apiKey, model, isStreaming, dbReady } = useSessionState()
+  const { sendMessage, stopStreaming, openSettings } = useSessionActions()
+  const [value, setValue] = useComposerDraft()
 
   const modelOption = getModelOption(model)
   const totalRows = activeSession?.tables.reduce((total, table) => total + table.rowCount, 0) ?? 0
-  const disabled = !activeSession || !apiKey
+  const disabled = !activeSession || !apiKey || !dbReady
 
   const handleSubmit = () => {
     const text = value.trim()
@@ -30,60 +34,49 @@ export function Composer() {
 
   return (
     <div className="composer">
-      {!apiKey ? (
-        <div className="composer-notice">
-          <KeyIcon size={16} />
-          <span>Add your DeepSeek API key to start chatting.</span>
-          <button type="button" className="btn btn-small btn-primary" onClick={openSettings}>
-            Open settings
-          </button>
-        </div>
-      ) : null}
-
-      <div className="composer-chips">
-        {activeSession ? (
-          <>
-            <span className="chip" title={activeSession.fileName}>
-              <FileIcon size={13} />
-              <span className="chip-text">{activeSession.fileName}</span>
-            </span>
-            <span className="chip">
-              <TableIcon size={13} />
-              <span>
-                {activeSession.tables.length} table{activeSession.tables.length === 1 ? '' : 's'}
+      <div className="composer-inner">
+        <div className="composer-chips">
+          {activeSession ? (
+            <>
+              <span className="chip" title={activeSession.fileName}>
+                <SheetIcon size={13} />
+                <span className="chip-text">{activeSession.fileName}</span>
               </span>
-              <span className="chip-divider" />
-              <span>{formatCount(totalRows)} rows</span>
-            </span>
-          </>
-        ) : null}
-        <span className="chip chip-model" title={modelOption.description}>
-          <BoltIcon size={13} />
-          <span>{modelOption.shortLabel}</span>
-        </span>
-        {!apiKey ? (
-          <button type="button" className="chip chip-warning" onClick={openSettings}>
-            <KeyIcon size={13} />
-            <span>Key missing</span>
-          </button>
-        ) : null}
-      </div>
+              <span className="chip">
+                {formatCount(totalRows)} rows
+              </span>
+            </>
+          ) : null}
 
-      <ChatInput
-        value={value}
-        onChange={setValue}
-        onSubmit={handleSubmit}
-        onStop={stopStreaming}
-        disabled={disabled}
-        streaming={isStreaming}
-        placeholder={
-          !apiKey
-            ? 'Add an API key in settings to chat with your data…'
-            : activeSession
-              ? `Ask about ${activeSession.fileName}…`
-              : 'Upload a file to begin…'
-        }
-      />
+          <span className="chip chip-quiet" title={modelOption.description}>
+            <CpuIcon size={13} />
+            <span>{modelOption.shortLabel}</span>
+          </span>
+
+          {!apiKey ? (
+            <button type="button" className="chip chip-warn" onClick={openSettings}>
+              <KeyIcon size={13} />
+              <span>Add API key</span>
+            </button>
+          ) : null}
+        </div>
+
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={handleSubmit}
+          onStop={stopStreaming}
+          disabled={disabled}
+          streaming={isStreaming}
+          placeholder={
+            !apiKey
+              ? 'Add your API key to start asking questions…'
+              : activeSession
+                ? `Ask about ${activeSession.fileName}…`
+                : 'Upload a file to begin…'
+          }
+        />
+      </div>
     </div>
   )
 }

@@ -1,5 +1,12 @@
 import type { SVGProps } from 'react'
 
+/**
+ * Single icon set for the app.
+ *
+ * Every icon shares one stroke geometry so the UI reads as one system. Sizes
+ * come from the caller; nothing here hard-codes layout.
+ */
+
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
   size?: number
 }
@@ -11,7 +18,7 @@ function baseProps({ size = 18, ...props }: IconProps) {
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
-    strokeWidth: 1.8,
+    strokeWidth: 1.7,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
     'aria-hidden': true,
@@ -66,8 +73,8 @@ export function ActivityIcon(props: IconProps) {
 export function SendIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
-      <path d="M22 2 11 13" />
-      <path d="M22 2 15 22l-4-9-9-4Z" />
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
     </svg>
   )
 }
@@ -75,16 +82,7 @@ export function SendIcon(props: IconProps) {
 export function StopIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
-      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
-
-export function SparkIcon(props: IconProps) {
-  return (
-    <svg {...baseProps(props)}>
-      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z" />
-      <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z" />
+      <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />
     </svg>
   )
 }
@@ -102,7 +100,17 @@ export function FileIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 2v6h6M9 13h6M9 17h6" />
+      <path d="M14 2v6h6" />
+    </svg>
+  )
+}
+
+/** Sheet-shaped icon used for CSV/XLSX datasets. */
+export function SheetIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <rect x="3" y="3" width="18" height="18" rx="2.5" />
+      <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
     </svg>
   )
 }
@@ -175,10 +183,12 @@ export function EyeOffIcon(props: IconProps) {
   )
 }
 
-export function MenuIcon(props: IconProps) {
+/** Sidebar toggle: a panel with its left column highlighted. */
+export function SidebarIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
-      <path d="M4 6h16M4 12h16M4 18h16" />
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M9 4v16" />
     </svg>
   )
 }
@@ -186,7 +196,7 @@ export function MenuIcon(props: IconProps) {
 export function PanelRightIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
       <path d="M15 4v16" />
     </svg>
   )
@@ -197,6 +207,27 @@ export function DownloadIcon(props: IconProps) {
     <svg {...baseProps(props)}>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <path d="M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  )
+}
+
+/** Opens a file in an external application. */
+export function ExternalIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <path d="M15 3h6v6M10 14 21 3" />
+    </svg>
+  )
+}
+
+/** Camera/export glyph for "copy figure as image". */
+export function ImageIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <circle cx="8.5" cy="9.5" r="1.6" />
+      <path d="m4 17 4.5-4.5 3.5 3.5 3-3L20 17" />
     </svg>
   )
 }
@@ -219,10 +250,38 @@ export function KeyIcon(props: IconProps) {
   )
 }
 
-export function BoltIcon(props: IconProps) {
+/** Model / compute glyph. Replaces the sparkle. */
+export function CpuIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
-      <path d="M13 2 4 14h7l-1 8 9-12h-7Z" />
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+      <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" />
+    </svg>
+  )
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  )
+}
+
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  )
+}
+
+export function RefreshIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M21 12a9 9 0 1 1-3-6.7" />
+      <path d="M21 3v6h-6" />
     </svg>
   )
 }

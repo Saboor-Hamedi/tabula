@@ -1,12 +1,19 @@
-import type { ModelId } from '../types'
-import { DEFAULT_MODEL } from '../constants'
+import type { ModelId } from '../../core/types'
+import { DEFAULT_MODEL } from '../../core/constants'
+
+/**
+ * Selectable models.
+ *
+ * `badge` is optional: only the default carries one, so the UI does not decorate
+ * every option with a label that means nothing.
+ */
 
 export interface ModelOption {
   id: ModelId
   label: string
   shortLabel: string
   description: string
-  badge: string
+  badge?: string
 }
 
 export const MODEL_OPTIONS: readonly ModelOption[] = [
@@ -14,15 +21,14 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
     id: 'deepseek-v4-flash',
     label: 'DeepSeek V4 Flash',
     shortLabel: 'V4 Flash',
-    description: 'Fast, efficient everyday analysis. Best for most questions.',
+    description: 'Fast, efficient everyday analysis.',
     badge: 'Default',
   },
   {
     id: 'deepseek-v4-pro',
     label: 'DeepSeek V4 Pro',
     shortLabel: 'V4 Pro',
-    description: 'Deeper reasoning for complex, multi-step investigations.',
-    badge: 'Deep',
+    description: 'Deeper reasoning for complex investigations.',
   },
 ]
 

@@ -1,11 +1,20 @@
 import { useRef, useState, type DragEvent } from 'react'
 import { ACCEPTED_EXTENSIONS } from '../../core/constants'
-import { AlertIcon, DatabaseIcon, UploadIcon } from '../common/Icons'
-import { useSession } from '../SessionProvider'
+import { AlertIcon, SheetIcon, UploadIcon } from '../common/Icons'
+import { useSessionActions, useSessionState } from '../SessionProvider'
 import { UploadStatus } from './UploadStatus'
 
+/**
+ * Empty state: the drop target.
+ *
+ * Deliberately quiet. A dashed drop area, one line of copy, and the format
+ * limits. No feature grid, no marketing headline — the product is the chat that
+ * comes after the upload.
+ */
+
 export function UploadZone() {
-  const { uploadFile, upload, dbError } = useSession()
+  const { upload, dbError } = useSessionState()
+  const { uploadFile } = useSessionActions()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -16,47 +25,44 @@ export function UploadZone() {
     void uploadFile(files[0])
   }
 
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
     setDragging(false)
-    if (busy) return
-    handleFiles(event.dataTransfer.files)
+    if (!busy) handleFiles(event.dataTransfer.files)
   }
 
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
     if (!busy) setDragging(true)
   }
 
-  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+  const onDragLeave = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
     setDragging(false)
   }
 
   return (
-    <div className="upload-screen">
-      <div className="upload-hero">
-        <div className="upload-eyebrow">
-          <DatabaseIcon size={14} />
-          In-browser analytics · DuckDB-WASM
+    <div className="empty-screen">
+      <div className="empty-inner">
+        <div className="empty-mark" aria-hidden>
+          <SheetIcon size={22} />
         </div>
-        <h1 className="upload-title">Talk to your spreadsheet.</h1>
-        <p className="upload-subtitle">
-          Upload a CSV or Excel workbook. Tabula profiles it with DuckDB, then answers questions
-          with SQL, charts, and tables. Nothing is uploaded to a server.
+
+        <h1 className="empty-title">Ask your spreadsheet anything</h1>
+        <p className="empty-sub">
+          Drop a CSV or Excel workbook. Tabula reads the columns, profiles the values, and answers
+          with SQL, charts, and tables. Your file never leaves this browser.
         </p>
 
         <div
-          className={`upload-zone ${dragging ? 'is-dragging' : ''} ${busy ? 'is-busy' : ''}`}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => {
-            if (!busy) inputRef.current?.click()
-          }}
+          className={`drop-zone ${dragging ? 'is-dragging' : ''} ${busy ? 'is-busy' : ''}`}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onClick={() => !busy && inputRef.current?.click()}
           role="button"
           tabIndex={0}
           onKeyDown={(event) => {
@@ -67,21 +73,15 @@ export function UploadZone() {
           }}
           aria-label="Upload a CSV or Excel file"
         >
-          <div className="upload-icon" aria-hidden>
-            <UploadIcon size={26} />
-          </div>
-          <div className="upload-zone-title">Drop a file here</div>
-          <div className="upload-zone-sub">
-            or <span className="upload-link">browse your computer</span>
-          </div>
-          <div className="upload-formats">
-            {ACCEPTED_EXTENSIONS.map((extension) => (
-              <span key={extension} className="format-pill">
-                {extension.slice(1).toUpperCase()}
-              </span>
-            ))}
-            <span className="format-note">Up to 80 MB · all sheets imported</span>
-          </div>
+          <UploadIcon size={20} />
+          <span className="drop-zone-title">
+            {busy ? 'Working…' : 'Drop a file, or browse'}
+          </span>
+          <span className="drop-zone-meta">
+            {ACCEPTED_EXTENSIONS.map((extension) => extension.slice(1).toUpperCase()).join(' · ')}
+            {'  ·  up to 80 MB  ·  all sheets imported'}
+          </span>
+
           <input
             ref={inputRef}
             type="file"
@@ -105,21 +105,6 @@ export function UploadZone() {
             </div>
           </div>
         ) : null}
-
-        <div className="upload-features">
-          <div className="upload-feature">
-            <strong>Private by default</strong>
-            <span>Files never leave this browser tab.</span>
-          </div>
-          <div className="upload-feature">
-            <strong>Agentic exploration</strong>
-            <span>Schema-aware SQL with real data profiling.</span>
-          </div>
-          <div className="upload-feature">
-            <strong>Charts and tables</strong>
-            <span>Mermaid visualizations grounded in results.</span>
-          </div>
-        </div>
       </div>
     </div>
   )

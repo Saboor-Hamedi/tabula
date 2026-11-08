@@ -1,7 +1,15 @@
 import type { Session } from '../../core/types'
 import { formatCount, formatRelativeTime } from '../../core/utils/format'
-import { DatabaseIcon, FileIcon } from '../common/Icons'
+import { SheetIcon } from '../common/Icons'
 import { DeleteSessionButton } from '../session/DeleteSessionButton'
+
+/**
+ * One dataset row in the sidebar.
+ *
+ * Kept intentionally quiet: file name, format, size, row count. The active row
+ * gets a left accent bar rather than a filled card, so the list stays calm when
+ * there are many datasets.
+ */
 
 export interface SessionCardProps {
   session: Session
@@ -19,32 +27,26 @@ export function SessionCard({ session, active, onSelect }: SessionCardProps) {
         className="session-card-main"
         onClick={() => onSelect(session.id)}
         aria-current={active ? 'true' : undefined}
+        title={session.fileName}
       >
         <span className="session-icon" aria-hidden>
-          <FileIcon size={16} />
+          <SheetIcon size={15} />
         </span>
         <span className="session-copy">
-          <span className="session-name" title={session.fileName}>
-            {session.fileName}
-          </span>
+          <span className="session-name">{session.fileName}</span>
           <span className="session-meta">
-            <span className="session-type">{session.fileType.toUpperCase()}</span>
-            <span className="session-dot" />
-            <span>{formatRelativeTime(session.uploadedAt)}</span>
-          </span>
-          <span className="session-stats">
-            <span>
-              <DatabaseIcon size={12} />
-              {session.tables.length} table{session.tables.length === 1 ? '' : 's'}
-            </span>
-            <span>{formatCount(totalRows)} rows</span>
+            {session.fileType.toUpperCase()}
+            <span className="dot" />
+            {formatCount(totalRows)} rows
+            <span className="dot" />
+            {formatRelativeTime(session.uploadedAt)}
           </span>
         </span>
       </button>
+
       <div className="session-actions">
         <DeleteSessionButton sessionId={session.id} />
       </div>
-      {active ? <span className="session-active-bar" aria-hidden /> : null}
     </div>
   )
 }

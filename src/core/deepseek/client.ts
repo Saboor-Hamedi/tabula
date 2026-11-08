@@ -17,3 +17,15 @@ export function buildProviderOptions(modelId: ModelId) {
   }
   return undefined
 }
+
+/**
+ * Suggestions are a latency-sensitive side task. Disabling thinking keeps them
+ * cheap and fast even when the user has selected the deeper analysis model.
+ */
+export function buildSuggestionProviderOptions() {
+  return {
+    deepseek: {
+      thinking: { type: 'disabled' as const },
+    },
+  }
+}

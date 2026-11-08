@@ -14,6 +14,8 @@ import { closeDuckDB } from '../core/duckdb/closeDuckDB'
 import { ingestCSV } from '../core/duckdb/ingestCSV'
 import { ingestExcel } from '../core/duckdb/ingestExcel'
 import { buildSchemaName, quoteIdent } from '../core/duckdb/sql'
+import { buildDatasetDigest } from '../core/profiling/buildDigest'
+import { buildLocalSuggestions, generateSuggestions } from '../core/agent/suggestions'
 import { runAgentTurn } from '../core/agent/runAgentTurn'
 import { buildTraceExport, traceExportFileName } from '../core/agent/trace'
 import {
@@ -28,31 +30,65 @@ import {
   registerSession,
   unregisterSession,
 } from '../core/storage/sessions'
+import {
+  clearPersistedWorkspace,
+  deletePersistedSession,
+  loadPersistedWorkspace,
+  loadSessionFile,
+  saveActiveSessionId,
+  savePersistedSession,
+  saveSessionFile,
+} from '../core/storage/persistence'
+import { getPanelOpen, getSidebarOpen, savePanelOpen, saveSidebarOpen } from '../core/storage/uiPrefs'
+import { downloadFile } from '../core/storage/fileAccess'
 import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES } from '../core/constants'
 import { formatCount } from '../core/utils/format'
 import type {
   ChatMessage,
+  DatasetDigest,
   FileKind,
   ModelId,
+  PanelTab,
   Session,
   ToolTraceEntry,
   UploadState,
 } from '../core/types'
 
-export interface SessionContextValue {
+/**
+ * Workspace state container.
+ *
+ * Responsibilities:
+ *  - own the DuckDB handle and rebuild every persisted session on boot,
+ *  - ingest uploads and keep a live dataset digest for the agent,
+ *  - run agent turns and stream deltas into the active transcript,
+ *  - generate data-derived follow-up suggestions after every answer,
+ *  - persist transcripts and layout so a refresh loses nothing.
+ *
+ * Actions are exposed through a separate context so components that only need
+ * to *do* things (buttons, composer) do not re-render on every streamed token.
+ */
+
+export interface SessionState {
   dbReady: boolean
   dbError: string | null
   sessions: Session[]
   activeSession: Session | null
   messages: ChatMessage[]
   traces: ToolTraceEntry[]
+  /** Live snapshot of the active dataset, used for suggestions and the digest UI. */
+  digest: DatasetDigest | null
   isStreaming: boolean
   streamingSessionId: string | null
   upload: UploadState
   apiKey: string | null
   model: ModelId
   settingsOpen: boolean
-  traceOpen: boolean
+  panelOpen: boolean
+  panelTab: PanelTab
+  sidebarOpen: boolean
+}
+
+export interface SessionActions {
   uploadFile: (file: File) => Promise<void>
   selectSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => Promise<void>
@@ -63,12 +99,20 @@ export interface SessionContextValue {
   saveApiKey: (key: string) => void
   clearApiKey: () => void
   setModel: (model: ModelId) => void
-  toggleTrace: () => void
-  setTraceOpen: (open: boolean) => void
+  openPanel: (tab?: PanelTab) => void
+  closePanel: () => void
+  setPanelTab: (tab: PanelTab) => void
+  setSidebarOpen: (open: boolean) => void
+  toggleSidebar: () => void
   exportTrace: () => void
+  /** Hands the original uploaded file to the OS so it opens in Excel. */
+  openActiveFile: () => Promise<void>
 }
 
-const SessionContext = createContext<SessionContextValue | null>(null)
+export type SessionContextValue = SessionState & SessionActions
+
+const SessionStateContext = createContext<SessionState | null>(null)
+const SessionActionsContext = createContext<SessionActions | null>(null)
 
 const IDLE_UPLOAD: UploadState = { phase: 'idle', fileName: null, message: '' }
 
@@ -86,7 +130,25 @@ function getFileKind(fileName: string): FileKind | null {
   return null
 }
 
-function buildWelcomeMessage(session: Session): ChatMessage {
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'Something went wrong.'
+}
+
+/** Restores fields missing from sessions saved by an earlier app version. */
+function normalizeSession(session: Session): Session {
+  return { ...session, fileSize: session.fileSize ?? 0 }
+}
+
+/** Clears transient suggestion flags so a reload never shows a stuck spinner. */
+function normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) =>
+    message.suggestionsPending ? { ...message, suggestionsPending: false } : message,
+  )
+}
+
+function buildWelcomeMessage(session: Session, suggestions: string[]): ChatMessage {
   const tableLines = session.tables
     .map(
       (table) =>
@@ -99,20 +161,86 @@ function buildWelcomeMessage(session: Session): ChatMessage {
     role: 'assistant',
     createdAt: Date.now(),
     welcome: true,
+    suggestions,
+    suggestionsPending: false,
     content: `**${session.fileName} is ready.**
 
 Loaded ${session.tables.length} table${session.tables.length === 1 ? '' : 's'} into DuckDB:
 
 ${tableLines}
 
-Ask anything about this data. I will inspect the schema, explore it with SQL, and answer with charts and tables.`,
+Ask anything, or start from one of the questions below. I read the actual columns and values before answering.`,
   }
 }
 
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  return 'Something went wrong.'
+interface BootstrapResult {
+  handle: DuckDBHandle
+  sessions: Session[]
+  messagesBySession: Record<string, ChatMessage[]>
+  tracesBySession: Record<string, ToolTraceEntry[]>
+  digestBySession: Record<string, DatasetDigest>
+  activeSessionId: string | null
+}
+
+/**
+ * Opens DuckDB and rebuilds every persisted session from its stored file.
+ *
+ * Each restored session also gets a fresh digest, so the agent and the file
+ * panel have full column context immediately after a refresh — not only after a
+ * new upload.
+ */
+async function bootstrapWorkspace(): Promise<BootstrapResult> {
+  const handle = await initDuckDB()
+  const persisted = await loadPersistedWorkspace()
+  const sessions: Session[] = []
+  const messagesBySession: Record<string, ChatMessage[]> = {}
+  const tracesBySession: Record<string, ToolTraceEntry[]> = {}
+  const digestBySession: Record<string, DatasetDigest> = {}
+
+  for (const record of persisted.sessions) {
+    const session = normalizeSession(record.session)
+    sessions.push(session)
+    messagesBySession[session.id] = normalizeMessages(record.messages ?? [])
+    tracesBySession[session.id] = record.traces ?? []
+    registerSession(session)
+
+    const file = await loadSessionFile(session.id)
+    if (!file) continue
+
+    try {
+      if (session.fileType === 'csv') {
+        await ingestCSV({ handle, file, sessionId: session.id })
+      } else {
+        await ingestExcel({ handle, file, sessionId: session.id })
+      }
+
+      digestBySession[session.id] = await buildDatasetDigest(handle.connection, session)
+
+      // Recompute starter questions from the current digest. They are local and
+      // deterministic, so a restored session always reflects the current
+      // heuristics instead of whatever was stored days ago.
+      messagesBySession[session.id] = messagesBySession[session.id].map((message) =>
+        message.welcome
+          ? {
+              ...message,
+              suggestions: buildLocalSuggestions(session, digestBySession[session.id]),
+              suggestionsPending: false,
+            }
+          : message,
+      )
+    } catch {
+      // Keep the transcript visible even if a stored file can no longer be parsed.
+    }
+  }
+
+  return {
+    handle,
+    sessions,
+    messagesBySession,
+    tracesBySession,
+    digestBySession,
+    activeSessionId: persisted.activeSessionId,
+  }
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -122,33 +250,49 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [messagesBySession, setMessagesBySession] = useState<Record<string, ChatMessage[]>>({})
   const [tracesBySession, setTracesBySession] = useState<Record<string, ToolTraceEntry[]>>({})
+  const [digestBySession, setDigestBySession] = useState<Record<string, DatasetDigest>>({})
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingSessionId, setStreamingSessionId] = useState<string | null>(null)
   const [upload, setUpload] = useState<UploadState>(IDLE_UPLOAD)
   const [apiKey, setApiKey] = useState<string | null>(() => getStoredApiKey())
   const [model, setModelState] = useState<ModelId>(() => getStoredModel())
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [traceOpen, setTraceOpen] = useState(false)
+  const [panelOpen, setPanelOpenState] = useState(() => getPanelOpen(true))
+  const [panelTab, setPanelTabState] = useState<PanelTab>('file')
+  const [sidebarOpen, setSidebarOpenState] = useState(() => getSidebarOpen(true))
 
   const dbHandleRef = useRef<DuckDBHandle | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const streamingSessionRef = useRef<string | null>(null)
+  const persistReadyRef = useRef(false)
+  const bootstrapRef = useRef<Promise<BootstrapResult> | null>(null)
+  /** Original files kept in memory so "Open in Excel" never re-reads storage. */
+  const fileCacheRef = useRef<Map<string, File>>(new Map())
 
   useEffect(() => {
-    let cancelled = false
-    initDuckDB()
-      .then((handle) => {
-        if (cancelled) return
-        dbHandleRef.current = handle
+    let active = true
+    if (!bootstrapRef.current) bootstrapRef.current = bootstrapWorkspace()
+
+    bootstrapRef.current
+      .then((result) => {
+        if (!active) return
+        dbHandleRef.current = result.handle
+        setSessions(result.sessions)
+        setMessagesBySession(result.messagesBySession)
+        setTracesBySession(result.tracesBySession)
+        setDigestBySession(result.digestBySession)
+        setActiveSessionId(result.activeSessionId)
         setDbReady(true)
         setDbError(null)
+        persistReadyRef.current = true
       })
       .catch((error: unknown) => {
-        if (cancelled) return
+        if (!active) return
         setDbError(errorMessage(error))
       })
+
     return () => {
-      cancelled = true
+      active = false
     }
   }, [])
 
@@ -167,6 +311,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [activeSessionId, tracesBySession],
   )
 
+  const digest = useMemo(
+    () => (activeSessionId ? digestBySession[activeSessionId] ?? null : null),
+    [activeSessionId, digestBySession],
+  )
+
   const upsertTrace = useCallback((sessionId: string, entry: ToolTraceEntry) => {
     setTracesBySession((previous) => {
       const list = previous[sessionId] ?? []
@@ -179,83 +328,174 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const uploadFile = useCallback(async (file: File) => {
-    const kind = getFileKind(file.name)
-    if (!kind) {
-      setUpload({
-        phase: 'error',
-        fileName: file.name,
-        message: `Unsupported file type. Upload ${ACCEPTED_EXTENSIONS.join(' or ')}.`,
+  const patchMessage = useCallback(
+    (sessionId: string, messageId: string, patch: Partial<ChatMessage>) => {
+      setMessagesBySession((previous) => {
+        const list = previous[sessionId]
+        if (!list) return previous
+        return {
+          ...previous,
+          [sessionId]: list.map((message) =>
+            message.id === messageId ? { ...message, ...patch } : message,
+          ),
+        }
       })
-      return
-    }
+    },
+    [],
+  )
 
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setUpload({
-        phase: 'error',
-        fileName: file.name,
-        message: 'File is too large for in-browser analysis (limit: 80 MB).',
-      })
-      return
-    }
-
-    setUpload({ phase: 'reading', fileName: file.name, message: 'Reading file…' })
+  /** Builds a digest for a session and stores it for the agent and the UI. */
+  const refreshDigest = useCallback(async (session: Session): Promise<DatasetDigest | null> => {
+    const handle = dbHandleRef.current
+    if (!handle) return null
 
     try {
-      let handle = dbHandleRef.current
-      if (!handle) {
-        handle = await initDuckDB()
-        dbHandleRef.current = handle
-        setDbReady(true)
-        setDbError(null)
-      }
-
-      setUpload({ phase: 'ingesting', fileName: file.name, message: 'Building DuckDB tables…' })
-
-      const sessionId = createId()
-      const result =
-        kind === 'csv'
-          ? await ingestCSV({ handle, file, sessionId })
-          : await ingestExcel({ handle, file, sessionId })
-
-      if (result.tables.length === 0) {
-        throw new Error('No readable tables were found in this file.')
-      }
-
-      const session: Session = {
-        id: sessionId,
-        fileName: file.name,
-        fileType: kind,
-        uploadedAt: Date.now(),
-        schemaName: buildSchemaName(sessionId),
-        tables: result.tables,
-        primaryTable: result.primaryTable,
-      }
-
-      registerSession(session)
-      setSessions((previous) => [...previous, session])
-      setActiveSessionId(sessionId)
-      setMessagesBySession((previous) => ({
-        ...previous,
-        [sessionId]: [buildWelcomeMessage(session)],
-      }))
-      setTracesBySession((previous) => ({ ...previous, [sessionId]: [] }))
-      setUpload({
-        phase: 'done',
-        fileName: file.name,
-        message: `Loaded ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}.`,
-      })
-    } catch (error) {
-      setUpload({
-        phase: 'error',
-        fileName: file.name,
-        message: errorMessage(error),
-      })
+      const next = await buildDatasetDigest(handle.connection, session)
+      setDigestBySession((previous) => ({ ...previous, [session.id]: next }))
+      return next
+    } catch {
+      return null
     }
   }, [])
 
+  /**
+   * Suggestion pass. Local heuristics land immediately (so the UI never waits),
+   * then the model refines them when a key is configured.
+   */
+  const refreshSuggestions = useCallback(
+    async (
+      session: Session,
+      messageId: string,
+      currentDigest: DatasetDigest | null,
+      question?: string,
+      answer?: string,
+    ): Promise<void> => {
+      const local = buildLocalSuggestions(session, currentDigest)
+      patchMessage(session.id, messageId, { suggestions: local, suggestionsPending: true })
+
+      if (!apiKey) {
+        patchMessage(session.id, messageId, { suggestionsPending: false })
+        return
+      }
+
+      const refined = await generateSuggestions({
+        session,
+        digest: currentDigest,
+        apiKey,
+        model,
+        question,
+        answer,
+      })
+      patchMessage(session.id, messageId, {
+        suggestions: refined,
+        suggestionsPending: false,
+      })
+    },
+    [apiKey, model, patchMessage],
+  )
+
+  const uploadFile = useCallback(
+    async (file: File) => {
+      const kind = getFileKind(file.name)
+      if (!kind) {
+        setUpload({
+          phase: 'error',
+          fileName: file.name,
+          message: `Unsupported file type. Upload ${ACCEPTED_EXTENSIONS.join(' or ')}.`,
+        })
+        return
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setUpload({
+          phase: 'error',
+          fileName: file.name,
+          message: 'File is too large for in-browser analysis (limit: 80 MB).',
+        })
+        return
+      }
+
+      setUpload({ phase: 'reading', fileName: file.name, message: 'Reading file…' })
+
+      try {
+        let handle = dbHandleRef.current
+        if (!handle) {
+          handle = await initDuckDB()
+          dbHandleRef.current = handle
+          setDbReady(true)
+          setDbError(null)
+        }
+
+        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Building DuckDB tables…' })
+
+        const sessionId = createId()
+        const result =
+          kind === 'csv'
+            ? await ingestCSV({ handle, file, sessionId })
+            : await ingestExcel({ handle, file, sessionId })
+
+        if (result.tables.length === 0) {
+          throw new Error('No readable tables were found in this file.')
+        }
+
+        const session: Session = {
+          id: sessionId,
+          fileName: file.name,
+          fileType: kind,
+          fileSize: file.size,
+          uploadedAt: Date.now(),
+          schemaName: buildSchemaName(sessionId),
+          tables: result.tables,
+          primaryTable: result.primaryTable,
+        }
+
+        fileCacheRef.current.set(sessionId, file)
+        registerSession(session)
+
+        // Digest first: the welcome message and every suggestion depend on it.
+        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Profiling columns…' })
+        const nextDigest = await refreshDigest(session)
+
+        const welcome = buildWelcomeMessage(
+          session,
+          buildLocalSuggestions(session, nextDigest),
+        )
+
+        setSessions((previous) => [session, ...previous])
+        setActiveSessionId(sessionId)
+        setMessagesBySession((previous) => ({ ...previous, [sessionId]: [welcome] }))
+        setTracesBySession((previous) => ({ ...previous, [sessionId]: [] }))
+        setUpload({
+          phase: 'done',
+          fileName: file.name,
+          message: `Loaded ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}.`,
+        })
+
+        await saveSessionFile(sessionId, file)
+        void savePersistedSession({
+          id: sessionId,
+          session,
+          messages: [welcome],
+          traces: [],
+          updatedAt: Date.now(),
+        })
+
+        // Now let the model sharpen the starter questions.
+        void refreshSuggestions(session, welcome.id, nextDigest)
+      } catch (error) {
+        setUpload({
+          phase: 'error',
+          fileName: file.name,
+          message: errorMessage(error),
+        })
+      }
+    },
+    [refreshDigest, refreshSuggestions],
+  )
+
   const selectSession = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId)
+    void saveActiveSessionId(sessionId)
   }, [])
 
   const deleteSession = useCallback(
@@ -269,12 +509,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const remaining = sessions.filter((session) => session.id !== sessionId)
 
       unregisterSession(sessionId)
+      fileCacheRef.current.delete(sessionId)
+      void deletePersistedSession(sessionId)
+
       setMessagesBySession((previous) => {
         const next = { ...previous }
         delete next[sessionId]
         return next
       })
       setTracesBySession((previous) => {
+        const next = { ...previous }
+        delete next[sessionId]
+        return next
+      })
+      setDigestBySession((previous) => {
         const next = { ...previous }
         delete next[sessionId]
         return next
@@ -296,20 +544,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setActiveSessionId(null)
         setMessagesBySession({})
         setTracesBySession({})
+        setDigestBySession({})
         setIsStreaming(false)
         setStreamingSessionId(null)
         streamingSessionRef.current = null
-        setTraceOpen(false)
+        setPanelOpenState(false)
         dbHandleRef.current = null
         setDbReady(false)
+        void clearPersistedWorkspace()
         await closeDuckDB()
         return
       }
 
+      const nextActiveId = activeSessionId === sessionId ? remaining[0].id : activeSessionId
       setSessions(remaining)
-      setActiveSessionId((current) => (current === sessionId ? remaining[0].id : current))
+      setActiveSessionId(nextActiveId)
+      if (nextActiveId) void saveActiveSessionId(nextActiveId)
     },
-    [sessions],
+    [activeSessionId, sessions],
   )
 
   const sendMessage = useCallback(
@@ -354,52 +606,82 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController()
       abortRef.current = controller
 
-      const updateAssistant = (updater: (message: ChatMessage) => ChatMessage) => {
-        setMessagesBySession((previous) => {
-          const list = previous[sessionId] ?? []
-          return {
-            ...previous,
-            [sessionId]: list.map((message) =>
-              message.id === assistantId ? updater(message) : message,
-            ),
-          }
-        })
-      }
-
       try {
         const result = await runAgentTurn({
           apiKey,
           model,
           session,
+          digest: digestBySession[sessionId] ?? null,
           history,
           userText: text,
           signal: controller.signal,
           onDelta: (delta) => {
-            updateAssistant((message) => ({ ...message, content: message.content + delta }))
+            setMessagesBySession((previous) => {
+              const list = previous[sessionId] ?? []
+              return {
+                ...previous,
+                [sessionId]: list.map((message) =>
+                  message.id === assistantId
+                    ? { ...message, content: message.content + delta }
+                    : message,
+                ),
+              }
+            })
           },
           onTrace: (entry) => upsertTrace(sessionId, entry),
         })
 
-        updateAssistant((message) => ({ ...message, content: result.text }))
+        patchMessage(sessionId, assistantId, { content: result.text })
+
+        // Follow-ups are derived from the question, the answer, and the data.
+        void refreshSuggestions(
+          session,
+          assistantId,
+          digestBySession[sessionId] ?? null,
+          text,
+          result.text,
+        )
       } catch (error) {
         if (controller.signal.aborted) {
-          updateAssistant((message) => ({
-            ...message,
-            content:
-              message.content.trim().length > 0
-                ? `${message.content}\n\n_Stopped._`
-                : '_Generation stopped._',
-          }))
+          setMessagesBySession((previous) => {
+            const list = previous[sessionId] ?? []
+            return {
+              ...previous,
+              [sessionId]: list.map((message) =>
+                message.id === assistantId
+                  ? {
+                      ...message,
+                      suggestionsPending: false,
+                      content:
+                        message.content.trim().length > 0
+                          ? `${message.content}\n\n_Stopped._`
+                          : '_Generation stopped._',
+                    }
+                  : message,
+              ),
+            }
+          })
         } else {
           const message = errorMessage(error)
-          updateAssistant((current) => ({
-            ...current,
-            error: true,
-            content:
-              current.content.trim().length > 0
-                ? `${current.content}\n\n> **Agent error:** ${message}`
-                : `> **Agent error:** ${message}`,
-          }))
+          setMessagesBySession((previous) => {
+            const list = previous[sessionId] ?? []
+            return {
+              ...previous,
+              [sessionId]: list.map((item) =>
+                item.id === assistantId
+                  ? {
+                      ...item,
+                      error: true,
+                      suggestionsPending: false,
+                      content:
+                        item.content.trim().length > 0
+                          ? `${item.content}\n\n> **Agent error:** ${message}`
+                          : `> **Agent error:** ${message}`,
+                    }
+                  : item,
+              ),
+            }
+          })
         }
       } finally {
         setIsStreaming(false)
@@ -408,7 +690,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         abortRef.current = null
       }
     },
-    [activeSession, apiKey, isStreaming, messagesBySession, model, upsertTrace],
+    [
+      activeSession,
+      apiKey,
+      digestBySession,
+      isStreaming,
+      messagesBySession,
+      model,
+      patchMessage,
+      refreshSuggestions,
+      upsertTrace,
+    ],
   )
 
   const stopStreaming = useCallback(() => {
@@ -434,7 +726,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setModelState(nextModel)
   }, [])
 
-  const toggleTrace = useCallback(() => setTraceOpen((open) => !open), [])
+  const openPanel = useCallback((tab: PanelTab = 'file') => {
+    setPanelTabState(tab)
+    setPanelOpenState(true)
+    savePanelOpen(true)
+  }, [])
+
+  const closePanel = useCallback(() => {
+    setPanelOpenState(false)
+    savePanelOpen(false)
+  }, [])
+
+  const setPanelTab = useCallback((tab: PanelTab) => {
+    setPanelTabState(tab)
+    setPanelOpenState(true)
+    savePanelOpen(true)
+  }, [])
+
+  const setSidebarOpen = useCallback((open: boolean) => {
+    setSidebarOpenState(open)
+    saveSidebarOpen(open)
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpenState((previous) => {
+      saveSidebarOpen(!previous)
+      return !previous
+    })
+  }, [])
 
   const exportTrace = useCallback(() => {
     const session = activeSession
@@ -453,7 +772,51 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url)
   }, [activeSession, tracesBySession])
 
-  const value = useMemo<SessionContextValue>(
+  /**
+   * Hands the original file back to the OS.
+   *
+   * A browser cannot spawn Excel, but it can download the exact bytes it was
+   * given; the OS then opens the file with the registered spreadsheet app.
+   */
+  const openActiveFile = useCallback(async () => {
+    const session = activeSession
+    if (!session) return
+
+    const cached = fileCacheRef.current.get(session.id)
+    if (cached) {
+      downloadFile(cached)
+      return
+    }
+
+    const stored = await loadSessionFile(session.id)
+    if (!stored) return
+    fileCacheRef.current.set(session.id, stored)
+    downloadFile(stored)
+  }, [activeSession])
+
+  // Debounced snapshots keep transcripts and results intact across refreshes.
+  useEffect(() => {
+    if (!persistReadyRef.current || isStreaming) return
+    const timer = window.setTimeout(() => {
+      for (const session of sessions) {
+        void savePersistedSession({
+          id: session.id,
+          session,
+          messages: messagesBySession[session.id] ?? [],
+          traces: tracesBySession[session.id] ?? [],
+          updatedAt: Date.now(),
+        })
+      }
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [isStreaming, messagesBySession, sessions, tracesBySession])
+
+  useEffect(() => {
+    if (!persistReadyRef.current) return
+    void saveActiveSessionId(activeSessionId)
+  }, [activeSessionId])
+
+  const state = useMemo<SessionState>(
     () => ({
       dbReady,
       dbError,
@@ -461,64 +824,106 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activeSession,
       messages,
       traces,
+      digest,
       isStreaming,
       streamingSessionId,
       upload,
       apiKey,
       model,
       settingsOpen,
-      traceOpen,
-      uploadFile,
-      selectSession,
-      deleteSession,
-      sendMessage,
-      stopStreaming,
-      openSettings,
-      closeSettings,
-      saveApiKey,
-      clearApiKey,
-      setModel,
-      toggleTrace,
-      setTraceOpen,
-      exportTrace,
+      panelOpen,
+      panelTab,
+      sidebarOpen,
     }),
     [
-      dbReady,
-      dbError,
-      sessions,
       activeSession,
-      messages,
-      traces,
-      isStreaming,
-      streamingSessionId,
-      upload,
       apiKey,
+      dbError,
+      dbReady,
+      digest,
+      isStreaming,
+      messages,
       model,
+      panelOpen,
+      panelTab,
+      sessions,
       settingsOpen,
-      traceOpen,
-      uploadFile,
-      selectSession,
-      deleteSession,
-      sendMessage,
-      stopStreaming,
-      openSettings,
-      closeSettings,
-      saveApiKey,
-      clearApiKey,
-      setModel,
-      toggleTrace,
-      exportTrace,
+      sidebarOpen,
+      streamingSessionId,
+      traces,
+      upload,
     ],
   )
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  // Stable for the lifetime of the provider: action-only consumers never re-render.
+  const actions = useMemo<SessionActions>(
+    () => ({
+      uploadFile,
+      selectSession,
+      deleteSession,
+      sendMessage,
+      stopStreaming,
+      openSettings,
+      closeSettings,
+      saveApiKey,
+      clearApiKey,
+      setModel,
+      openPanel,
+      closePanel,
+      setPanelTab,
+      setSidebarOpen,
+      toggleSidebar,
+      exportTrace,
+      openActiveFile,
+    }),
+    [
+      clearApiKey,
+      closePanel,
+      closeSettings,
+      deleteSession,
+      exportTrace,
+      openActiveFile,
+      openPanel,
+      openSettings,
+      saveApiKey,
+      selectSession,
+      sendMessage,
+      setModel,
+      setPanelTab,
+      setSidebarOpen,
+      stopStreaming,
+      toggleSidebar,
+      uploadFile,
+    ],
+  )
+
+  return (
+    <SessionActionsContext.Provider value={actions}>
+      <SessionStateContext.Provider value={state}>{children}</SessionStateContext.Provider>
+    </SessionActionsContext.Provider>
+  )
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+/** Full workspace access: state plus actions. */
 export function useSession(): SessionContextValue {
-  const context = useContext(SessionContext)
-  if (!context) {
+  const state = useContext(SessionStateContext)
+  const actions = useContext(SessionActionsContext)
+  if (!state || !actions) {
     throw new Error('useSession must be used inside SessionProvider.')
   }
-  return context
+  return { ...state, ...actions }
+}
+
+/** State only. Use when a component must re-render on data changes. */
+export function useSessionState(): SessionState {
+  const state = useContext(SessionStateContext)
+  if (!state) throw new Error('useSessionState must be used inside SessionProvider.')
+  return state
+}
+
+/** Actions only. Use in buttons and forms to avoid streaming re-renders. */
+export function useSessionActions(): SessionActions {
+  const actions = useContext(SessionActionsContext)
+  if (!actions) throw new Error('useSessionActions must be used inside SessionProvider.')
+  return actions
 }

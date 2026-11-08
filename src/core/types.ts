@@ -1,3 +1,10 @@
+/**
+ * Shared domain types.
+ *
+ * `core/` owns these; `features/` only consumes them. Keeping them in one file
+ * means a component and the agent layer can never drift apart.
+ */
+
 export type ModelId = 'deepseek-v4-flash' | 'deepseek-v4-pro'
 
 export type FileKind = 'csv' | 'xlsx'
@@ -46,6 +53,7 @@ export interface Session {
   id: string
   fileName: string
   fileType: FileKind
+  fileSize: number
   uploadedAt: number
   schemaName: string
   tables: TableSummary[]
@@ -60,7 +68,12 @@ export interface ChatMessage {
   content: string
   createdAt: number
   error?: boolean
+  /** Marks the message the agent writes right after a file is ingested. */
   welcome?: boolean
+  /** Data-derived follow-up questions rendered under the message. */
+  suggestions?: string[]
+  /** True while the suggestion pass is still running. */
+  suggestionsPending?: boolean
 }
 
 export type TraceStatus = 'running' | 'success' | 'error'
@@ -76,6 +89,9 @@ export interface ToolTraceEntry {
   startedAt: number
   finishedAt: number | null
 }
+
+/** Tabs of the right-hand inspector. */
+export type PanelTab = 'file' | 'trace'
 
 export type UploadPhase = 'idle' | 'reading' | 'ingesting' | 'done' | 'error'
 
@@ -121,4 +137,27 @@ export interface RunSqlArgs {
 
 export interface ToolResultPayload {
   [key: string]: unknown
+}
+
+/** One column as understood by the digest builder. */
+export interface DigestColumn {
+  name: string
+  type: string
+  distinctCount: number
+  topValues: string[]
+}
+
+/** Compact, model-friendly description of one table. */
+export interface DigestTable {
+  name: string
+  rowCount: number
+  columns: DigestColumn[]
+}
+
+/**
+ * A cheap, local snapshot of the dataset. Used to seed suggestions and the
+ * welcome message without spending a model call.
+ */
+export interface DatasetDigest {
+  tables: DigestTable[]
 }
