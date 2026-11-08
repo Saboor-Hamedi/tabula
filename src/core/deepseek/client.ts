@@ -15,7 +15,15 @@ export function buildProviderOptions(modelId: ModelId) {
       },
     }
   }
-  return undefined
+
+  // Flash is the everyday/default model. V4 turns thinking on by default, which
+  // adds seconds before the first token; disable it so answers start streaming
+  // immediately. Pro remains available when deeper reasoning is worth the wait.
+  return {
+    deepseek: {
+      thinking: { type: 'disabled' as const },
+    },
+  }
 }
 
 /**

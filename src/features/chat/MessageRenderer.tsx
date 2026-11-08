@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import { parseMessageContent } from '../../core/parsing/parseMessage'
 import type { ContentBlock } from '../../core/types'
+import { ChartBlock } from '../render/ChartBlock'
 import { DataTable } from '../render/DataTable'
 import { MarkdownText } from '../render/MarkdownText'
 import { MermaidBlock } from '../render/MermaidBlock'
@@ -22,6 +23,9 @@ export interface MessageRendererProps {
 function renderBlock(block: ContentBlock, index: number, streaming: boolean) {
   if (block.type === 'mermaid') {
     return <MermaidBlock key={`mermaid-${index}`} code={block.code} streaming={streaming} />
+  }
+  if (block.type === 'chart') {
+    return <ChartBlock key={`chart-${index}`} chart={block.chart} />
   }
   if (block.type === 'table') {
     return <DataTable key={`table-${index}`} headers={block.headers} rows={block.rows} />

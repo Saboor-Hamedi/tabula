@@ -101,9 +101,34 @@ export interface UploadState {
   message: string
 }
 
+export interface ElbowPoint {
+  x: number
+  y: number
+}
+
+/**
+ * A structured figure that Mermaid cannot express, such as an annotated elbow
+ * chart with a circled optimal rank.
+ */
+export interface ElbowChartData {
+  type: 'elbow'
+  title: string
+  xLabel: string
+  yLabel: string
+  points: ElbowPoint[]
+  elbowX: number
+  elbowLabel?: string
+  note?: string
+  /** Optional color for every title, label, tick and legend in the figure. */
+  textColor?: string
+}
+
+export type ChartData = ElbowChartData
+
 export type ContentBlock =
   | { type: 'markdown'; content: string }
   | { type: 'mermaid'; code: string }
+  | { type: 'chart'; chart: ChartData }
   | { type: 'table'; headers: string[]; rows: string[][] }
 
 export interface MermaidBlockData {
@@ -116,13 +141,18 @@ export interface MarkdownBlockData {
   content: string
 }
 
+export interface ChartBlockData {
+  type: 'chart'
+  chart: ChartData
+}
+
 export interface TableBlockData {
   type: 'table'
   headers: string[]
   rows: string[][]
 }
 
-export type RawBlock = MarkdownBlockData | MermaidBlockData | TableBlockData
+export type RawBlock = MarkdownBlockData | MermaidBlockData | ChartBlockData | TableBlockData
 
 export type ToolName = 'inspect_schema' | 'run_sql'
 

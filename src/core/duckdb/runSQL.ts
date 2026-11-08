@@ -36,6 +36,10 @@ export async function runSQL({
   const table = await handle.connection.query(trimmed)
   const elapsedMs = Math.round(performance.now() - startedAt)
 
+  if (!table || typeof table.numRows !== 'number') {
+    throw new Error('DuckDB returned an unreadable result for this query.')
+  }
+
   const totalRows = table.numRows
   const limited = totalRows > maxRows ? table.slice(0, maxRows) : table
 

@@ -56,7 +56,7 @@ export function Inspector() {
               <DownloadIcon size={15} />
             </IconButton>
           ) : null}
-          <IconButton label="Close inspector" size="sm" onClick={closePanel}>
+          <IconButton label="Close inspector" size="sm" onClick={() => closePanel()}>
             <CloseIcon size={15} />
           </IconButton>
         </div>

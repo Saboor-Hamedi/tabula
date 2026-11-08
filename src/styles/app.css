@@ -162,15 +162,51 @@
 }
 
 .app-grid.has-sidebar {
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr);
 }
 
 .app-grid.has-panel {
-  grid-template-columns: minmax(0, 1fr) var(--inspector-width);
+  grid-template-columns: minmax(0, 1fr) 5px var(--inspector-width);
 }
 
 .app-grid.has-sidebar.has-panel {
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--inspector-width);
+  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr) 5px var(--inspector-width);
+}
+
+/* The 5px gutter doubles as the drag target; the visible rule is only 1px. */
+.resize-handle {
+  position: relative;
+  z-index: 6;
+  width: 5px;
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.resize-handle::after {
+  content: '';
+  width: 1px;
+  height: 100%;
+  background: var(--border);
+  transition:
+    width var(--transition),
+    background var(--transition);
+}
+
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after {
+  width: 2px;
+  background: var(--accent);
+}
+
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .app-main {
@@ -225,7 +261,6 @@
   min-height: 0;
   height: 100%;
   background: var(--surface);
-  border-right: 1px solid var(--border);
 }
 
 /* Height is bound to the header metric so both bars line up exactly. */
@@ -740,6 +775,15 @@
   overflow-wrap: anywhere;
 }
 
+.stream-text {
+  min-width: 0;
+  font-size: var(--text-md);
+  line-height: 1.68;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .message-time {
   font-size: var(--text-xs);
   color: var(--text-muted);
@@ -953,20 +997,19 @@
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-2) var(--space-1);
-  border: 1px solid var(--border-strong);
+  border: 0;
   border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--transition), box-shadow var(--transition);
+  background: var(--surface-2);
+  transition: background var(--transition), box-shadow var(--transition);
 }
 
 .composer-field:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .composer-field.is-streaming {
-  border-color: var(--accent);
+  background: var(--surface);
 }
 
 .composer-textarea {
@@ -1028,13 +1071,23 @@
 }
 
 .composer-send.is-stop {
-  background: var(--surface-3);
-  color: var(--text);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  background: var(--text);
+  color: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface) 14%, transparent);
 }
 
 .composer-send.is-stop:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
+  background: var(--danger);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.composer-send.is-stop svg {
+  width: 11px;
+  height: 11px;
 }
 
 /* ---------- Markdown ---------- */
@@ -1286,9 +1339,21 @@
   background: var(--surface-2);
 }
 
-.mermaid-diagram {
+.mermaid-diagram,
+.elbow-chart {
   display: flex;
   justify-content: center;
+}
+
+.elbow-chart {
+  width: 100%;
+}
+
+.elbow-chart svg {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  overflow: visible;
 }
 
 .mermaid-diagram svg {
@@ -1492,7 +1557,6 @@
   min-height: 0;
   height: 100%;
   background: var(--surface);
-  border-left: 1px solid var(--border);
 }
 
 .inspector-head {

@@ -40,6 +40,12 @@ import {
   saveSessionFile,
 } from '../core/storage/persistence'
 import { getPanelOpen, getSidebarOpen, savePanelOpen, saveSidebarOpen } from '../core/storage/uiPrefs'
+import {
+  clearWorkspaceCache,
+  readWorkspaceCache,
+  saveWorkspaceCache,
+  type WorkspaceCache,
+} from '../core/storage/workspaceCache'
 import { downloadFile } from '../core/storage/fileAccess'
 import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES } from '../core/constants'
 import { formatCount } from '../core/utils/format'
@@ -100,9 +106,9 @@ export interface SessionActions {
   clearApiKey: () => void
   setModel: (model: ModelId) => void
   openPanel: (tab?: PanelTab) => void
-  closePanel: () => void
+  closePanel: (persist?: boolean) => void
   setPanelTab: (tab: PanelTab) => void
-  setSidebarOpen: (open: boolean) => void
+  setSidebarOpen: (open: boolean, persist?: boolean) => void
   toggleSidebar: () => void
   exportTrace: () => void
   /** Hands the original uploaded file to the OS so it opens in Excel. */
@@ -138,14 +144,26 @@ function errorMessage(error: unknown): string {
 
 /** Restores fields missing from sessions saved by an earlier app version. */
 function normalizeSession(session: Session): Session {
-  return { ...session, fileSize: session.fileSize ?? 0 }
+  const tables = Array.isArray(session.tables) ? session.tables : []
+  return {
+    ...session,
+    fileSize: session.fileSize ?? 0,
+    tables,
+    primaryTable: session.primaryTable ?? tables[0]?.name ?? null,
+  }
 }
 
-/** Clears transient suggestion flags so a reload never shows a stuck spinner. */
-function normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.map((message) =>
-    message.suggestionsPending ? { ...message, suggestionsPending: false } : message,
-  )
+/** Clears transient suggestion flags and repairs malformed cached messages. */
+function normalizeMessages(messages: ChatMessage[] | undefined): ChatMessage[] {
+  if (!Array.isArray(messages)) return []
+  return messages
+    .filter((message) => message !== null && typeof message === 'object')
+    .map((message) => ({
+      ...message,
+      content: typeof message.content === 'string' ? message.content : '',
+      suggestions: Array.isArray(message.suggestions) ? message.suggestions : [],
+      suggestionsPending: false,
+    }))
 }
 
 function buildWelcomeMessage(session: Session, suggestions: string[]): ChatMessage {
@@ -244,13 +262,33 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  // Seed the first render from the synchronous mirror so a refresh never flashes
+  // the upload screen before IndexedDB and DuckDB finish restoring.
+  const cached = useMemo<WorkspaceCache | null>(() => readWorkspaceCache(), [])
+  const cachedSessions = useMemo(
+    () => (cached?.sessions ?? []).map(normalizeSession),
+    [cached],
+  )
+
   const [dbReady, setDbReady] = useState(false)
   const [dbError, setDbError] = useState<string | null>(null)
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [messagesBySession, setMessagesBySession] = useState<Record<string, ChatMessage[]>>({})
+  const [sessions, setSessions] = useState<Session[]>(cachedSessions)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    () => cached?.activeSessionId ?? cachedSessions[0]?.id ?? null,
+  )
+  const [messagesBySession, setMessagesBySession] = useState<Record<string, ChatMessage[]>>(
+    () => {
+      const messages: Record<string, ChatMessage[]> = {}
+      for (const session of cachedSessions) {
+        messages[session.id] = normalizeMessages(cached?.messagesBySession?.[session.id])
+      }
+      return messages
+    },
+  )
   const [tracesBySession, setTracesBySession] = useState<Record<string, ToolTraceEntry[]>>({})
-  const [digestBySession, setDigestBySession] = useState<Record<string, DatasetDigest>>({})
+  const [digestBySession, setDigestBySession] = useState<Record<string, DatasetDigest>>(
+    () => cached?.digestBySession ?? {},
+  )
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingSessionId, setStreamingSessionId] = useState<string | null>(null)
   const [upload, setUpload] = useState<UploadState>(IDLE_UPLOAD)
@@ -370,26 +408,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       question?: string,
       answer?: string,
     ): Promise<void> => {
-      const local = buildLocalSuggestions(session, currentDigest)
-      patchMessage(session.id, messageId, { suggestions: local, suggestionsPending: true })
+      try {
+        const local = buildLocalSuggestions(session, currentDigest)
+        patchMessage(session.id, messageId, { suggestions: local, suggestionsPending: true })
 
-      if (!apiKey) {
+        if (!apiKey) {
+          patchMessage(session.id, messageId, { suggestionsPending: false })
+          return
+        }
+
+        const refined = await generateSuggestions({
+          session,
+          digest: currentDigest,
+          apiKey,
+          model,
+          question,
+          answer,
+        })
+        patchMessage(session.id, messageId, {
+          suggestions: refined,
+          suggestionsPending: false,
+        })
+      } catch {
+        // Suggestions are optional. Never let them create an unhandled rejection.
         patchMessage(session.id, messageId, { suggestionsPending: false })
-        return
       }
-
-      const refined = await generateSuggestions({
-        session,
-        digest: currentDigest,
-        apiKey,
-        model,
-        question,
-        answer,
-      })
-      patchMessage(session.id, messageId, {
-        suggestions: refined,
-        suggestionsPending: false,
-      })
     },
     [apiKey, model, patchMessage],
   )
@@ -551,6 +594,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setPanelOpenState(false)
         dbHandleRef.current = null
         setDbReady(false)
+        clearWorkspaceCache()
         void clearPersistedWorkspace()
         await closeDuckDB()
         return
@@ -606,6 +650,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController()
       abortRef.current = controller
 
+      // Token deltas arrive many times per second. Coalescing them into one
+      // render per animation frame keeps the stream smooth without dropping the
+      // first characters on slower machines.
+      let pendingDelta = ''
+      let deltaFrame: number | null = null
+
+      const flushPendingDelta = () => {
+        if (deltaFrame !== null) {
+          window.cancelAnimationFrame(deltaFrame)
+          deltaFrame = null
+        }
+        if (pendingDelta.length === 0) return
+
+        const delta = pendingDelta
+        pendingDelta = ''
+        setMessagesBySession((previous) => {
+          const list = previous[sessionId] ?? []
+          return {
+            ...previous,
+            [sessionId]: list.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: `${message.content}${delta}` }
+                : message,
+            ),
+          }
+        })
+      }
+
+      const scheduleDelta = (delta: string) => {
+        pendingDelta += delta
+        if (deltaFrame !== null) return
+        deltaFrame = window.requestAnimationFrame(() => {
+          deltaFrame = null
+          flushPendingDelta()
+        })
+      }
+
       try {
         const result = await runAgentTurn({
           apiKey,
@@ -615,22 +696,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           history,
           userText: text,
           signal: controller.signal,
-          onDelta: (delta) => {
-            setMessagesBySession((previous) => {
-              const list = previous[sessionId] ?? []
-              return {
-                ...previous,
-                [sessionId]: list.map((message) =>
-                  message.id === assistantId
-                    ? { ...message, content: message.content + delta }
-                    : message,
-                ),
-              }
-            })
-          },
+          onDelta: scheduleDelta,
           onTrace: (entry) => upsertTrace(sessionId, entry),
         })
 
+        // Drain the last buffered characters before replacing with the
+        // authoritative final text.
+        flushPendingDelta()
         patchMessage(sessionId, assistantId, { content: result.text })
 
         // Follow-ups are derived from the question, the answer, and the data.
@@ -642,6 +714,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           result.text,
         )
       } catch (error) {
+        flushPendingDelta()
         if (controller.signal.aborted) {
           setMessagesBySession((previous) => {
             const list = previous[sessionId] ?? []
@@ -732,9 +805,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     savePanelOpen(true)
   }, [])
 
-  const closePanel = useCallback(() => {
+  const closePanel = useCallback((persist = true) => {
     setPanelOpenState(false)
-    savePanelOpen(false)
+    if (persist) savePanelOpen(false)
   }, [])
 
   const setPanelTab = useCallback((tab: PanelTab) => {
@@ -743,9 +816,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     savePanelOpen(true)
   }, [])
 
-  const setSidebarOpen = useCallback((open: boolean) => {
+  const setSidebarOpen = useCallback((open: boolean, persist = true) => {
     setSidebarOpenState(open)
-    saveSidebarOpen(open)
+    if (persist) saveSidebarOpen(open)
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -798,6 +871,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!persistReadyRef.current || isStreaming) return
     const timer = window.setTimeout(() => {
+      saveWorkspaceCache({
+        sessions,
+        activeSessionId,
+        messagesBySession,
+        digestBySession,
+      })
       for (const session of sessions) {
         void savePersistedSession({
           id: session.id,
@@ -809,7 +888,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     }, 350)
     return () => window.clearTimeout(timer)
-  }, [isStreaming, messagesBySession, sessions, tracesBySession])
+  }, [
+    activeSessionId,
+    digestBySession,
+    isStreaming,
+    messagesBySession,
+    sessions,
+    tracesBySession,
+  ])
 
   useEffect(() => {
     if (!persistReadyRef.current) return
@@ -905,6 +991,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 
 /** Full workspace access: state plus actions. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSession(): SessionContextValue {
   const state = useContext(SessionStateContext)
   const actions = useContext(SessionActionsContext)
@@ -915,6 +1002,7 @@ export function useSession(): SessionContextValue {
 }
 
 /** State only. Use when a component must re-render on data changes. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSessionState(): SessionState {
   const state = useContext(SessionStateContext)
   if (!state) throw new Error('useSessionState must be used inside SessionProvider.')
@@ -922,6 +1010,7 @@ export function useSessionState(): SessionState {
 }
 
 /** Actions only. Use in buttons and forms to avoid streaming re-renders. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSessionActions(): SessionActions {
   const actions = useContext(SessionActionsContext)
   if (!actions) throw new Error('useSessionActions must be used inside SessionProvider.')

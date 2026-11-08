@@ -1,6 +1,3 @@
-import { getModelOption } from '../../core/agent/modelOptions'
-import { formatCount } from '../../core/utils/format'
-import { CpuIcon, KeyIcon, SheetIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { ChatInput } from '../chat/ChatInput'
 import { useComposerDraft } from './useComposerDraft'
@@ -17,12 +14,10 @@ import { useComposerDraft } from './useComposerDraft'
  */
 
 export function Composer() {
-  const { activeSession, apiKey, model, isStreaming, dbReady } = useSessionState()
-  const { sendMessage, stopStreaming, openSettings } = useSessionActions()
+  const { activeSession, apiKey, isStreaming, dbReady } = useSessionState()
+  const { sendMessage, stopStreaming } = useSessionActions()
   const [value, setValue] = useComposerDraft()
 
-  const modelOption = getModelOption(model)
-  const totalRows = activeSession?.tables.reduce((total, table) => total + table.rowCount, 0) ?? 0
   const disabled = !activeSession || !apiKey || !dbReady
 
   const handleSubmit = () => {
@@ -35,32 +30,6 @@ export function Composer() {
   return (
     <div className="composer">
       <div className="composer-inner">
-        <div className="composer-chips">
-          {activeSession ? (
-            <>
-              <span className="chip" title={activeSession.fileName}>
-                <SheetIcon size={13} />
-                <span className="chip-text">{activeSession.fileName}</span>
-              </span>
-              <span className="chip">
-                {formatCount(totalRows)} rows
-              </span>
-            </>
-          ) : null}
-
-          <span className="chip chip-quiet" title={modelOption.description}>
-            <CpuIcon size={13} />
-            <span>{modelOption.shortLabel}</span>
-          </span>
-
-          {!apiKey ? (
-            <button type="button" className="chip chip-warn" onClick={openSettings}>
-              <KeyIcon size={13} />
-              <span>Add API key</span>
-            </button>
-          ) : null}
-        </div>
-
         <ChatInput
           value={value}
           onChange={setValue}

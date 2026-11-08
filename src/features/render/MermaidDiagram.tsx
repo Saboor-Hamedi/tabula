@@ -20,33 +20,107 @@ function cssVar(name: string, fallback: string): string {
   return value.length > 0 ? value : fallback
 }
 
+/** Saturated data palette. Kept semantic in the prompt: red/amber/green map to rank. */
+const PIE_COLORS = [
+  '#dc2626',
+  '#ea580c',
+  '#d97706',
+  '#ca8a04',
+  '#65a30d',
+  '#16a34a',
+  '#0d9488',
+  '#0891b2',
+  '#2563eb',
+  '#4f46e5',
+  '#7c3aed',
+  '#db2777',
+]
+
+const XY_COLORS = [
+  '#2563eb',
+  '#ea580c',
+  '#16a34a',
+  '#dc2626',
+  '#7c3aed',
+  '#0891b2',
+  '#ca8a04',
+  '#db2777',
+]
+
 function ensureInitialized(dark: boolean): void {
   const key = dark ? 'dark' : 'light'
   if (initializedKey === key) return
+
+  const text = cssVar('--text', dark ? '#e8eaee' : '#14171c')
+  const muted = cssVar('--text-muted', dark ? '#767e8c' : '#868d9b')
+  const border = cssVar('--border', dark ? '#232830' : '#e6e8ec')
+  const borderStrong = cssVar('--border-strong', dark ? '#333a45' : '#d3d7de')
+  const surface = cssVar('--surface', dark ? '#12151a' : '#ffffff')
+  const surface2 = cssVar('--surface-2', dark ? '#171b21' : '#f6f7f9')
+
+  const themeVariables: Record<string, unknown> = {
+    background: 'transparent',
+    primaryColor: dark ? '#1e3a8a' : '#dbeafe',
+    primaryBorderColor: dark ? '#60a5fa' : '#2563eb',
+    primaryTextColor: dark ? '#eff6ff' : '#0f172a',
+    secondaryColor: dark ? '#7c2d12' : '#ffedd5',
+    secondaryBorderColor: dark ? '#fb923c' : '#ea580c',
+    secondaryTextColor: dark ? '#ffedd5' : '#7c2d12',
+    tertiaryColor: dark ? '#14532d' : '#dcfce7',
+    tertiaryBorderColor: dark ? '#4ade80' : '#16a34a',
+    tertiaryTextColor: dark ? '#dcfce7' : '#14532d',
+    lineColor: dark ? '#64748b' : '#64748b',
+    textColor: text,
+    mainBkg: surface,
+    nodeBorder: borderStrong,
+    clusterBkg: surface2,
+    clusterBorder: border,
+    titleColor: text,
+    edgeLabelBackground: surface,
+    fontSize: '13px',
+    pieTitleTextColor: text,
+    pieLegendTextColor: text,
+    pieSectionTextColor: '#ffffff',
+    pieStrokeColor: surface,
+    pieStrokeWidth: '2px',
+    pieOuterStrokeColor: border,
+    pieOpacity: '0.95',
+    xyChart: {
+      backgroundColor: 'transparent',
+      titleColor: text,
+      dataLabelColor: text,
+      legendTextColor: text,
+      xAxisLabelColor: text,
+      xAxisTitleColor: text,
+      xAxisTickColor: muted,
+      xAxisLineColor: borderStrong,
+      yAxisLabelColor: text,
+      yAxisTitleColor: text,
+      yAxisTickColor: muted,
+      yAxisLineColor: borderStrong,
+      plotColorPalette: XY_COLORS.join(', '),
+    },
+  }
+
+  PIE_COLORS.forEach((color, index) => {
+    themeVariables[`pie${index + 1}`] = color
+  })
 
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
     theme: 'base',
     fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
-    themeVariables: {
-      primaryColor: cssVar('--accent-soft', '#e6f2f0'),
-      primaryBorderColor: cssVar('--accent', '#0f766e'),
-      primaryTextColor: cssVar('--text', '#101828'),
-      secondaryColor: cssVar('--surface-2', '#f4f6f8'),
-      tertiaryColor: cssVar('--surface', '#ffffff'),
-      lineColor: cssVar('--border-strong', '#cbd5e1'),
-      textColor: cssVar('--text', '#101828'),
-      mainBkg: cssVar('--surface', '#ffffff'),
-      nodeBorder: cssVar('--border-strong', '#cbd5e1'),
-      clusterBkg: cssVar('--surface-2', '#f4f6f8'),
-      clusterBorder: cssVar('--border', '#e2e8f0'),
-      titleColor: cssVar('--text', '#101828'),
-      edgeLabelBackground: cssVar('--surface', '#ffffff'),
-      fontSize: '13px',
-    },
-    flowchart: { curve: 'basis', padding: 12, useMaxWidth: true },
-    pie: { textPosition: 0.6, useMaxWidth: true },
+    themeVariables,
+    themeCSS: `
+      .nodeLabel, .edgeLabel, .label { font-weight: 550; }
+      .node rect, .node polygon, .node circle { rx: 8px; ry: 8px; }
+      .chart-title text, .pieTitleText { font-weight: 700; }
+      .chart-title text, .bottom-axis text, .left-axis text,
+      .pieTitleText, .legend text, .plot text { fill: ${text}; }
+    `,
+    flowchart: { curve: 'basis', padding: 12, useMaxWidth: true, wrappingWidth: 240 },
+    pie: { textPosition: 0.62, useMaxWidth: true },
     xyChart: { useMaxWidth: true },
   })
 
@@ -61,6 +135,36 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
   return run
 }
 
+/**
+ * Optional color request emitted by the agent as a Mermaid comment:
+ * `%% tabula:textColor=#dc2626 %%`
+ */
+function extractCustomTextColor(code: string): string | null {
+  const match = /%%\s*tabula:textColor\s*=\s*(#[0-9a-fA-F]{3,8})\s*%%/i.exec(code)
+  return match ? match[1] : null
+}
+
+const CHART_TEXT_SELECTOR =
+  '.chart-title text,.bottom-axis text,.left-axis text,.pieTitleText,.legend text,.plot text'
+
+/** Applies one requested text color to every chart title, axis and legend. */
+function applyCustomTextColor(svgMarkup: string, color: string): string {
+  try {
+    const documentNode = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml')
+    if (documentNode.querySelector('parsererror')) return svgMarkup
+
+    documentNode.querySelectorAll(CHART_TEXT_SELECTOR).forEach((node) => {
+      if (!(node instanceof SVGElement)) return
+      node.setAttribute('fill', color)
+      node.style.setProperty('fill', color, 'important')
+    })
+
+    return new XMLSerializer().serializeToString(documentNode.documentElement)
+  } catch {
+    return svgMarkup
+  }
+}
+
 export interface MermaidDiagramProps {
   code: string
 }
@@ -73,6 +177,7 @@ interface RenderState {
 
 export default function MermaidDiagram({ code }: MermaidDiagramProps) {
   const [result, setResult] = useState<RenderState | null>(null)
+  const customTextColor = extractCustomTextColor(code)
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -99,7 +204,10 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
         await mermaid.parse(source)
         const rendered = await enqueue(() => mermaid.render(id, source))
         if (!active) return
-        setResult({ code, svg: rendered.svg, error: null })
+        const svg = customTextColor
+          ? applyCustomTextColor(rendered.svg, customTextColor)
+          : rendered.svg
+        setResult({ code, svg, error: null })
       } catch (renderError) {
         if (!active) return
         setResult({
@@ -115,7 +223,7 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
     return () => {
       active = false
     }
-  }, [code, dark])
+  }, [code, customTextColor, dark])
 
   if (code.trim().length === 0) return <MermaidFallback code={code} />
 
@@ -134,6 +242,7 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
       className="mermaid-diagram"
       role="img"
       aria-label="Generated chart"
+      data-export-text-color={customTextColor ?? undefined}
       dangerouslySetInnerHTML={{ __html: current.svg }}
     />
   )

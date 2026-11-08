@@ -34,6 +34,40 @@ export interface SuggestionInput {
   signal?: AbortSignal
 }
 
+/** Repairs a digest restored from an older/corrupt cache. */
+function normalizeDigest(digest: DatasetDigest | null): DatasetDigest | null {
+  if (!digest || !Array.isArray(digest.tables)) return null
+
+  const tables: DigestTable[] = []
+  for (const table of digest.tables) {
+    if (!table || typeof table !== 'object') continue
+
+    const columns: DigestColumn[] = []
+    if (Array.isArray(table.columns)) {
+      for (const column of table.columns) {
+        if (!column || typeof column !== 'object') continue
+        columns.push({
+          name: typeof column.name === 'string' ? column.name : 'column',
+          type: typeof column.type === 'string' ? column.type : 'VARCHAR',
+          distinctCount:
+            typeof column.distinctCount === 'number' ? column.distinctCount : 0,
+          topValues: Array.isArray(column.topValues)
+            ? column.topValues.filter((value): value is string => typeof value === 'string')
+            : [],
+        })
+      }
+    }
+
+    tables.push({
+      name: typeof table.name === 'string' ? table.name : 'table',
+      rowCount: typeof table.rowCount === 'number' ? table.rowCount : 0,
+      columns,
+    })
+  }
+
+  return { tables }
+}
+
 /** Picks the table with the most columns — usually the richest one. */
 function pickPrimaryTable(digest: DatasetDigest, session: Session): DigestTable | null {
   const preferred = digest.tables.find((table) => table.name === session.primaryTable)
@@ -93,8 +127,10 @@ export function buildLocalSuggestions(
   session: Session,
   digest: DatasetDigest | null,
 ): string[] {
-  const table = digest ? pickPrimaryTable(digest, session) : null
-  const tableName = table?.name ?? session.primaryTable ?? session.tables[0]?.name ?? 'the data'
+  const safeDigest = normalizeDigest(digest)
+  const table = safeDigest ? pickPrimaryTable(safeDigest, session) : null
+  const sessionTables = Array.isArray(session.tables) ? session.tables : []
+  const tableName = table?.name ?? session.primaryTable ?? sessionTables[0]?.name ?? 'the data'
   const columns = table?.columns ?? []
 
   const temporal = findTemporal(columns)
@@ -213,8 +249,9 @@ export async function generateSuggestions({
   answer,
   signal,
 }: SuggestionInput): Promise<string[]> {
-  const fallback = buildLocalSuggestions(session, digest)
-  if (!apiKey || !digest) return fallback
+  const safeDigest = normalizeDigest(digest)
+  const fallback = buildLocalSuggestions(session, safeDigest)
+  if (!apiKey || !safeDigest) return fallback
 
   try {
     const result = await generateText({
@@ -228,7 +265,7 @@ export async function generateSuggestions({
       prompt: `File: ${session.fileName}
 
 Dataset:
-${describeDigest(digest)}
+${describeDigest(safeDigest)}
 
 ${
   question

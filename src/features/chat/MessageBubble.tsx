@@ -30,13 +30,14 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const { sendMessage } = useSessionActions()
   const [copied, setCopied] = useState(false)
+  const content = typeof message.content === 'string' ? message.content : ''
 
   const isUser = message.role === 'user'
-  const isThinking = streaming && !isUser && message.content.trim().length === 0
+  const isThinking = streaming && !isUser && content.trim().length === 0
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(message.content)
+      await navigator.clipboard.writeText(content)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -47,7 +48,7 @@ export const MessageBubble = memo(function MessageBubble({
   if (isUser) {
     return (
       <article className="message message-user">
-        <div className="user-bubble">{message.content}</div>
+        <div className="user-bubble">{content}</div>
         <time className="message-time">{formatTime(message.createdAt)}</time>
       </article>
     )
@@ -64,13 +65,15 @@ export const MessageBubble = memo(function MessageBubble({
           </span>
           <span>{activity ?? 'Reading your data…'}</span>
         </div>
+      ) : streaming ? (
+        <div className="stream-text">{content}</div>
       ) : (
-        <MessageRenderer content={message.content} streaming={streaming} />
+        <MessageRenderer content={content} />
       )}
 
       {streaming && !isThinking ? <span className="stream-caret" aria-hidden /> : null}
 
-      {!streaming && message.content.trim().length > 0 ? (
+      {!streaming && content.trim().length > 0 ? (
         <div className="message-tools">
           <button type="button" className="tool-btn" onClick={handleCopy}>
             {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}

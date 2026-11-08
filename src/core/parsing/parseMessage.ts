@@ -1,4 +1,5 @@
 import type { ContentBlock } from '../types'
+import { extractChartBlocks } from './extractChartBlocks'
 import { extractMermaidBlocks } from './extractMermaidBlocks'
 import { extractTableBlocks } from './extractTableBlocks'
 
@@ -25,11 +26,19 @@ function parse(text: string): ContentBlock[] {
     }
     if (block.type !== 'markdown') continue
 
-    for (const inner of extractTableBlocks(block.content)) {
-      if (inner.type === 'table') {
-        blocks.push({ type: 'table', headers: inner.headers, rows: inner.rows })
-      } else if (inner.type === 'markdown' && inner.content.trim().length > 0) {
-        blocks.push({ type: 'markdown', content: inner.content.trim() })
+    for (const chartBlock of extractChartBlocks(block.content)) {
+      if (chartBlock.type === 'chart') {
+        blocks.push(chartBlock)
+        continue
+      }
+      if (chartBlock.type !== 'markdown') continue
+
+      for (const inner of extractTableBlocks(chartBlock.content)) {
+        if (inner.type === 'table') {
+          blocks.push({ type: 'table', headers: inner.headers, rows: inner.rows })
+        } else if (inner.type === 'markdown' && inner.content.trim().length > 0) {
+          blocks.push({ type: 'markdown', content: inner.content.trim() })
+        }
       }
     }
   }

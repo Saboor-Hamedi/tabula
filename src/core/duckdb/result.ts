@@ -14,9 +14,16 @@ interface ArrowTableLike {
   slice(begin: number, end?: number): ArrowTableLike
 }
 
-export function tableToRawRows(table: ArrowTableLike): RawRow[] {
+export function tableToRawRows(table: ArrowTableLike | null | undefined): RawRow[] {
+  if (!table || typeof table.toArray !== 'function') return []
   const rows = table.toArray() as JsonRow[]
-  return rows.map((row) => row.toJSON())
+  if (!Array.isArray(rows)) return []
+
+  const output: RawRow[] = []
+  for (const row of rows) {
+    if (row && typeof row.toJSON === 'function') output.push(row.toJSON())
+  }
+  return output
 }
 
 export function tableToRows(table: ArrowTableLike): Array<Record<string, CellValue>> {
@@ -29,8 +36,9 @@ export function tableToRows(table: ArrowTableLike): Array<Record<string, CellVal
   })
 }
 
-export function tableColumns(table: ArrowTableLike): string[] {
-  return table.schema.fields.map((field) => field.name)
+export function tableColumns(table: ArrowTableLike | null | undefined): string[] {
+  const fields = table?.schema?.fields
+  return Array.isArray(fields) ? fields.map((field) => field.name) : []
 }
 
 export function firstScalar(table: ArrowTableLike, column: string): unknown {

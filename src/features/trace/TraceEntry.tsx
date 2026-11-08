@@ -13,6 +13,9 @@ import { AlertIcon, CheckIcon, ChevronDownIcon, DatabaseIcon, TableIcon } from '
 export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
   const [expanded, setExpanded] = useState(false)
   const duration = entry.finishedAt ? entry.finishedAt - entry.startedAt : null
+  const detail = typeof entry.detail === 'string' ? entry.detail : ''
+  const summary = typeof entry.summary === 'string' ? entry.summary : ''
+  const argsText = JSON.stringify(entry.args ?? {}, null, 2)
 
   return (
     <div className={`trace-entry is-${entry.status}`}>
@@ -45,7 +48,7 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
         <ChevronDownIcon size={13} className={`trace-chevron ${expanded ? 'is-open' : ''}`} />
       </button>
 
-      <div className="trace-summary">{entry.summary}</div>
+      <div className="trace-summary">{summary}</div>
 
       {expanded ? (
         <div className="trace-detail">
@@ -58,12 +61,12 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
 
           <div className="trace-detail-row is-column">
             <span className="trace-detail-label">Arguments</span>
-            <pre className="trace-code">{JSON.stringify(entry.args, null, 2)}</pre>
+            <pre className="trace-code">{argsText}</pre>
           </div>
 
           <div className="trace-detail-row is-column">
             <span className="trace-detail-label">Result</span>
-            <pre className="trace-code">{entry.detail.length > 0 ? entry.detail : '—'}</pre>
+            <pre className="trace-code">{detail.length > 0 ? detail : '—'}</pre>
           </div>
         </div>
       ) : null}
