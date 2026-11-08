@@ -38,7 +38,7 @@ export function Inspector() {
             className={`inspector-tab ${panelTab === 'trace' ? 'is-active' : ''}`}
             onClick={() => setPanelTab('trace')}
           >
-            Trace
+            Activity
             {traces.length > 0 ? (
               <span className="inspector-tab-count">{formatCount(traces.length)}</span>
             ) : null}
@@ -48,7 +48,7 @@ export function Inspector() {
         <div className="inspector-head-actions">
           {panelTab === 'trace' ? (
             <IconButton
-              label="Export trace as JSON"
+              label="Download activity"
               size="sm"
               onClick={exportTrace}
               disabled={!activeSession || traces.length === 0}
@@ -68,8 +68,8 @@ export function Inspector() {
         ) : traces.length === 0 ? (
           <div className="panel-empty">
             <ActivityIcon size={22} />
-            <p>No tool calls yet</p>
-            <span>Ask a question and every schema read and SQL query shows up here.</span>
+            <p>No activity yet</p>
+            <span>Ask a question and each column check and analysis step shows up here.</span>
           </div>
         ) : (
           <div className="trace-list">

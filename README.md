@@ -1,75 +1,53 @@
-# React + TypeScript + Vite
+# Tabula
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Tabula is a local-first workspace for asking questions about CSV and Excel files. Upload a workbook, inspect the detected columns, and chat with an agent that explores the data and answers with findings, tables, and charts.
 
-Currently, two official plugins are available:
+Files and results stay in the browser. Only the question, a compact column summary, and the results needed for an answer are sent to DeepSeek.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+- React 19 + TypeScript + Vite
+- DuckDB-WASM for in-browser analysis
+- DeepSeek through the AI SDK
+- Mermaid plus custom SVG figures for charts
+- IndexedDB for durable sessions and localStorage for instant startup/layout state
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Open the local URL, add a DeepSeek access key from **Settings**, then upload a CSV/XLSX file or choose **Try a sample dataset**.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run dev      # local development
+npm run lint     # static checks
+npm run test     # core unit tests
+npm run build    # typecheck + production build
+npm run preview  # serve the production build
 ```
+
+## Architecture
+
+- `src/core/` contains framework-free logic: persistence, parsing, analysis, agent tools, exports, diagnostics.
+- `src/features/` contains React surfaces: shell, sidebar, header, chat, composer, figures, inspector, settings.
+- `src/core/workers/` contains the spreadsheet conversion worker.
+- `src/core/parsing/` turns assistant output into text, tables, diagrams, and structured chart blocks.
+- `src/features/session/` contains workspace restore and persistence hooks.
+
+Core code must not import from features.
+
+## Privacy and deployment
+
+- Uploaded files never leave the browser tab.
+- The DeepSeek access key is stored only in this browser.
+- Production builds add a Content Security Policy and a service worker that caches the app shell and analysis assets after first use.
+- For a public multi-user deployment, proxy model calls through a backend instead of accepting user keys in the browser.
+
+## CI
+
+`.github/workflows/ci.yml` runs lint, tests, and a production build on pushes and pull requests.

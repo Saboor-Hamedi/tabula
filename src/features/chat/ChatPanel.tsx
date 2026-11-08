@@ -28,8 +28,8 @@ export function ChatPanel() {
     if (!streamingHere) return null
     const running = traces.find((trace) => trace.status === 'running')
     if (!running) return 'Thinking…'
-    if (running.toolName === 'inspect_schema') return 'Inspecting the schema…'
-    return 'Running SQL…'
+    if (running.toolName === 'inspect_schema') return 'Reading the columns…'
+    return 'Analysing the data…'
   }, [streamingHere, traces])
 
   const handleScroll = useCallback(() => {

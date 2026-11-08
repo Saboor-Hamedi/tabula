@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import type { ChatMessage } from '../../core/types'
-import { formatTime } from '../../core/utils/format'
+import { formatCompact, formatTime } from '../../core/utils/format'
 import { CheckIcon, CopyIcon } from '../common/Icons'
 import { useSessionActions } from '../SessionProvider'
 import { MessageRenderer } from './MessageRenderer'
@@ -65,10 +65,8 @@ export const MessageBubble = memo(function MessageBubble({
           </span>
           <span>{activity ?? 'Reading your data…'}</span>
         </div>
-      ) : streaming ? (
-        <div className="stream-text">{content}</div>
       ) : (
-        <MessageRenderer content={content} />
+        <MessageRenderer content={content} streaming={streaming} />
       )}
 
       {streaming && !isThinking ? <span className="stream-caret" aria-hidden /> : null}
@@ -79,6 +77,11 @@ export const MessageBubble = memo(function MessageBubble({
             {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
+          {message.usage ? (
+            <span className="message-time">
+              {formatCompact(message.usage.inputTokens + message.usage.outputTokens)} tokens
+            </span>
+          ) : null}
           <time className="message-time">{formatTime(message.createdAt)}</time>
         </div>
       ) : null}

@@ -1,6 +1,7 @@
 import type { ChartData } from '../../core/types'
 import { Figure } from './Figure'
 import { ElbowChart } from './ElbowChart'
+import { SeriesChart } from './SeriesChart'
 
 /** File-safe name derived from the chart's own title. */
 function figureName(title: string): string {
@@ -18,6 +19,13 @@ export function ChartBlock({ chart }: { chart: ChartData }) {
     return (
       <Figure name={figureName(chart.title)}>
         <ElbowChart data={chart} />
+      </Figure>
+    )
+  }
+  if (chart.type === 'series') {
+    return (
+      <Figure name={figureName(chart.title)}>
+        <SeriesChart data={chart} />
       </Figure>
     )
   }

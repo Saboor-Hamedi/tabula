@@ -1,4 +1,11 @@
-import type { ChartData, ElbowChartData, ElbowPoint, RawBlock } from '../types'
+import type {
+  ChartData,
+  ElbowChartData,
+  ElbowPoint,
+  RawBlock,
+  SeriesChartData,
+  SeriesPoint,
+} from '../types'
 
 /**
  * Structured figure fences.
@@ -123,6 +130,57 @@ function parseElbow(record: Record<string, unknown>): ElbowChartData | null {
   }
 }
 
+function readSeriesPoints(record: Record<string, unknown>): SeriesPoint[] {
+  const source = Array.isArray(record.points) ? record.points : []
+  const points: SeriesPoint[] = []
+
+  for (const entry of source) {
+    const point = asRecord(entry)
+    if (!point) continue
+    const label = point.label
+    const value = readNumber(point, 'value')
+    if (typeof label !== 'string' || label.trim().length === 0 || value === null) continue
+    points.push({ label: label.trim(), value })
+  }
+
+  return points
+}
+
+function parseSeries(record: Record<string, unknown>): SeriesChartData | null {
+  const kind = record.kind
+  if (kind !== 'bar' && kind !== 'line' && kind !== 'scatter') return null
+
+  const points = readSeriesPoints(record)
+  if (points.length < 2) return null
+
+  const highlight = readNumber(record, 'highlightIndex')
+  const highlightIndex =
+    highlight !== null && Number.isFinite(highlight)
+      ? Math.max(0, Math.min(points.length - 1, Math.round(highlight)))
+      : undefined
+  const note = record.note
+  const textColor = record.textColor
+
+  return {
+    type: 'series',
+    kind,
+    title: readString(record, 'title', 'Analysis'),
+    xLabel: readString(record, 'xLabel', 'Category'),
+    yLabel: readString(record, 'yLabel', 'Value'),
+    points,
+    highlightIndex,
+    highlightLabel:
+      typeof record.highlightLabel === 'string' && record.highlightLabel.trim().length > 0
+        ? record.highlightLabel.trim()
+        : undefined,
+    note: typeof note === 'string' && note.trim().length > 0 ? note.trim() : undefined,
+    textColor:
+      typeof textColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(textColor.trim())
+        ? textColor.trim()
+        : undefined,
+  }
+}
+
 /** Converts the fence body into a chart, or null when the JSON is invalid. */
 export function parseChartCode(code: string): ChartData | null {
   try {
@@ -130,6 +188,7 @@ export function parseChartCode(code: string): ChartData | null {
     const record = asRecord(parsed)
     if (!record) return null
     if (record.type === 'elbow') return parseElbow(record)
+    if (record.type === 'series') return parseSeries(record)
     return null
   } catch {
     return null

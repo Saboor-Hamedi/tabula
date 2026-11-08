@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { getModelOption, MODEL_OPTIONS } from '../../core/agent/modelOptions'
-import { CheckIcon, CpuIcon, PanelRightIcon, SidebarIcon } from '../common/Icons'
+import {
+  CheckIcon,
+  CpuIcon,
+  DownloadIcon,
+  PanelRightIcon,
+  SidebarIcon,
+} from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
@@ -15,8 +21,29 @@ import { useSessionActions, useSessionState } from '../SessionProvider'
  */
 
 export function Header() {
-  const { activeSession, model, sidebarOpen, panelOpen } = useSessionState()
-  const { toggleSidebar, openPanel, closePanel } = useSessionActions()
+  const { activeSession, messages, model, sidebarOpen, panelOpen } = useSessionState()
+  const {
+    toggleSidebar,
+    openPanel,
+    closePanel,
+    renameSession,
+    exportTranscript,
+  } = useSessionActions()
+  const [editingName, setEditingName] = useState(false)
+  const [draftName, setDraftName] = useState('')
+
+  const canExport = messages.some((message) => message.role === 'user')
+
+  const beginRename = () => {
+    if (!activeSession) return
+    setDraftName(activeSession.fileName)
+    setEditingName(true)
+  }
+
+  const commitRename = () => {
+    if (activeSession && draftName.trim()) renameSession(activeSession.id, draftName)
+    setEditingName(false)
+  }
 
   return (
     <header className="app-header">
@@ -30,9 +57,29 @@ export function Header() {
         </IconButton>
 
         <div className="header-title">
-          <span className="header-title-name" title={activeSession?.fileName}>
-            {activeSession ? activeSession.fileName : 'New analysis'}
-          </span>
+          {editingName ? (
+            <input
+              className="header-title-input"
+              value={draftName}
+              autoFocus
+              aria-label="Dataset name"
+              onChange={(event) => setDraftName(event.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitRename()
+                if (event.key === 'Escape') setEditingName(false)
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className="header-title-name"
+              title={activeSession ? 'Rename dataset' : undefined}
+              onClick={beginRename}
+            >
+              {activeSession ? activeSession.fileName : 'New analysis'}
+            </button>
+          )}
           {activeSession ? (
             <span className="header-title-meta">
               {activeSession.tables.length} table
@@ -45,6 +92,15 @@ export function Header() {
       </div>
 
       <div className="app-header-right">
+        {activeSession ? (
+          <IconButton
+            label="Download conversation"
+            disabled={!canExport}
+            onClick={exportTranscript}
+          >
+            <DownloadIcon size={16} />
+          </IconButton>
+        ) : null}
         <ModelMenu model={model} />
         <IconButton
           label={panelOpen ? 'Hide inspector' : 'Show inspector'}

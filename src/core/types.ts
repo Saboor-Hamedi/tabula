@@ -74,6 +74,11 @@ export interface ChatMessage {
   suggestions?: string[]
   /** True while the suggestion pass is still running. */
   suggestionsPending?: boolean
+  /** Token usage for this answer, when the provider reports it. */
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+  }
 }
 
 export type TraceStatus = 'running' | 'success' | 'error'
@@ -123,7 +128,25 @@ export interface ElbowChartData {
   textColor?: string
 }
 
-export type ChartData = ElbowChartData
+export interface SeriesPoint {
+  label: string
+  value: number
+}
+
+export interface SeriesChartData {
+  type: 'series'
+  kind: 'bar' | 'line' | 'scatter'
+  title: string
+  xLabel: string
+  yLabel: string
+  points: SeriesPoint[]
+  highlightIndex?: number
+  highlightLabel?: string
+  note?: string
+  textColor?: string
+}
+
+export type ChartData = ElbowChartData | SeriesChartData
 
 export type ContentBlock =
   | { type: 'markdown'; content: string }

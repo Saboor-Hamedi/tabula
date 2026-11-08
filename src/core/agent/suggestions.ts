@@ -1,6 +1,6 @@
 import { generateText } from 'ai'
 import type { DatasetDigest, DigestColumn, DigestTable, ModelId, Session } from '../types'
-import { SUGGESTION_COUNT } from '../constants'
+import { DIGEST_MAX_TABLES, SUGGESTION_COUNT } from '../constants'
 import { createDeepSeekModel, buildSuggestionProviderOptions } from '../deepseek/client'
 import {
   isCategoricalColumn,
@@ -65,7 +65,7 @@ function normalizeDigest(digest: DatasetDigest | null): DatasetDigest | null {
     })
   }
 
-  return { tables }
+  return { tables: tables.slice(0, DIGEST_MAX_TABLES) }
 }
 
 /** Picks the table with the most columns — usually the richest one. */

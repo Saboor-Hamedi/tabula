@@ -1,7 +1,9 @@
-import { memo, useMemo } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { MAX_PREVIEW_ROWS } from '../../core/constants'
+import { buildCsv, downloadCsv } from '../../core/export/csv'
 import { parseInlineMarkdown } from '../../core/parsing/inlineMarkdown'
 import { formatCount } from '../../core/utils/format'
+import { DownloadIcon } from '../common/Icons'
 
 /**
  * Table rendered from a GFM block in an assistant message.
@@ -42,6 +44,9 @@ function CellValue({ value }: { value: string }) {
 
 export const DataTable = memo(function DataTable({ headers, rows }: DataTableProps) {
   const visibleRows = useMemo(() => rows.slice(0, MAX_PREVIEW_ROWS), [rows])
+  const handleDownload = useCallback(() => {
+    downloadCsv('tabula-table.csv', buildCsv(headers, rows))
+  }, [headers, rows])
 
   if (headers.length === 0) return null
 
@@ -78,11 +83,17 @@ export const DataTable = memo(function DataTable({ headers, rows }: DataTablePro
         </table>
       </div>
 
-      {rows.length > MAX_PREVIEW_ROWS ? (
-        <div className="data-table-foot">
-          Showing {formatCount(MAX_PREVIEW_ROWS)} of {formatCount(rows.length)} rows
-        </div>
-      ) : null}
+      <div className="data-table-foot">
+        <span>
+          {rows.length > MAX_PREVIEW_ROWS
+            ? `Showing ${formatCount(MAX_PREVIEW_ROWS)} of ${formatCount(rows.length)} rows`
+            : `${formatCount(rows.length)} row${rows.length === 1 ? '' : 's'}`}
+        </span>
+        <button type="button" className="tool-btn" onClick={handleDownload}>
+          <DownloadIcon size={13} />
+          <span>Download data</span>
+        </button>
+      </div>
     </div>
   )
 })

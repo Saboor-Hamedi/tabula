@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { hasOpenFence } from '../../core/parsing/parseMessage'
+import { useInView } from '../common/useInView'
 import { Figure } from './Figure'
 import { MermaidFallback } from './MermaidFallback'
 
@@ -32,16 +33,24 @@ function figureName(code: string): string {
 }
 
 export function MermaidBlock({ code, streaming = false }: MermaidBlockProps) {
+  const { ref, inView } = useInView<HTMLDivElement>()
+
   // A half-written diagram would render as a syntax error and then remount.
   if (streaming && hasOpenFence(code)) {
     return <MermaidFallback code={code} />
   }
 
   return (
-    <Figure name={figureName(code)}>
-      <Suspense fallback={<MermaidFallback />}>
-        <MermaidDiagram code={code} />
-      </Suspense>
-    </Figure>
+    <div className="mermaid-viewport" ref={ref}>
+      {inView ? (
+        <Figure name={figureName(code)}>
+          <Suspense fallback={<MermaidFallback />}>
+            <MermaidDiagram code={code} />
+          </Suspense>
+        </Figure>
+      ) : (
+        <MermaidFallback />
+      )}
+    </div>
   )
 }

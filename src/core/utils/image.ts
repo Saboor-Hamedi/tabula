@@ -63,7 +63,7 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
   exportStyle.textContent =
     'svg{background:transparent!important;background-color:transparent!important}' +
     'rect.background{display:none!important}' +
-    `.chart-title text,.bottom-axis text,.left-axis text,.pieTitleText,.legend text,.elbow-chart-text{fill:${textColor}!important}` +
+    `.chart-title text,.bottom-axis text,.left-axis text,.pieTitleText,.legend text,.elbow-chart-text,.series-chart-text{fill:${textColor}!important}` +
     `.chart-title text,.pieTitleText{font-weight:700!important}`
   clone.insertBefore(exportStyle, clone.firstChild)
 
@@ -72,7 +72,7 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
   // dark-theme white text.
   clone
     .querySelectorAll(
-      '.chart-title text,.bottom-axis text,.left-axis text,.pieTitleText,.legend text,.elbow-chart-text',
+      '.chart-title text,.bottom-axis text,.left-axis text,.pieTitleText,.legend text,.elbow-chart-text,.series-chart-text',
     )
     .forEach((node) => {
       if (!(node instanceof SVGElement)) return

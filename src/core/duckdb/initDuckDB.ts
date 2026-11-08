@@ -30,7 +30,7 @@ async function createHandle(): Promise<DuckDBHandle> {
   }
 
   const worker = new Worker(bundle.mainWorker)
-  const logger = new duckdb.ConsoleLogger()
+  const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING)
   const db = new duckdb.AsyncDuckDB(logger, worker)
 
   try {

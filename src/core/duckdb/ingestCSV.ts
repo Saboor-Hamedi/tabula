@@ -15,10 +15,17 @@ export interface IngestCSVInput {
   handle: DuckDBHandle
   file: File
   sessionId: string
+  /** Explicit schema for restored/replaced sessions. */
+  schemaName?: string
 }
 
-export async function ingestCSV({ handle, file, sessionId }: IngestCSVInput): Promise<IngestResult> {
-  const schemaName = buildSchemaName(sessionId)
+export async function ingestCSV({
+  handle,
+  file,
+  sessionId,
+  schemaName: requestedSchema,
+}: IngestCSVInput): Promise<IngestResult> {
+  const schemaName = requestedSchema ?? buildSchemaName(sessionId)
   const registeredPath = `upload_${sessionId}.csv`
   const bytes = new Uint8Array(await file.arrayBuffer())
 

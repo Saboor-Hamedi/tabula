@@ -1,4 +1,4 @@
-import type { ChatMessage, Session, ToolTraceEntry } from '../types'
+import type { ChatMessage, DatasetDigest, Session, ToolTraceEntry } from '../types'
 
 const DB_NAME = 'tabula-workspace'
 const DB_VERSION = 1
@@ -13,6 +13,7 @@ export interface PersistedSessionRecord {
   session: Session
   messages: ChatMessage[]
   traces: ToolTraceEntry[]
+  digest?: DatasetDigest
   updatedAt: number
 }
 

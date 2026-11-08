@@ -17,7 +17,7 @@ export function SidebarFooter() {
       <button type="button" className="sidebar-settings" onClick={openSettings}>
         <SettingsIcon size={15} />
         <span>Settings</span>
-        {!apiKey ? <span className="sidebar-dot" aria-label="API key required" /> : null}
+        {!apiKey ? <span className="sidebar-dot" aria-label="Access key required" /> : null}
       </button>
     </div>
   )

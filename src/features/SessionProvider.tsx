@@ -19,6 +19,11 @@ import { buildLocalSuggestions, generateSuggestions } from '../core/agent/sugges
 import { runAgentTurn } from '../core/agent/runAgentTurn'
 import { buildTraceExport, traceExportFileName } from '../core/agent/trace'
 import {
+  buildTranscript,
+  downloadTextFile,
+  transcriptFileName,
+} from '../core/export/transcript'
+import {
   clearApiKey as persistClearApiKey,
   getStoredApiKey,
   getStoredModel,
@@ -33,7 +38,6 @@ import {
 import {
   clearPersistedWorkspace,
   deletePersistedSession,
-  loadPersistedWorkspace,
   loadSessionFile,
   saveActiveSessionId,
   savePersistedSession,
@@ -43,12 +47,18 @@ import { getPanelOpen, getSidebarOpen, savePanelOpen, saveSidebarOpen } from '..
 import {
   clearWorkspaceCache,
   readWorkspaceCache,
-  saveWorkspaceCache,
   type WorkspaceCache,
 } from '../core/storage/workspaceCache'
 import { downloadFile } from '../core/storage/fileAccess'
-import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES } from '../core/constants'
+import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES, WELCOME_MAX_TABLES } from '../core/constants'
 import { formatCount } from '../core/utils/format'
+import {
+  bootstrapWorkspace,
+  normalizeMessages,
+  normalizeSession,
+  type BootstrapResult,
+} from './session/workspaceBootstrap'
+import { useWorkspacePersistence } from './session/useWorkspacePersistence'
 import type {
   ChatMessage,
   DatasetDigest,
@@ -111,6 +121,9 @@ export interface SessionActions {
   setSidebarOpen: (open: boolean, persist?: boolean) => void
   toggleSidebar: () => void
   exportTrace: () => void
+  exportTranscript: () => void
+  renameSession: (sessionId: string, fileName: string) => void
+  replaceActiveFile: (file: File) => Promise<void>
   /** Hands the original uploaded file to the OS so it opens in Excel. */
   openActiveFile: () => Promise<void>
 }
@@ -142,37 +155,22 @@ function errorMessage(error: unknown): string {
   return 'Something went wrong.'
 }
 
-/** Restores fields missing from sessions saved by an earlier app version. */
-function normalizeSession(session: Session): Session {
-  const tables = Array.isArray(session.tables) ? session.tables : []
-  return {
-    ...session,
-    fileSize: session.fileSize ?? 0,
-    tables,
-    primaryTable: session.primaryTable ?? tables[0]?.name ?? null,
-  }
-}
-
-/** Clears transient suggestion flags and repairs malformed cached messages. */
-function normalizeMessages(messages: ChatMessage[] | undefined): ChatMessage[] {
-  if (!Array.isArray(messages)) return []
-  return messages
-    .filter((message) => message !== null && typeof message === 'object')
-    .map((message) => ({
-      ...message,
-      content: typeof message.content === 'string' ? message.content : '',
-      suggestions: Array.isArray(message.suggestions) ? message.suggestions : [],
-      suggestionsPending: false,
-    }))
-}
-
 function buildWelcomeMessage(session: Session, suggestions: string[]): ChatMessage {
-  const tableLines = session.tables
+  const totalRows = session.tables.reduce((total, table) => total + table.rowCount, 0)
+  const ranked = [...session.tables].sort(
+    (left, right) => right.rowCount - left.rowCount || right.columnCount - left.columnCount,
+  )
+  const listed = ranked.slice(0, WELCOME_MAX_TABLES)
+  const tableLines = listed
     .map(
       (table) =>
         `- \`${table.name}\` — ${formatCount(table.rowCount)} rows · ${table.columnCount} columns`,
     )
     .join('\n')
+  const more =
+    session.tables.length > listed.length
+      ? `\n…and ${formatCount(session.tables.length - listed.length)} more tables. Ask about a specific sheet or column.`
+      : ''
 
   return {
     id: createId(),
@@ -183,81 +181,12 @@ function buildWelcomeMessage(session: Session, suggestions: string[]): ChatMessa
     suggestionsPending: false,
     content: `**${session.fileName} is ready.**
 
-Loaded ${session.tables.length} table${session.tables.length === 1 ? '' : 's'} into DuckDB:
+Loaded ${formatCount(session.tables.length)} table${session.tables.length === 1 ? '' : 's'} with ${formatCount(totalRows)} rows in total.
 
-${tableLines}
+Largest tables:
+${tableLines}${more}
 
-Ask anything, or start from one of the questions below. I read the actual columns and values before answering.`,
-  }
-}
-
-interface BootstrapResult {
-  handle: DuckDBHandle
-  sessions: Session[]
-  messagesBySession: Record<string, ChatMessage[]>
-  tracesBySession: Record<string, ToolTraceEntry[]>
-  digestBySession: Record<string, DatasetDigest>
-  activeSessionId: string | null
-}
-
-/**
- * Opens DuckDB and rebuilds every persisted session from its stored file.
- *
- * Each restored session also gets a fresh digest, so the agent and the file
- * panel have full column context immediately after a refresh — not only after a
- * new upload.
- */
-async function bootstrapWorkspace(): Promise<BootstrapResult> {
-  const handle = await initDuckDB()
-  const persisted = await loadPersistedWorkspace()
-  const sessions: Session[] = []
-  const messagesBySession: Record<string, ChatMessage[]> = {}
-  const tracesBySession: Record<string, ToolTraceEntry[]> = {}
-  const digestBySession: Record<string, DatasetDigest> = {}
-
-  for (const record of persisted.sessions) {
-    const session = normalizeSession(record.session)
-    sessions.push(session)
-    messagesBySession[session.id] = normalizeMessages(record.messages ?? [])
-    tracesBySession[session.id] = record.traces ?? []
-    registerSession(session)
-
-    const file = await loadSessionFile(session.id)
-    if (!file) continue
-
-    try {
-      if (session.fileType === 'csv') {
-        await ingestCSV({ handle, file, sessionId: session.id })
-      } else {
-        await ingestExcel({ handle, file, sessionId: session.id })
-      }
-
-      digestBySession[session.id] = await buildDatasetDigest(handle.connection, session)
-
-      // Recompute starter questions from the current digest. They are local and
-      // deterministic, so a restored session always reflects the current
-      // heuristics instead of whatever was stored days ago.
-      messagesBySession[session.id] = messagesBySession[session.id].map((message) =>
-        message.welcome
-          ? {
-              ...message,
-              suggestions: buildLocalSuggestions(session, digestBySession[session.id]),
-              suggestionsPending: false,
-            }
-          : message,
-      )
-    } catch {
-      // Keep the transcript visible even if a stored file can no longer be parsed.
-    }
-  }
-
-  return {
-    handle,
-    sessions,
-    messagesBySession,
-    tracesBySession,
-    digestBySession,
-    activeSessionId: persisted.activeSessionId,
+Ask anything, or start from one of the questions below.`,
   }
 }
 
@@ -469,7 +398,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setDbError(null)
         }
 
-        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Building DuckDB tables…' })
+        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Preparing your tables…' })
 
         const sessionId = createId()
         const result =
@@ -496,7 +425,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         registerSession(session)
 
         // Digest first: the welcome message and every suggestion depend on it.
-        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Profiling columns…' })
+        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Reading columns…' })
         const nextDigest = await refreshDigest(session)
 
         const welcome = buildWelcomeMessage(
@@ -520,6 +449,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           session,
           messages: [welcome],
           traces: [],
+          digest: nextDigest ?? undefined,
           updatedAt: Date.now(),
         })
 
@@ -534,6 +464,122 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     },
     [refreshDigest, refreshSuggestions],
+  )
+
+  const replaceActiveFile = useCallback(
+    async (file: File) => {
+      const session = activeSession
+      if (!session) return
+
+      const kind = getFileKind(file.name)
+      if (!kind) {
+        setUpload({
+          phase: 'error',
+          fileName: file.name,
+          message: `Unsupported file type. Upload ${ACCEPTED_EXTENSIONS.join(' or ')}.`,
+        })
+        return
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setUpload({
+          phase: 'error',
+          fileName: file.name,
+          message: 'File is too large for in-browser analysis (limit: 80 MB).',
+        })
+        return
+      }
+
+      setUpload({ phase: 'reading', fileName: file.name, message: 'Reading file…' })
+
+      try {
+        let handle = dbHandleRef.current
+        if (!handle) {
+          handle = await initDuckDB()
+          dbHandleRef.current = handle
+          setDbReady(true)
+          setDbError(null)
+        }
+
+        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Preparing your tables…' })
+
+        // Ingest into a temporary schema first, so a failed replacement leaves
+        // the existing dataset untouched.
+        const temporaryId = createId()
+        const result =
+          kind === 'csv'
+            ? await ingestCSV({ handle, file, sessionId: temporaryId })
+            : await ingestExcel({ handle, file, sessionId: temporaryId })
+
+        if (result.tables.length === 0) {
+          throw new Error('No readable tables were found in this file.')
+        }
+
+        try {
+          await handle.connection.query(
+            `DROP SCHEMA IF EXISTS ${quoteIdent(session.schemaName)} CASCADE`,
+          )
+        } catch {
+          // The old schema may already be gone.
+        }
+
+        const updated: Session = {
+          ...session,
+          fileName: file.name,
+          fileType: kind,
+          fileSize: file.size,
+          uploadedAt: Date.now(),
+          schemaName: buildSchemaName(temporaryId),
+          tables: result.tables,
+          primaryTable: result.primaryTable,
+        }
+
+        fileCacheRef.current.set(session.id, file)
+        unregisterSession(session.id)
+        registerSession(updated)
+        setSessions((previous) =>
+          previous.map((entry) => (entry.id === session.id ? updated : entry)),
+        )
+        setMessagesBySession((previous) => ({ ...previous, [session.id]: [] }))
+        setTracesBySession((previous) => ({ ...previous, [session.id]: [] }))
+        setDigestBySession((previous) => {
+          const next = { ...previous }
+          delete next[session.id]
+          return next
+        })
+
+        setUpload({ phase: 'ingesting', fileName: file.name, message: 'Reading columns…' })
+        const nextDigest = await refreshDigest(updated)
+        const welcome = buildWelcomeMessage(
+          updated,
+          buildLocalSuggestions(updated, nextDigest),
+        )
+        setMessagesBySession((previous) => ({ ...previous, [session.id]: [welcome] }))
+        setUpload({
+          phase: 'done',
+          fileName: file.name,
+          message: `Replaced with ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}.`,
+        })
+
+        await saveSessionFile(session.id, file)
+        void savePersistedSession({
+          id: session.id,
+          session: updated,
+          messages: [welcome],
+          traces: [],
+          digest: nextDigest ?? undefined,
+          updatedAt: Date.now(),
+        })
+        void refreshSuggestions(updated, welcome.id, nextDigest)
+      } catch (error) {
+        setUpload({
+          phase: 'error',
+          fileName: file.name,
+          message: errorMessage(error),
+        })
+      }
+    },
+    [activeSession, refreshDigest, refreshSuggestions],
   )
 
   const selectSession = useCallback((sessionId: string) => {
@@ -703,7 +749,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // Drain the last buffered characters before replacing with the
         // authoritative final text.
         flushPendingDelta()
-        patchMessage(sessionId, assistantId, { content: result.text })
+        patchMessage(sessionId, assistantId, {
+          content: result.text,
+          usage: result.usage,
+        })
 
         // Follow-ups are derived from the question, the answer, and the data.
         void refreshSuggestions(
@@ -845,6 +894,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url)
   }, [activeSession, tracesBySession])
 
+  const exportTranscript = useCallback(() => {
+    const session = activeSession
+    if (!session) return
+    const sessionMessages = messagesBySession[session.id] ?? []
+    downloadTextFile(transcriptFileName(session), buildTranscript(session, sessionMessages))
+  }, [activeSession, messagesBySession])
+
+  const renameSession = useCallback(
+    (sessionId: string, fileName: string) => {
+      const trimmed = fileName.trim()
+      if (!trimmed) return
+      const target = sessions.find((session) => session.id === sessionId)
+      if (!target) return
+
+      const updated: Session = { ...target, fileName: trimmed }
+      unregisterSession(sessionId)
+      registerSession(updated)
+      setSessions((previous) =>
+        previous.map((session) => (session.id === sessionId ? updated : session)),
+      )
+      void savePersistedSession({
+        id: sessionId,
+        session: updated,
+        messages: messagesBySession[sessionId] ?? [],
+        traces: tracesBySession[sessionId] ?? [],
+        digest: digestBySession[sessionId],
+        updatedAt: Date.now(),
+      })
+    },
+    [digestBySession, messagesBySession, sessions, tracesBySession],
+  )
+
   /**
    * Hands the original file back to the OS.
    *
@@ -867,40 +948,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     downloadFile(stored)
   }, [activeSession])
 
-  // Debounced snapshots keep transcripts and results intact across refreshes.
-  useEffect(() => {
-    if (!persistReadyRef.current || isStreaming) return
-    const timer = window.setTimeout(() => {
-      saveWorkspaceCache({
-        sessions,
-        activeSessionId,
-        messagesBySession,
-        digestBySession,
-      })
-      for (const session of sessions) {
-        void savePersistedSession({
-          id: session.id,
-          session,
-          messages: messagesBySession[session.id] ?? [],
-          traces: tracesBySession[session.id] ?? [],
-          updatedAt: Date.now(),
-        })
-      }
-    }, 350)
-    return () => window.clearTimeout(timer)
-  }, [
+  useWorkspacePersistence({
+    ready: persistReadyRef,
+    sessions,
     activeSessionId,
+    messagesBySession,
+    tracesBySession,
     digestBySession,
     isStreaming,
-    messagesBySession,
-    sessions,
-    tracesBySession,
-  ])
-
-  useEffect(() => {
-    if (!persistReadyRef.current) return
-    void saveActiveSessionId(activeSessionId)
-  }, [activeSessionId])
+  })
 
   const state = useMemo<SessionState>(
     () => ({
@@ -960,6 +1016,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSidebarOpen,
       toggleSidebar,
       exportTrace,
+      exportTranscript,
+      renameSession,
+      replaceActiveFile,
       openActiveFile,
     }),
     [
@@ -968,6 +1027,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       closeSettings,
       deleteSession,
       exportTrace,
+      exportTranscript,
+      renameSession,
+      replaceActiveFile,
       openActiveFile,
       openPanel,
       openSettings,

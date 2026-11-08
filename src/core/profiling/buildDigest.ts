@@ -1,6 +1,6 @@
 import type { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
 import type { DatasetDigest, DigestColumn, DigestTable, Session } from '../types'
-import { DIGEST_MAX_COLUMNS, DIGEST_TOP_VALUES } from '../constants'
+import { DIGEST_MAX_COLUMNS, DIGEST_MAX_TABLES, DIGEST_TOP_VALUES } from '../constants'
 import { firstNumber } from '../duckdb/result'
 import { qualifiedName, quoteIdent, quoteString } from '../duckdb/sql'
 
@@ -99,14 +99,30 @@ async function describeColumn(
   }
 }
 
-/** Builds the digest for every table in a session. */
+/**
+ * Builds a digest for the most useful tables in a session.
+ *
+ * Workbooks can contain hundreds of sheets. Profiling every one would take a
+ * long time and flood the assistant with noise, so the primary table plus the
+ * largest tables are described first.
+ */
 export async function buildDatasetDigest(
   connection: AsyncDuckDBConnection,
   session: Session,
 ): Promise<DatasetDigest> {
+  const primary = session.tables.find((table) => table.name === session.primaryTable)
+  const ranked = [...session.tables]
+    .filter((table) => table.name !== primary?.name)
+    .sort(
+      (left, right) =>
+        right.rowCount - left.rowCount || right.columnCount - left.columnCount,
+    )
+  const selected = [primary, ...ranked].filter(
+    (table): table is Session['tables'][number] => table !== undefined,
+  )
   const tables: DigestTable[] = []
 
-  for (const table of session.tables) {
+  for (const table of selected.slice(0, DIGEST_MAX_TABLES)) {
     const target = qualifiedName(session.schemaName, table.name)
 
     try {
@@ -121,8 +137,8 @@ export async function buildDatasetDigest(
         name: table.name,
         rowCount: table.rowCount,
         columns: described,
-      })    } catch {
-      // A table that cannot be read still gets listed so the UI stays honest.
+      })
+    } catch {
       tables.push({ name: table.name, rowCount: table.rowCount, columns: [] })
     }
   }

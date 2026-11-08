@@ -15,7 +15,10 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
   const duration = entry.finishedAt ? entry.finishedAt - entry.startedAt : null
   const detail = typeof entry.detail === 'string' ? entry.detail : ''
   const summary = typeof entry.summary === 'string' ? entry.summary : ''
-  const argsText = JSON.stringify(entry.args ?? {}, null, 2)
+  const safeArgs = { ...(entry.args ?? {}) }
+  if (entry.toolName === 'run_sql') delete safeArgs.sql
+  const argsText = JSON.stringify(safeArgs, null, 2)
+  const friendlyTool = entry.toolName === 'inspect_schema' ? 'Read columns' : 'Analysed data'
 
   return (
     <div className={`trace-entry is-${entry.status}`}>
@@ -41,7 +44,7 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
           ) : (
             <TableIcon size={12} />
           )}
-          <span>{entry.toolName}</span>
+          <span>{friendlyTool}</span>
         </span>
 
         <span className="trace-time">{formatTime(entry.startedAt)}</span>
@@ -60,12 +63,12 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
           ) : null}
 
           <div className="trace-detail-row is-column">
-            <span className="trace-detail-label">Arguments</span>
+            <span className="trace-detail-label">Step details</span>
             <pre className="trace-code">{argsText}</pre>
           </div>
 
           <div className="trace-detail-row is-column">
-            <span className="trace-detail-label">Result</span>
+            <span className="trace-detail-label">Outcome</span>
             <pre className="trace-code">{detail.length > 0 ? detail : '—'}</pre>
           </div>
         </div>

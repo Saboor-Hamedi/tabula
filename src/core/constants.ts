@@ -38,6 +38,12 @@ export const SUGGESTION_COUNT = 4
 export const DIGEST_TOP_VALUES = 6
 /** Columns sampled per table when building the dataset digest. */
 export const DIGEST_MAX_COLUMNS = 24
+/** Largest tables described in the digest; prevents huge workbooks from hanging. */
+export const DIGEST_MAX_TABLES = 12
+/** Tables listed in the assistant prompt before summarising the rest. */
+export const PROMPT_MAX_TABLES = 30
+/** Tables shown in the welcome message. */
+export const WELCOME_MAX_TABLES = 5
 
 export const ACCEPTED_EXTENSIONS = ['.csv', '.xlsx'] as const
 

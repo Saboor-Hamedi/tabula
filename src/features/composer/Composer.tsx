@@ -39,7 +39,7 @@ export function Composer() {
           streaming={isStreaming}
           placeholder={
             !apiKey
-              ? 'Add your API key to start asking questions…'
+              ? 'Add your DeepSeek key to start asking questions…'
               : activeSession
                 ? `Ask about ${activeSession.fileName}…`
                 : 'Upload a file to begin…'

@@ -22,6 +22,10 @@ export interface AgentTurnInput {
 
 export interface AgentTurnResult {
   text: string
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+  }
 }
 
 /**
@@ -60,6 +64,7 @@ export async function runAgentTurn({
     sessionId: session.id,
     schemaName: session.schemaName,
     tableNames: session.tables.map((table) => table.name),
+    tables: session.tables,
     onTrace,
   }
 
@@ -112,5 +117,16 @@ export async function runAgentTurn({
     throw new Error('The model returned an empty response. Try asking again.')
   }
 
-  return { text: answer }
+  let usage: AgentTurnResult['usage']
+  try {
+    const reported = await result.usage
+    usage = {
+      inputTokens: reported.inputTokens ?? 0,
+      outputTokens: reported.outputTokens ?? 0,
+    }
+  } catch {
+    usage = undefined
+  }
+
+  return { text: answer, usage }
 }

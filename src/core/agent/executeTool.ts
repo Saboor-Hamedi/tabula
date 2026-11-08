@@ -2,8 +2,8 @@ import type { DuckDBHandle } from '../duckdb/initDuckDB'
 import { listTables, tableExists } from '../duckdb/listTables'
 import { runSQL } from '../duckdb/runSQL'
 import { profileTable } from '../profiling/profileTable'
-import { MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
-import type { TableProfile, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
+import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
+import type { TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
 import {
   createTraceEntry,
   createTraceId,
@@ -17,6 +17,7 @@ export interface ToolContext {
   sessionId: string
   schemaName: string
   tableNames: string[]
+  tables: TableSummary[]
   onTrace: (entry: ToolTraceEntry) => void
 }
 
@@ -51,19 +52,26 @@ async function inspectSchema(
     }
   }
 
+  const ranked = [...context.tables].sort(
+    (left, right) => right.rowCount - left.rowCount || right.columnCount - left.columnCount,
+  )
+  const rankedNames = ranked.map((table) => table.name)
+
   const tablesToProfile: string[] = []
   if (requestedTable) {
     const match = available.find((name) => name.toLowerCase() === requestedTable.toLowerCase())
     if (!match) {
       return {
         error: `Table "${requestedTable}" was not found.`,
-        availableTables: available,
-        hint: 'Call inspect_schema without a table argument to inspect every table.',
+        availableTables: available.slice(0, 50),
+        availableTableCount: available.length,
+        hint: 'Pass the exact table name, or omit it to inspect the largest tables.',
       }
     }
     tablesToProfile.push(match)
   } else {
-    tablesToProfile.push(...available)
+    const ordered = rankedNames.filter((name) => available.includes(name))
+    tablesToProfile.push(...(ordered.length > 0 ? ordered : available).slice(0, DIGEST_MAX_TABLES))
   }
 
   const profiles: TableProfile[] = []
@@ -76,12 +84,15 @@ async function inspectSchema(
   return {
     engine: 'DuckDB (in-memory)',
     schema: context.schemaName,
-    scope: requestedTable ? 'single_table' : 'all_tables',
+    scope: requestedTable ? 'single_table' : 'largest_tables',
     tableCount: profiles.length,
+    totalTableCount: available.length,
     tables: profiles,
     maxAgentSteps: MAX_AGENT_STEPS,
     guidance:
-      'Use the exact column names and types shown above. The schema is already on the search_path, so unqualified table names work. Explore distributions, nulls, cardinality, group-bys, and time trends before answering.',
+      available.length > profiles.length
+        ? `This workbook has ${available.length} tables. The largest ${profiles.length} are shown. Ask for a specific table by exact name when needed.`
+        : 'Use the exact column names and types shown above. The schema is already on the search_path, so unqualified table names work. Explore distributions, nulls, cardinality, group-bys, and time trends before answering.',
   }
 }
 

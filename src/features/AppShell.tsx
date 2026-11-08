@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react'
 import {
   getPanelWidth,
   getSidebarWidth,
@@ -8,13 +8,19 @@ import {
   SIDEBAR_WIDTH,
 } from '../core/storage/uiPrefs'
 import { ChatPanel } from './chat/ChatPanel'
+import { useKeyboardShortcuts } from './common/useKeyboardShortcuts'
 import { Header } from './header/Header'
 import { ResizeHandle } from './layout/ResizeHandle'
-import { Inspector } from './panel/Inspector'
 import { useSessionActions, useSessionState } from './SessionProvider'
-import { SettingsModal } from './settings/SettingsModal'
 import { Sidebar } from './sidebar/Sidebar'
 import { UploadZone } from './upload/UploadZone'
+
+const Inspector = lazy(() =>
+  import('./panel/Inspector').then((module) => ({ default: module.Inspector })),
+)
+const SettingsModal = lazy(() =>
+  import('./settings/SettingsModal').then((module) => ({ default: module.SettingsModal })),
+)
 
 /**
  * Application shell.
@@ -43,10 +49,11 @@ function useMediaQuery(query: string): boolean {
 }
 
 export function AppShell() {
-  const { activeSession, sidebarOpen, panelOpen } = useSessionState()
-  const { closePanel, setSidebarOpen } = useSessionActions()
+  const { activeSession, sidebarOpen, panelOpen, settingsOpen } = useSessionState()
+  const { closePanel, exportTranscript, setSidebarOpen } = useSessionActions()
   const sidebarOverlay = useMediaQuery(SIDEBAR_OVERLAY_QUERY)
   const panelOverlay = useMediaQuery(PANEL_OVERLAY_QUERY)
+  useKeyboardShortcuts({ exportTranscript })
 
   const [sidebarWidth, setSidebarWidth] = useState(getSidebarWidth)
   const [panelWidth, setPanelWidth] = useState(getPanelWidth)
@@ -120,7 +127,11 @@ export function AppShell() {
             onResize={updatePanelWidth}
           />
         ) : null}
-        {panelOpen ? <Inspector /> : null}
+        {panelOpen ? (
+          <Suspense fallback={<aside className="inspector" aria-hidden />}>
+            <Inspector />
+          </Suspense>
+        ) : null}
       </div>
 
       {sidebarAsOverlay ? (
@@ -136,7 +147,11 @@ export function AppShell() {
         </>
       ) : null}
 
-      <SettingsModal />
+      {settingsOpen ? (
+        <Suspense fallback={null}>
+          <SettingsModal />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

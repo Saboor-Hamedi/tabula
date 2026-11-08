@@ -57,7 +57,7 @@ export function ChatInput({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        disabled={disabled || streaming}
+        disabled={disabled}
         aria-label="Message the data agent"
       />
 

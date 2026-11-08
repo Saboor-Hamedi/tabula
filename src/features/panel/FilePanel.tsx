@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { ACCEPTED_EXTENSIONS } from '../../core/constants'
 import { formatBytes, formatCount, formatRelativeTime } from '../../core/utils/format'
-import { ExternalIcon, SheetIcon, TableIcon } from '../common/Icons'
+import { ExternalIcon, SheetIcon, TableIcon, UploadIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
 /**
@@ -13,7 +14,8 @@ import { useSessionActions, useSessionState } from '../SessionProvider'
 
 export function FilePanel() {
   const { activeSession, digest } = useSessionState()
-  const { openActiveFile } = useSessionActions()
+  const { openActiveFile, replaceActiveFile } = useSessionActions()
+  const replaceRef = useRef<HTMLInputElement>(null)
 
   const totalRows = useMemo(
     () =>
@@ -58,6 +60,28 @@ export function FilePanel() {
         </span>
       </button>
 
+      <div className="file-panel-actions">
+        <button
+          type="button"
+          className="btn btn-ghost btn-small"
+          onClick={() => replaceRef.current?.click()}
+        >
+          <UploadIcon size={13} />
+          <span>Replace file</span>
+        </button>
+        <input
+          ref={replaceRef}
+          type="file"
+          accept={ACCEPTED_EXTENSIONS.join(',')}
+          className="visually-hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void replaceActiveFile(file)
+            event.target.value = ''
+          }}
+        />
+      </div>
+
       <div className="file-facts">
         <div className="file-fact">
           <span className="file-fact-label">Tables</span>
@@ -97,7 +121,13 @@ export function FilePanel() {
         ))}
 
         {!digest ? (
-          <div className="file-panel-note">Profiling columns…</div>
+          <div className="file-panel-note">Reading columns…</div>
+        ) : digest.tables.length < activeSession.tables.length ? (
+          <div className="file-panel-note">
+            Showing the {formatCount(digest.tables.length)} largest of{' '}
+            {formatCount(activeSession.tables.length)} tables. Ask about a specific sheet or column
+            for more detail.
+          </div>
         ) : null}
       </div>
     </div>

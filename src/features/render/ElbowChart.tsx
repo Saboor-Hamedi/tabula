@@ -1,6 +1,7 @@
 import { useId, useMemo } from 'react'
 import type { ElbowChartData, ElbowPoint } from '../../core/types'
 import { formatCompact } from '../../core/utils/format'
+import { annotationBackground, CHART_COLORS, niceMax } from './chartTheme'
 
 /**
  * Annotated elbow chart.
@@ -15,55 +16,15 @@ const HEIGHT = 420
 const MARGIN = { top: 64, right: 32, bottom: 64, left: 76 }
 
 const COLORS = {
-  ink: '#111827',
-  secondary: '#4b5563',
-  grid: '#e5e7eb',
-  axis: '#9ca3af',
-  line: '#2563eb',
-  point: '#1d4ed8',
-  elbow: '#dc2626',
-  elbowSoft: '#fee2e2',
+  ...CHART_COLORS,
+  elbow: CHART_COLORS.highlight,
+  elbowSoft: CHART_COLORS.highlightSoft,
 } as const
-
-function niceMax(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 1
-  const target = value * 1.06
-  const exponent = Math.floor(Math.log10(target))
-  const magnitude = 10 ** exponent
-  const fraction = target / magnitude
-  const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10
-  return niceFraction * magnitude
-}
 
 function closestPoint(points: ElbowPoint[], elbowX: number): ElbowPoint {
   return points.reduce((best, point) =>
     Math.abs(point.x - elbowX) < Math.abs(best.x - elbowX) ? point : best,
   )
-}
-
-/** Parses #rgb / #rrggbb / #rrggbbaa into an approximate relative luminance. */
-function colorLuminance(color: string): number | null {
-  const match = /^#([0-9a-f]{3,8})$/i.exec(color.trim())
-  if (!match) return null
-  const hex = match[1]
-  const full =
-    hex.length === 3
-      ? hex
-          .split('')
-          .map((part) => part + part)
-          .join('')
-      : hex.slice(0, 6)
-  if (full.length < 6) return null
-  const channels = [0, 2, 4].map((offset) => parseInt(full.slice(offset, offset + 2), 16) / 255)
-  const [red, green, blue] = channels.map((value) =>
-    value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
-  )
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
-}
-
-function annotationBackground(color: string): string {
-  const luminance = colorLuminance(color)
-  return luminance !== null && luminance > 0.55 ? '#111827' : '#ffffff'
 }
 
 export function ElbowChart({ data }: { data: ElbowChartData }) {

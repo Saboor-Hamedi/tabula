@@ -76,7 +76,7 @@ function SettingsDialog() {
             <div className="field-head">
               <label htmlFor="api-key" className="field-label">
                 <KeyIcon size={14} />
-                DeepSeek API key
+                DeepSeek access key
               </label>
               {apiKey ? (
                 <span className="field-status is-ok">Saved · {maskApiKey(apiKey)}</span>
@@ -120,9 +120,9 @@ function SettingsDialog() {
             ) : null}
 
             <p className="field-help">
-              Stored in this browser only, under <code>data-agent:deepseek-key</code>. Only your
-              questions, the column digest, and the query results the agent requests are sent to
-              DeepSeek. The uploaded file itself stays local.
+              Stored only in this browser. Only your questions, a summary of the selected columns,
+              and the results needed to answer are sent to DeepSeek. The uploaded file itself stays
+              local.
             </p>
           </div>
         </div>
