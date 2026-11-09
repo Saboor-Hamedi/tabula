@@ -37,7 +37,7 @@ const QUICK_STARTERS = [
 
 export function PythonPanel() {
   const { pythonResult, pythonHistory = [], pythonStatus, activeSession } = useSessionState()
-  const { runPythonCode, clearPythonResult } = useSessionActions()
+  const { runPythonCode, clearPythonResult, removePythonRun } = useSessionActions()
   const [selectedRunIndex, setSelectedRunIndex] = useState(0)
   const [copiedStdout, setCopiedStdout] = useState(false)
   const [copiedImgIdx, setCopiedImgIdx] = useState<number | null>(null)
@@ -155,26 +155,46 @@ export function PythonPanel() {
         ) : null}
       </div>
 
-      {/* History Navigation Bar (when multiple runs exist) */}
-      {pythonHistory.length > 1 ? (
+      {/* History Navigation Bar (when runs exist) */}
+      {pythonHistory.length > 0 ? (
         <div className="python-history-bar" role="tablist">
           <span className="python-history-label">Runs:</span>
           <div className="python-history-pills">
             {pythonHistory.map((run, idx) => (
-              <button
+              <div
                 key={run.executedAt || idx}
-                type="button"
                 role="tab"
+                tabIndex={0}
                 aria-selected={selectedRunIndex === idx}
                 className={`python-history-pill ${selectedRunIndex === idx ? 'is-active' : ''}`}
                 onClick={() => setSelectedRunIndex(idx)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setSelectedRunIndex(idx)
+                  }
+                }}
               >
                 <span>Run {pythonHistory.length - idx}</span>
                 {run.images.length > 0 ? (
-                  <span className="python-pill-badge">{run.images.length} 📊</span>
+                  <span className="python-pill-badge">{run.images.length}</span>
                 ) : null}
                 {run.error ? <span className="python-pill-error">!</span> : null}
-              </button>
+                <button
+                  type="button"
+                  className="python-pill-close-btn"
+                  aria-label={`Close Run ${pythonHistory.length - idx}`}
+                  title="Close run"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removePythonRun(idx)
+                    if (selectedRunIndex >= idx && selectedRunIndex > 0) {
+                      setSelectedRunIndex(selectedRunIndex - 1)
+                    }
+                  }}
+                >
+                  <CloseIcon size={10} />
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -184,30 +204,9 @@ export function PythonPanel() {
         {/* If no runs and not running, show minimal clean empty state */}
         {!activeRun && pythonStatus !== 'running' ? (
           <div className="python-empty-state">
-            <div className="python-icon-circle">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
-                  fill="currentColor"
-                  fillOpacity="0.08"
-                />
-                <path
-                  d="M10 8h4a2 2 0 0 1 2 2v2H8V10a2 2 0 0 1 2-2z"
-                  fill="#3b82f6"
-                />
-                <path
-                  d="M14 16h-4a2 2 0 0 1-2-2v-2h8v2a2 2 0 0 1-2 2z"
-                  fill="#eab308"
-                />
-              </svg>
+            <div className="python-starters-head">
+              <span>Quick Starters</span>
             </div>
-            <h3>Python Results Viewer</h3>
-            <p>
-              Run any Python code block from the chat. Your plots, terminal output, and results will automatically appear here.
-            </p>
-            <p className="python-subtext">
-              Or run a quick starter on your dataset:
-            </p>
 
             <div className="python-starters-list">
               {QUICK_STARTERS.map((starter) => (

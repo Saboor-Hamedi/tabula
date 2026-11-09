@@ -14,9 +14,11 @@ export function ReportView() {
 
   if (!activeSession) return null
 
-  const title = activeSession.fileName
-  const subtitle = `Tabula report · ${new Date().toLocaleString()} · ${formatCount(messages.length)} messages`
-  const fileName = `${title.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '-') || 'tabula'}-report.html`
+  const title = activeSession.primaryTable
+    ? `${activeSession.primaryTable} Analysis Report`
+    : 'Dataset Analysis Report'
+  const subtitle = `Tabula analysis · ${new Date().toLocaleString()} · ${formatCount(messages.length)} messages`
+  const fileName = `tabula-analysis-report-${new Date().toISOString().slice(0, 10)}.html`
 
   const getHtml = () =>
     buildReportHtml({

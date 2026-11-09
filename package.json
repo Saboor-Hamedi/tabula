@@ -16,6 +16,7 @@
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.81",
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
+    "@supabase/supabase-js": "^2.119.0",
     "ai": "^7.0.165",
     "apache-arrow": "^21.2.0",
     "mermaid": "^12.3.0",

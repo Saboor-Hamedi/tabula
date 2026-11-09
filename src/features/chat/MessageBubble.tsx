@@ -2,7 +2,7 @@ import { memo, useState } from 'react'
 import { getModelOption } from '../../core/agent/modelOptions'
 import type { ChatMessage } from '../../core/types'
 import { formatCompact, formatTime } from '../../core/utils/format'
-import { CheckIcon, CopyIcon } from '../common/Icons'
+import { CheckIcon, CopyIcon, FileIcon } from '../common/Icons'
 import { useSessionActions } from '../SessionProvider'
 import { MessageRenderer } from './MessageRenderer'
 import { Suggestions } from './Suggestions'
@@ -29,8 +29,9 @@ export const MessageBubble = memo(function MessageBubble({
   activity,
   busy,
 }: MessageBubbleProps) {
-  const { editFigure, sendMessage } = useSessionActions()
+  const { editFigure, sendMessage, saveToNotes } = useSessionActions()
   const [copied, setCopied] = useState(false)
+  const [savedNote, setSavedNote] = useState(false)
   const content = typeof message.content === 'string' ? message.content : ''
 
   const isUser = message.role === 'user'
@@ -44,6 +45,12 @@ export const MessageBubble = memo(function MessageBubble({
     } catch {
       setCopied(false)
     }
+  }
+
+  const handleSaveToNotes = () => {
+    saveToNotes(content)
+    setSavedNote(true)
+    window.setTimeout(() => setSavedNote(false), 2000)
   }
 
   if (isUser) {
@@ -80,9 +87,18 @@ export const MessageBubble = memo(function MessageBubble({
 
       {!streaming && content.trim().length > 0 ? (
         <div className="message-tools">
-          <button type="button" className="tool-btn" onClick={handleCopy}>
+          <button type="button" className="tool-btn" onClick={handleCopy} title="Copy message text">
             {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
+          </button>
+          <button
+            type="button"
+            className="tool-btn"
+            onClick={handleSaveToNotes}
+            title="Save insight to Studio Notes"
+          >
+            {savedNote ? <CheckIcon size={13} /> : <FileIcon size={13} />}
+            <span>{savedNote ? 'Saved to Notes' : 'Save to Notes'}</span>
           </button>
           {message.model ? (
             <span className="message-time" title={getModelOption(message.model).label}>

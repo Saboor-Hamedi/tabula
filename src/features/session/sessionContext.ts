@@ -76,6 +76,9 @@ export interface SessionActions {
   openActiveFile: () => Promise<void>
   runPythonCode: (code: string, options?: { openPanel?: boolean }) => Promise<PythonExecutionResult>
   clearPythonResult: () => void
+  removePythonRun: (index: number) => void
+  saveToNotes: (text: string) => void
+  clearChat: () => Promise<void>
 }
 
 export type SessionContextValue = SessionState & SessionActions

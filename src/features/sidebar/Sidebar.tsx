@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { ACCEPTED_EXTENSIONS } from '../../core/constants'
 import { formatCount } from '../../core/utils/format'
-import { DatabaseIcon, FileIcon } from '../common/Icons'
+import { DatabaseIcon, FileIcon, PlusIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { UploadStatus } from '../upload/UploadStatus'
 import { SessionCard } from './SessionCard'
@@ -32,7 +33,8 @@ export function Sidebar({
   onExpand,
 }: SidebarProps) {
   const { sessions, activeSession, upload } = useSessionState()
-  const { selectSession } = useSessionActions()
+  const { selectSession, uploadFile } = useSessionActions()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const totalRows = useMemo(
     () =>
@@ -46,14 +48,14 @@ export function Sidebar({
 
   if (isCollapsed) {
     return (
-      <aside className="sidebar is-collapsed" aria-label="Datasets rail">
+      <aside className="sidebar is-collapsed" aria-label="Sources rail">
         <div className="sidebar-rail-header">
           <button
             type="button"
             className="brand-rail-btn"
             onClick={onExpand}
-            title="Expand datasets sidebar"
-            aria-label="Expand datasets sidebar"
+            title="Expand sources sidebar"
+            aria-label="Expand sources sidebar"
           >
             <span className="brand-mark" aria-hidden>
               <FileIcon size={16} />
@@ -65,23 +67,48 @@ export function Sidebar({
   }
 
   return (
-    <aside className="sidebar" aria-label="Datasets">
+    <aside className="sidebar" aria-label="Sources">
       <SidebarHeader onClose={onClose} closable={closable} />
 
       <div className="sidebar-body">
         <div className="sidebar-section-head">
-          <span className="sidebar-section-label">Datasets</span>
+          <span className="sidebar-section-label">Sources</span>
           <span className="sidebar-section-count">
-            {sessions.length} · {formatCount(totalRows)} rows
+            {sessions.length} source{sessions.length === 1 ? '' : 's'}
           </span>
         </div>
+
+        {/* NotebookLM-Style "Add Source" Button */}
+        <button
+          type="button"
+          className="sidebar-add-source-btn"
+          onClick={() => fileInputRef.current?.click()}
+          title="Add a new spreadsheet or CSV source"
+        >
+          <PlusIcon size={14} />
+          <span>Add Source</span>
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_EXTENSIONS.join(',')}
+          className="visually-hidden"
+          onChange={(event) => {
+            const files = event.target.files
+            if (files && files.length > 0) {
+              void uploadFile(files[0])
+            }
+            event.target.value = ''
+          }}
+        />
 
         <div className="sidebar-list">
           {sessions.length === 0 ? (
             <div className="sidebar-empty">
               <DatabaseIcon size={18} />
-              <p>No datasets yet</p>
-              <span>Add a CSV or Excel workbook to start.</span>
+              <p>No sources yet</p>
+              <span>Add a CSV or Excel workbook above to start.</span>
             </div>
           ) : (
             sessions.map((session) => (

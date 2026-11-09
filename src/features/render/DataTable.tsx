@@ -1,9 +1,9 @@
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { MAX_PREVIEW_ROWS } from '../../core/constants'
 import { buildCsv, downloadCsv } from '../../core/export/csv'
 import { parseInlineMarkdown } from '../../core/parsing/inlineMarkdown'
 import { formatCount } from '../../core/utils/format'
-import { DownloadIcon } from '../common/Icons'
+import { CheckIcon, CopyIcon, DownloadIcon } from '../common/Icons'
 
 /**
  * Table rendered from a GFM block in an assistant message.
@@ -43,9 +43,49 @@ function CellValue({ value }: { value: string }) {
 }
 
 export const DataTable = memo(function DataTable({ headers = [], rows = [] }: DataTableProps) {
+  const [copied, setCopied] = useState(false)
   const safeHeaders = Array.isArray(headers) ? headers : []
   const safeRows = Array.isArray(rows) ? rows : []
   const visibleRows = useMemo(() => safeRows.slice(0, MAX_PREVIEW_ROWS), [safeRows])
+
+  const handleCopyTable = useCallback(async () => {
+    if (safeHeaders.length === 0) return
+
+    const allRows = [safeHeaders, ...safeRows]
+    const html = `<table style="border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10pt; width: 100%;">${allRows
+      .map(
+        (row, rIdx) => `<tr>${row
+          .map((cell) => {
+            const isHeader = rIdx === 0
+            const tag = isHeader ? 'th' : 'td'
+            const bg = isHeader ? 'background-color: #f3f4f6; font-weight: bold;' : ''
+            return `<${tag} style="border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; ${bg}">${cell}</${tag}>`
+          })
+          .join('')}</tr>`,
+      )
+      .join('')}</table>`
+
+    const tsv = allRows.map((row) => row.join('\t')).join('\n')
+
+    try {
+      if (typeof ClipboardItem !== 'undefined') {
+        const item = new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([tsv], { type: 'text/plain' }),
+        })
+        await navigator.clipboard.write([item])
+      } else {
+        await navigator.clipboard.writeText(tsv)
+      }
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      await navigator.clipboard.writeText(tsv)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    }
+  }, [safeHeaders, safeRows])
+
   const handleDownload = useCallback(() => {
     downloadCsv('tabula-table.csv', buildCsv(safeHeaders, safeRows))
   }, [safeHeaders, safeRows])
@@ -91,10 +131,21 @@ export const DataTable = memo(function DataTable({ headers = [], rows = [] }: Da
             ? `Showing ${formatCount(MAX_PREVIEW_ROWS)} of ${formatCount(rows.length)} rows`
             : `${formatCount(rows.length)} row${rows.length === 1 ? '' : 's'}`}
         </span>
-        <button type="button" className="tool-btn" onClick={handleDownload}>
-          <DownloadIcon size={13} />
-          <span>Download data</span>
-        </button>
+        <div className="data-table-foot-actions">
+          <button
+            type="button"
+            className="tool-btn"
+            onClick={handleCopyTable}
+            title="Copy Word & Google Docs ready formatted table"
+          >
+            {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+            <span>{copied ? 'Copied Table!' : 'Copy as table'}</span>
+          </button>
+          <button type="button" className="tool-btn" onClick={handleDownload} title="Download data as CSV">
+            <DownloadIcon size={13} />
+            <span>Download CSV</span>
+          </button>
+        </div>
       </div>
     </div>
   )

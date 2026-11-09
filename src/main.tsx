@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { installGlobalErrorHandlers } from './core/diagnostics'
 import './styles/theme.css'
 import './styles/app.css'
+import './styles/landing.css'
 import App from './App.tsx'
 
 installGlobalErrorHandlers()

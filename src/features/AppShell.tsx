@@ -55,10 +55,15 @@ function useMediaQuery(query: string): boolean {
 
 export function AppShell() {
   const { activeSession, sidebarOpen, panelOpen, settingsOpen, reportOpen, sheetPicker } = useSessionState()
-  const { closePanel, exportTranscript, setSidebarOpen } = useSessionActions()
+  const { closePanel, openPanel, exportTranscript, setSidebarOpen, toggleSidebar, openSettings } = useSessionActions()
   const sidebarOverlay = useMediaQuery(SIDEBAR_OVERLAY_QUERY)
   const panelOverlay = useMediaQuery(PANEL_OVERLAY_QUERY)
-  useKeyboardShortcuts({ exportTranscript })
+  useKeyboardShortcuts({
+    exportTranscript,
+    toggleSidebar,
+    togglePanel: () => (panelOpen ? closePanel() : openPanel('notes')),
+    openSettings,
+  })
   const { updateReady, applyUpdate } = useServiceWorkerUpdate()
 
   const [sidebarWidth, setSidebarWidth] = useState(getSidebarWidth)

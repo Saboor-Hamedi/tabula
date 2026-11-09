@@ -71,11 +71,9 @@ import { inspectWorkbookInWorker } from "../core/workers/excelClient";
 import {
   ACCEPTED_EXTENSIONS,
   MAX_UPLOAD_BYTES,
-  WELCOME_MAX_TABLES,
 } from "../core/constants";
 import { NEEDS_ACCESS_KEY } from "../core/config";
 import { recordMetric } from "../core/metrics";
-import { formatCount } from "../core/utils/format";
 import {
   bootstrapWorkspace,
   normalizeMessages,
@@ -119,6 +117,7 @@ import {
   type SessionActions,
   type SessionContextValue,
 } from "./session/sessionContext";
+import { addNoteToBoard } from "./theme";
 
 export {
   useSession,
@@ -153,50 +152,6 @@ function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Something went wrong.";
-}
-
-function buildWelcomeMessage(
-  session: Session,
-  suggestions: string[],
-): ChatMessage {
-  const tables = Array.isArray(session?.tables) ? session.tables : [];
-  const totalRows = tables.reduce(
-    (total, table) => total + (table?.rowCount ?? 0),
-    0,
-  );
-  const ranked = [...tables].sort(
-    (left, right) =>
-      (right?.rowCount ?? 0) - (left?.rowCount ?? 0) ||
-      (right?.columnCount ?? 0) - (left?.columnCount ?? 0),
-  );
-  const listed = ranked.slice(0, WELCOME_MAX_TABLES);
-  const tableLines = listed
-    .map(
-      (table) =>
-        `- \`${table.name}\` — ${formatCount(table.rowCount ?? 0)} rows · ${table.columnCount ?? 0} columns`,
-    )
-    .join("\n");
-  const more =
-    tables.length > listed.length
-      ? `\n…and ${formatCount(tables.length - listed.length)} more tables. Ask about a specific sheet or column.`
-      : "";
-
-  return {
-    id: createId(),
-    role: "assistant",
-    createdAt: Date.now(),
-    welcome: true,
-    suggestions: Array.isArray(suggestions) ? suggestions : [],
-    suggestionsPending: false,
-    content: `**${session.fileName} is ready.**
-
-Loaded ${formatCount(tables.length)} table${tables.length === 1 ? "" : "s"} with ${formatCount(totalRows)} rows in total.
-
-Largest tables:
-${tableLines}${more}
-
-Ask anything, or start from one of the questions below.`,
-  };
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -446,16 +401,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
         const nextDigest = await refreshDigest(session);
 
-        const welcome = buildWelcomeMessage(
-          session,
-          buildLocalSuggestions(session, nextDigest),
-        );
-
         setSessions((previous) => [session, ...previous]);
         setActiveSessionId(sessionId);
         setMessagesBySession((previous) => ({
           ...previous,
-          [sessionId]: [welcome],
+          [sessionId]: [],
         }));
         setTracesBySession((previous) => ({ ...previous, [sessionId]: [] }));
         recordMetric("lastUploadMs", performance.now() - startedAt);
@@ -469,16 +419,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void savePersistedSession({
           id: sessionId,
           session,
-          messages: [welcome],
+          messages: [],
           traces: [],
           digest: nextDigest ?? undefined,
           updatedAt: Date.now(),
         }).catch(() => undefined);
-
-        // Now let the model sharpen the starter questions.
-        void refreshSuggestions(session, welcome.id, nextDigest).catch(
-          () => undefined,
-        );
       } catch (error) {
         setUpload({
           phase: "error",
@@ -664,13 +609,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           message: "Reading columns…",
         });
         const nextDigest = await refreshDigest(updated);
-        const welcome = buildWelcomeMessage(
-          updated,
-          buildLocalSuggestions(updated, nextDigest),
-        );
         setMessagesBySession((previous) => ({
           ...previous,
-          [session.id]: [welcome],
+          [session.id]: [],
         }));
         recordMetric("lastUploadMs", performance.now() - startedAt);
         setUpload({
@@ -683,14 +624,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void savePersistedSession({
           id: session.id,
           session: updated,
-          messages: [welcome],
+          messages: [],
           traces: [],
           digest: nextDigest ?? undefined,
           updatedAt: Date.now(),
         }).catch(() => undefined);
-        void refreshSuggestions(updated, welcome.id, nextDigest).catch(
-          () => undefined,
-        );
       } catch (error) {
         setUpload({
           phase: "error",
@@ -987,6 +925,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (tab === 'python') preloadPythonEngine();
   }, []);
 
+  const saveToNotes = useCallback(
+    (text: string) => {
+      addNoteToBoard(text);
+      setPanelTabState("notes");
+      setPanelOpenState(true);
+      savePanelOpen(true);
+    },
+    [],
+  );
+
+  const clearChat = useCallback(async () => {
+    if (!activeSession) return;
+    const sessionId = activeSession.id;
+    setMessagesBySession((previous) => ({
+      ...previous,
+      [sessionId]: [],
+    }));
+    setTracesBySession((previous) => ({
+      ...previous,
+      [sessionId]: [],
+    }));
+    void savePersistedSession({
+      id: sessionId,
+      session: activeSession,
+      messages: [],
+      traces: [],
+      digest: digestBySession[sessionId] ?? undefined,
+      updatedAt: Date.now(),
+    }).catch(() => undefined);
+  }, [activeSession, digestBySession]);
+
   const closePanel = useCallback((persist = true) => {
     setPanelOpenState(false);
     if (persist) savePanelOpen(false);
@@ -1168,6 +1137,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPythonHistory([]);
   }, []);
 
+  const removePythonRun = useCallback((index: number) => {
+    setPythonHistory((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setPythonResult(null);
+      } else {
+        setPythonResult(next[0]);
+      }
+      return next;
+    });
+  }, []);
+
   useWorkspacePersistence({
     ready: persistReadyRef,
     sessions,
@@ -1257,11 +1238,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openActiveFile,
       runPythonCode,
       clearPythonResult,
+      removePythonRun,
+      saveToNotes,
+      clearChat,
     }),
     [
       cancelSheetSelection,
       clearApiKey,
+      clearChat,
       clearPythonResult,
+      removePythonRun,
       closePanel,
       closeReport,
       closeSettings,
@@ -1278,6 +1264,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openSettings,
       runPythonCode,
       saveApiKey,
+      saveToNotes,
       selectSession,
       sendMessage,
       setModel,

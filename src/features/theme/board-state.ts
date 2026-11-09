@@ -170,6 +170,28 @@ function saveItems(key: string, items: BoardItem[]): void {
   }
 }
 
+export function addNoteToBoard(
+  text: string,
+  color: NoteColor = 'butter',
+  storageKey = 'tabula-sticky-notes:v1',
+): NoteItem {
+  const current = loadItems(storageKey) ?? [];
+  const width = 360;
+  const height = 420;
+  const jitter = () => (Math.random() - 0.5) * 60;
+  const note = createNote({
+    color,
+    text,
+    x: Math.max(16, (width - 180) / 2 + jitter()),
+    y: Math.max(16, (height - 180) / 2 + jitter()),
+  });
+  saveItems(storageKey, [...current, note]);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tabula:note-added', { detail: note }));
+  }
+  return note;
+}
+
 /* ------------------------------------------------------------------ */
 /* Hook                                                                */
 /* ------------------------------------------------------------------ */
@@ -179,6 +201,18 @@ export function useBoard(storageKey: string, initialItems: readonly BoardItem[] 
     const items = loadItems(storageKey) ?? [...initialItems];
     return { items, topZ: items.reduce((max, item) => Math.max(max, item.z), 0) };
   });
+
+  // Listen for externally added notes (e.g. from chat responses)
+  useEffect(() => {
+    const handleNoteAdded = (event: Event) => {
+      const custom = event as CustomEvent<NoteItem>;
+      if (custom.detail) {
+        dispatch({ type: 'add', item: custom.detail });
+      }
+    };
+    window.addEventListener('tabula:note-added', handleNoteAdded);
+    return () => window.removeEventListener('tabula:note-added', handleNoteAdded);
+  }, []);
 
   // Save shortly after changes settle, and once more when the page is hidden.
   const latest = useRef(state.items);

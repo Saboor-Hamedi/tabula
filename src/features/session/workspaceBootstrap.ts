@@ -31,11 +31,11 @@ export function normalizeSession(session: Session): Session {
   }
 }
 
-/** Clears transient suggestion flags and repairs malformed cached messages. */
+/** Clears transient suggestion flags, filters synthetic welcome messages, and repairs malformed cached messages. */
 export function normalizeMessages(messages: ChatMessage[] | undefined): ChatMessage[] {
   if (!Array.isArray(messages)) return []
   return messages
-    .filter((message) => message !== null && typeof message === 'object')
+    .filter((message) => message !== null && typeof message === 'object' && !message.welcome)
     .map((message) => ({
       ...message,
       content: typeof message.content === 'string' ? message.content : '',

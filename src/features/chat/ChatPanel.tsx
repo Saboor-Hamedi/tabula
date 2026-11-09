@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useSessionState } from '../SessionProvider'
+import { TrashIcon } from '../common/Icons'
+import { useSessionActions, useSessionState } from '../SessionProvider'
 import { Composer } from '../composer/Composer'
+import { ChatWelcome } from './ChatWelcome'
 import { MessageBubble } from './MessageBubble'
 
 /**
@@ -19,6 +21,7 @@ const STICK_THRESHOLD = 120
 
 export function ChatPanel() {
   const { messages, isStreaming, streamingSessionId, activeSession, traces } = useSessionState()
+  const { clearChat } = useSessionActions()
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
   const lastSessionIdRef = useRef<string | null>(null)
@@ -70,17 +73,42 @@ export function ChatPanel() {
     <div className="chat-panel">
       <div className="chat-scroll" ref={scrollRef} onScroll={handleScroll}>
         <div className="chat-column">
-          {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              streaming={
-                streamingHere && index === messages.length - 1 && message.role === 'assistant'
-              }
-              activity={activity}
-              busy={isStreaming}
-            />
-          ))}
+          {messages.length === 0 ? (
+            <ChatWelcome />
+          ) : (
+            <>
+              <div className="chat-history-header">
+                <span className="chat-history-status">
+                  Loaded {activeSession?.tables?.length ?? 0} table
+                  {(activeSession?.tables?.length ?? 0) === 1 ? '' : 's'}.
+                </span>
+                <button
+                  type="button"
+                  className="chat-clear-history-btn"
+                  onClick={() => {
+                    if (window.confirm('Delete all messages and clear chat history?')) {
+                      void clearChat()
+                    }
+                  }}
+                  title="Clear chat history"
+                >
+                  <TrashIcon size={12} />
+                  <span>Clear history</span>
+                </button>
+              </div>
+              {messages.map((message, index) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  streaming={
+                    streamingHere && index === messages.length - 1 && message.role === 'assistant'
+                  }
+                  activity={activity}
+                  busy={isStreaming}
+                />
+              ))}
+            </>
+          )}
         </div>
       </div>
 

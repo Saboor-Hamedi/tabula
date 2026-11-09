@@ -1,11 +1,11 @@
+import { memo } from 'react'
 import { ArrowUpIcon } from '../common/Icons'
 
 /**
- * Data-derived follow-up questions.
+ * Follow-up suggestions rendered after an assistant response.
  *
- * These are never a static list: they are produced from the dataset digest (and
- * refined by the model after each answer), so every chip names a real column or
- * value from the uploaded file. Clicking one sends it as the next question.
+ * Uses the exact same 2-column card UI as the welcome page.
+ * 'Ask next' header has been removed.
  */
 
 export interface SuggestionsProps {
@@ -15,30 +15,42 @@ export interface SuggestionsProps {
   disabled?: boolean
 }
 
-export function Suggestions({ items, pending = false, onPick, disabled = false }: SuggestionsProps) {
+export const Suggestions = memo(function Suggestions({
+  items,
+  pending = false,
+  onPick,
+  disabled = false,
+}: SuggestionsProps) {
   if (items.length === 0 && !pending) return null
 
   return (
-    <div className="suggestions">
-      <div className="suggestions-head">
-        <span>Ask next</span>
-        {pending ? <span className="suggestions-pending">refining…</span> : null}
-      </div>
+    <div className="suggestions-container">
+      {pending && items.length === 0 ? (
+        <div className="suggestions-pending-bar">
+          <span className="suggestions-pending-dot" />
+          <span>Generating suggestions…</span>
+        </div>
+      ) : null}
 
-      <div className="suggestions-list">
+      <div className="welcome-suggestions-grid">
         {items.map((item) => (
           <button
             key={item}
             type="button"
-            className="suggestion"
+            className="welcome-suggestion-card"
             onClick={() => onPick(item)}
             disabled={disabled}
+            title={item}
           >
-            <span className="suggestion-text">{item}</span>
-            <ArrowUpIcon size={13} />
+            <div className="welcome-suggestion-body">
+              <span className="welcome-suggestion-title">{item}</span>
+            </div>
+            <div className="welcome-suggestion-arrow">
+              <ArrowUpIcon size={13} />
+            </div>
           </button>
         ))}
       </div>
     </div>
   )
-}
+})
