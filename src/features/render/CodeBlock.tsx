@@ -29,7 +29,7 @@ function CodeCellEditor({
   language,
   isPython,
 }: CodeCellProps) {
-  const { runPythonCode, openPanel, sendMessage } = useSessionActions()
+  const { runPythonCode, sendMessage } = useSessionActions()
   const { pythonStatus, pythonResult } = useSessionState()
 
   // Editing state
@@ -40,9 +40,12 @@ function CodeCellEditor({
   // Status state
   const [copied, setCopied] = useState(false)
   const [runningThis, setRunningThis] = useState(false)
-  const [runElapsedSec, setRunElapsedSec] = useState(0)
   const [localResult, setLocalResult] = useState<PythonExecutionResult | null>(null)
   const [askingFix, setAskingFix] = useState(false)
+
+  const isModified = currentCode.trim() !== initialCode.trim()
+  const lines = currentCode.split('\n')
+  const lineCount = lines.length
 
   // Sync initialCode changes
   useEffect(() => {
@@ -56,22 +59,15 @@ function CodeCellEditor({
     }
   }, [isEditing])
 
-  // Stopwatch timer while executing
+  // Auto-resize textarea to exactly match code lines with 0 bottom gap
   useEffect(() => {
-    if (!runningThis) {
-      setRunElapsedSec(0)
-      return
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      const targetHeight = Math.max(lines.length * 18, 18) + 16
+      textarea.style.height = `${Math.max(textarea.scrollHeight, targetHeight)}px`
     }
-    const start = performance.now()
-    const timer = window.setInterval(() => {
-      setRunElapsedSec(Number(((performance.now() - start) / 1000).toFixed(1)))
-    }, 100)
-    return () => clearInterval(timer)
-  }, [runningThis])
-
-  const isModified = currentCode.trim() !== initialCode.trim()
-  const lines = currentCode.split('\n')
-  const lineCount = lines.length
+  }, [currentCode, isEditing, lines.length])
 
   const handleCopy = async (text: string, setter: (v: boolean) => void) => {
     try {
@@ -189,6 +185,34 @@ function CodeCellEditor({
         </div>
 
         <div className="code-block-actions">
+          {/* Execution status in header */}
+          {resultToDisplay && !runningThis ? (
+            <span
+              className={`code-status-pill ${resultToDisplay.error ? 'is-error' : 'is-success'}`}
+              title={
+                resultToDisplay.error
+                  ? 'Execution failed (see right panel)'
+                  : `Executed in ${resultToDisplay.elapsedMs}ms (see right panel)`
+              }
+            >
+              {resultToDisplay.error ? 'Error' : `${resultToDisplay.elapsedMs}ms`}
+            </span>
+          ) : null}
+
+          {/* Ask AI to fix button in header if error */}
+          {resultToDisplay?.error && !runningThis ? (
+            <button
+              type="button"
+              className="code-tool-btn is-fix-btn"
+              onClick={() => handleAskAgentToFix(resultToDisplay.error || '')}
+              disabled={askingFix}
+              title="Send error to AI to generate a fix"
+            >
+              <SendIcon size={11} />
+              <span>{askingFix ? 'Asking…' : 'Fix'}</span>
+            </button>
+          ) : null}
+
           {/* Edit / Done button */}
           {isPython ? (
             <button
@@ -242,7 +266,7 @@ function CodeCellEditor({
         </div>
       </div>
 
-      {/* Code Editor Body / Display */}
+      {/* Code Editor Body / Display - flush with 0 bottom gap */}
       <div className="code-block-body">
         {isEditing ? (
           <div className="code-editor-wrapper">
@@ -263,14 +287,8 @@ function CodeCellEditor({
                 spellCheck={false}
                 autoCapitalize="off"
                 autoComplete="off"
-                rows={Math.min(Math.max(lineCount, 5), 32)}
                 aria-label="Code editor"
               />
-              <div className="code-editor-footer-hint">
-                <span>
-                  Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run · <kbd>Tab</kbd> to indent
-                </span>
-              </div>
             </div>
           </div>
         ) : (
@@ -288,60 +306,6 @@ function CodeCellEditor({
           </div>
         )}
       </div>
-
-      {/* Running feedback indicator */}
-      {runningThis ? (
-        <div className="code-block-inline-status">
-          <span className="python-status-indicator is-running" aria-hidden />
-          <span>Executing in Pyodide WASM… {runElapsedSec}s (showing on right)</span>
-        </div>
-      ) : null}
-
-      {/* Subtle execution footer when result is available */}
-      {resultToDisplay && !runningThis ? (
-        <div className="code-block-footer-status">
-          <div className="code-output-meta">
-            <span
-              className={`python-status-indicator is-${resultToDisplay.error ? 'error' : 'ready'}`}
-              aria-hidden
-            />
-            <span className="code-output-timing">
-              {resultToDisplay.error
-                ? 'Execution failed'
-                : `Executed in ${resultToDisplay.elapsedMs}ms`}
-            </span>
-            {resultToDisplay.images.length > 0 ? (
-              <span className="code-output-pill">
-                {resultToDisplay.images.length} {resultToDisplay.images.length === 1 ? 'figure' : 'figures'}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="code-footer-actions">
-            {resultToDisplay.error ? (
-              <button
-                type="button"
-                className="code-tool-btn is-fix-btn"
-                onClick={() => handleAskAgentToFix(resultToDisplay.error || '')}
-                disabled={askingFix}
-                title="Send error to AI to generate a fix"
-              >
-                <SendIcon size={11} />
-                <span>{askingFix ? 'Asking…' : 'Ask AI to fix'}</span>
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              className="code-view-results-link"
-              onClick={() => openPanel('python')}
-              title="Open right panel results viewer"
-            >
-              <span>View results on right →</span>
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

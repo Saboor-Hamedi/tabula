@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 
 export type ThemeMode = 'light' | 'dark'
 
-const THEME_STORAGE_KEY = 'tabula-theme'
+export const THEME_STORAGE_KEY = 'tabula-theme'
 
-function getInitialTheme(): ThemeMode {
+export function getInitialTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light'
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -16,21 +16,52 @@ function getInitialTheme(): ThemeMode {
   return 'light'
 }
 
+// Module-level persistent theme state so remounts, HMR, and errors never lose the theme
+let globalTheme: ThemeMode = getInitialTheme()
+const subscribers = new Set<(theme: ThemeMode) => void>()
+
+// Synchronously sync document attribute immediately on module load
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('data-theme', globalTheme)
+}
+
+function setGlobalTheme(next: ThemeMode) {
+  globalTheme = next
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', next)
+  }
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, next)
+  } catch {
+    // ignore
+  }
+  subscribers.forEach((fn) => fn(next))
+}
+
+// Listen to storage changes across tabs
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === THEME_STORAGE_KEY && (e.newValue === 'light' || e.newValue === 'dark')) {
+      setGlobalTheme(e.newValue)
+    }
+  })
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<ThemeMode>(getInitialTheme)
+  const [theme, setThemeState] = useState<ThemeMode>(() => globalTheme)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme)
-    } catch {
-      // ignore
+    setThemeState(globalTheme)
+    const subscriber = (t: ThemeMode) => setThemeState(t)
+    subscribers.add(subscriber)
+    return () => {
+      subscribers.delete(subscriber)
     }
-  }, [theme])
+  }, [])
 
   const toggleTheme = useCallback(
     (event?: React.MouseEvent) => {
-      const nextTheme = theme === 'dark' ? 'light' : 'dark'
+      const nextTheme = globalTheme === 'dark' ? 'light' : 'dark'
 
       // If View Transition API is unavailable, toggle state directly
       const doc = document as Document & {
@@ -40,7 +71,7 @@ export function useTheme() {
       }
 
       if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        setThemeState(nextTheme)
+        setGlobalTheme(nextTheme)
         return
       }
 
@@ -52,13 +83,7 @@ export function useTheme() {
       )
 
       const transition = doc.startViewTransition(() => {
-        setThemeState(nextTheme)
-        document.documentElement.setAttribute('data-theme', nextTheme)
-        try {
-          localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
-        } catch {
-          // ignore
-        }
+        setGlobalTheme(nextTheme)
       })
 
       transition.ready.then(() => {
@@ -77,7 +102,7 @@ export function useTheme() {
         )
       })
     },
-    [theme],
+    [],
   )
 
   return { theme, toggleTheme }

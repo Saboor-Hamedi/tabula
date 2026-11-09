@@ -11,6 +11,15 @@
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f766e" />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('tabula-theme');
+          var theme = (saved === 'light' || saved === 'dark') ? saved : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (_) {}
+      })();
+    </script>
     <title>Tabula — Chat with your data</title>
   </head>
   <body>

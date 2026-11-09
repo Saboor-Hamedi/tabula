@@ -1,9 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { getModelOption, MODEL_OPTIONS } from '../../core/agent/modelOptions'
+import { useState } from 'react'
 import {
-  CheckIcon,
-  CpuIcon,
-  DownloadIcon,
   FileIcon,
   MoonIcon,
   PanelRightIcon,
@@ -18,16 +14,15 @@ import { useSessionActions, useSessionState } from '../SessionProvider'
  * Header.
  *
  * Left: active dataset name and status.
- * Right: report/export, model switcher, theme toggle, and the inspector toggle.
+ * Right: report, theme toggle, and the inspector toggle.
  */
 
 export function Header() {
-  const { activeSession, messages, model, panelOpen } = useSessionState()
+  const { activeSession, messages, panelOpen } = useSessionState()
   const {
     openPanel,
     closePanel,
     renameSession,
-    exportTranscript,
     openReport,
   } = useSessionActions()
   const { theme, toggleTheme } = useTheme()
@@ -89,20 +84,10 @@ export function Header() {
       <div className="app-header-right">
         {!online ? <span className="offline-pill">Offline</span> : null}
         {activeSession ? (
-          <>
-            <IconButton label="Open report" disabled={!canExport} onClick={openReport}>
-              <FileIcon size={16} />
-            </IconButton>
-            <IconButton
-              label="Download conversation"
-              disabled={!canExport}
-              onClick={exportTranscript}
-            >
-              <DownloadIcon size={16} />
-            </IconButton>
-          </>
+          <IconButton label="Open report" disabled={!canExport} onClick={openReport}>
+            <FileIcon size={16} />
+          </IconButton>
         ) : null}
-        <ModelMenu model={model} />
         <IconButton
           label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           onClick={(e) => toggleTheme(e)}
@@ -118,80 +103,5 @@ export function Header() {
         </IconButton>
       </div>
     </header>
-  )
-}
-
-/**
- * Compact model switcher.
- *
- * Shows the current model only; the full list opens in a small menu. This keeps
- * the header short instead of carrying a permanent segmented control.
- */
-function ModelMenu({ model }: { model: ReturnType<typeof getModelOption>['id'] }) {
-  const { setModel } = useSessionActions()
-  const [open, setOpen] = useState(false)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const current = getModelOption(model)
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointer = (event: MouseEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('mousedown', handlePointer)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handlePointer)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [open])
-
-  return (
-    <div className="model-menu" ref={wrapperRef}>
-      <button
-        type="button"
-        className={`model-trigger ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <CpuIcon size={15} />
-        <span>{current.shortLabel}</span>
-      </button>
-
-      {open ? (
-        <div className="model-popover" role="listbox" aria-label="Model">
-          {MODEL_OPTIONS.map((option) => {
-            const selected = option.id === model
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                className={`model-option ${selected ? 'is-selected' : ''}`}
-                onClick={() => {
-                  setModel(option.id)
-                  setOpen(false)
-                }}
-              >
-                <div className="model-option-main">
-                  <span className="model-option-name">{option.label}</span>
-                  <span className="model-option-desc">{option.description}</span>
-                </div>
-                <div className="model-option-check" aria-hidden>
-                  {selected ? <CheckIcon size={16} /> : null}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
-    </div>
   )
 }

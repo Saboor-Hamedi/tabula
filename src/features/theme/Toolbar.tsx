@@ -1,18 +1,18 @@
 import { memo, useEffect, useState } from 'react';
-import { NOTE_COLORS, NOTE_COLOR_ORDER, STICKERS } from './colors';
+import { PlusIcon } from '../common/Icons';
+import { NOTE_COLORS, NOTE_COLOR_ORDER } from './colors';
 import type { NoteColor } from './types';
 
 interface ToolbarProps {
   count: number;
   onAddNote: (color: NoteColor) => void;
-  onAddSticker: (emoji: string) => void;
+  onAddSticker?: (emoji: string) => void;
   onClear: () => void;
 }
 
 export const Toolbar = memo(function Toolbar({
   count,
   onAddNote,
-  onAddSticker,
   onClear,
 }: ToolbarProps) {
   const [confirming, setConfirming] = useState(false);
@@ -30,7 +30,16 @@ export const Toolbar = memo(function Toolbar({
   return (
     <div className="sticky-toolbar">
       <div className="sticky-toolbar-group" role="group" aria-label="Add a note">
-        <span className="sticky-toolbar-label">Note</span>
+        <button
+          type="button"
+          onClick={() => onAddNote('butter')}
+          className="sticky-add-note-btn"
+          title="Add a new note"
+        >
+          <PlusIcon size={12} />
+          <span>New note</span>
+        </button>
+
         <div className="sticky-toolbar-swatches">
           {NOTE_COLOR_ORDER.map((color) => (
             <button
@@ -46,27 +55,9 @@ export const Toolbar = memo(function Toolbar({
         </div>
       </div>
 
-      <div className="sticky-toolbar-group" role="group" aria-label="Add a sticker">
-        <span className="sticky-toolbar-label">Sticker</span>
-        <div className="sticky-toolbar-stickers">
-          {STICKERS.map(({ emoji, name }) => (
-            <button
-              key={emoji}
-              type="button"
-              title={`Add a ${name} sticker`}
-              aria-label={`Add a ${name} sticker`}
-              onClick={() => onAddSticker(emoji)}
-              className="sticky-sticker-btn"
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="sticky-toolbar-actions">
         <span className="sticky-toolbar-count">
-          {count} {count === 1 ? 'item' : 'items'}
+          {count} {count === 1 ? 'note' : 'notes'}
         </span>
         <button
           type="button"

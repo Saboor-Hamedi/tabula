@@ -21,12 +21,13 @@ export function Inspector() {
     panelTab,
     traces,
     activeSession,
+    messages,
     isStreaming,
     streamingSessionId,
     pythonResult,
     pythonStatus,
   } = useSessionState()
-  const { setPanelTab, closePanel, exportTrace } = useSessionActions()
+  const { setPanelTab, closePanel, exportTrace, exportTranscript } = useSessionActions()
 
   const streamingHere = isStreaming && streamingSessionId === activeSession?.id
 
@@ -34,17 +35,18 @@ export function Inspector() {
     if (panelTab === 'notes') {
       try {
         const raw = localStorage.getItem('tabula-sticky-notes:v1')
-        const items = raw ? (JSON.parse(raw) as Array<{ kind: string; text?: string; emoji?: string; color?: string }>) : []
+        const items = raw ? (JSON.parse(raw) as Array<{ kind: string; text?: string; color?: string }>) : []
+        const validNotes = items.filter((i) => i.kind === 'note' && i.text?.trim())
+        if (validNotes.length === 0 && messages.length > 0) {
+          exportTranscript()
+          return
+        }
         let content = `# Tabula Studio Notes\n\nExported on ${new Date().toLocaleString()}\n\n`
-        if (items.length === 0) {
+        if (validNotes.length === 0) {
           content += '_No notes currently on the board._\n'
         } else {
-          items.forEach((item, index) => {
-            if (item.kind === 'note' && item.text?.trim()) {
-              content += `### Note ${index + 1} (${item.color || 'yellow'})\n${item.text}\n\n`
-            } else if (item.kind === 'sticker') {
-              content += `- Sticker: ${item.emoji}\n`
-            }
+          validNotes.forEach((item, index) => {
+            content += `### Note ${index + 1} (${item.color || 'yellow'})\n${item.text}\n\n`
           })
         }
         const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })

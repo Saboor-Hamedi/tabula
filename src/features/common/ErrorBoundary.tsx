@@ -21,8 +21,27 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { error }
   }
 
+  componentDidMount(): void {
+    try {
+      const saved = localStorage.getItem('tabula-theme')
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   componentDidCatch(error: Error, info: ErrorInfo): void {
     reportDiagnostic(error, 'boundary', { componentStack: info.componentStack ?? '' })
+    try {
+      const saved = localStorage.getItem('tabula-theme')
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved)
+      }
+    } catch {
+      // ignore
+    }
   }
 
   private handleReload = () => {

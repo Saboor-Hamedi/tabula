@@ -1,8 +1,6 @@
-import { useMemo, useRef } from 'react'
-import { ACCEPTED_EXTENSIONS } from '../../core/constants'
+import { useMemo } from 'react'
 import { formatCount } from '../../core/utils/format'
-import { DatabaseIcon, PlusIcon } from '../common/Icons'
-import { IconButton } from '../common/IconButton'
+import { DatabaseIcon, FileIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { UploadStatus } from '../upload/UploadStatus'
 import { SessionCard } from './SessionCard'
@@ -15,8 +13,7 @@ import { SidebarHeader } from './SidebarHeader'
  * Split into header / body / footer so each piece stays small and the header can
  * share its height with the app header.
  *
- * When collapsed, closes down to an icon rail showing the file/database icon,
- * matching Google NotebookLM / IDE patterns.
+ * When collapsed, closes down to a sleek icon rail displaying only the file icon.
  */
 
 export interface SidebarProps {
@@ -35,8 +32,7 @@ export function Sidebar({
   onExpand,
 }: SidebarProps) {
   const { sessions, activeSession, upload } = useSessionState()
-  const { selectSession, uploadFile } = useSessionActions()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { selectSession } = useSessionActions()
 
   const totalRows = useMemo(
     () =>
@@ -60,32 +56,10 @@ export function Sidebar({
             aria-label="Expand datasets sidebar"
           >
             <span className="brand-mark" aria-hidden>
-              <DatabaseIcon size={16} />
+              <FileIcon size={16} />
             </span>
           </button>
         </div>
-
-        <div className="sidebar-rail-body">
-          <IconButton
-            label="Add dataset"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <PlusIcon size={16} />
-          </IconButton>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED_EXTENSIONS.join(',')}
-          className="visually-hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            if (file) void uploadFile(file)
-            event.target.value = ''
-          }}
-        />
       </aside>
     )
   }
