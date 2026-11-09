@@ -240,9 +240,11 @@ function cell(
 ): TableCell {
   return new docx.TableCell({
     width: { size: width, type: docx.WidthType.PERCENTAGE },
+    verticalAlign: docx.VerticalAlign.CENTER,
     shading: header ? { fill: 'F1F5F9' } : undefined,
     children: [
       new docx.Paragraph({
+        alignment: docx.AlignmentType.CENTER,
         spacing: { after: 0 },
         children: [
           new docx.TextRun({
@@ -291,7 +293,8 @@ function pushTable(
 
   children.push(
     new docx.Table({
-      width: { size: 100, type: docx.WidthType.PERCENTAGE },
+      alignment: docx.AlignmentType.CENTER,
+      width: { size: 86, type: docx.WidthType.PERCENTAGE },
       borders,
       rows: tableRows,
     }),
@@ -314,11 +317,11 @@ function pngDimensions(dataUrl: string): { width: number; height: number } {
 
 function imageParagraph(docx: Docx, dataUrl: string): Paragraph {
   const { width, height } = pngDimensions(dataUrl)
-  const maxWidth = 540
+  const maxWidth = 480
   let renderWidth = Math.min(maxWidth, width || maxWidth)
   let renderHeight = Math.round((renderWidth * height) / (width || maxWidth))
-  if (renderHeight > 620) {
-    renderHeight = 620
+  if (renderHeight > 280) {
+    renderHeight = 280
     renderWidth = Math.round((renderHeight * width) / (height || 1))
   }
 
@@ -485,7 +488,7 @@ export async function buildDocxReport(
     if (message.role === 'user') {
       children.push(
         new docx.Paragraph({
-          spacing: { before: 160, after: 40 },
+        spacing: { before: 160, after: 40 },
           children: [
             new docx.TextRun({
               text: `Inquiry #${inquiry}`,

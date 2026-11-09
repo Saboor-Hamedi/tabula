@@ -93,16 +93,39 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
     const w = parseFloat(fo.getAttribute('width') || '0')
     const h = parseFloat(fo.getAttribute('height') || '0')
 
+    const fontSize = 12
+    const maxChars = Math.max(6, Math.floor((w - 8) / (fontSize * 0.52)))
+    const words = textContent.split(/\s+/)
+    const lines: string[] = []
+    let line = ''
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word
+      if (candidate.length <= maxChars) {
+        line = candidate
+      } else {
+        if (line) lines.push(line)
+        line = word
+      }
+    }
+    if (line) lines.push(line)
+
+    const lineHeight = fontSize * 1.25
+    const totalHeight = lineHeight * lines.length
+    const startY = y + (h - totalHeight) / 2 + lineHeight * 0.85
+
     const textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text')
-    textNode.setAttribute('x', String(x + w / 2))
-    textNode.setAttribute('y', String(y + h / 2 + 4))
     textNode.setAttribute('text-anchor', 'middle')
-    textNode.setAttribute('dominant-baseline', 'middle')
     textNode.setAttribute('fill', textColor)
     textNode.setAttribute('font-family', 'Inter, system-ui, -apple-system, sans-serif')
-    textNode.setAttribute('font-size', '12px')
+    textNode.setAttribute('font-size', `${fontSize}px`)
     textNode.setAttribute('font-weight', '550')
-    textNode.textContent = textContent
+    lines.forEach((lineText, index) => {
+      const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
+      tspan.setAttribute('x', String(x + w / 2))
+      tspan.setAttribute('y', String(startY + index * lineHeight))
+      tspan.textContent = lineText
+      textNode.appendChild(tspan)
+    })
 
     fo.parentNode?.replaceChild(textNode, fo)
   })

@@ -17,6 +17,7 @@ const EXPORT_THEME: MermaidConfig = {
   startOnLoad: false,
   securityLevel: 'strict',
   theme: 'base',
+  htmlLabels: false,
   fontFamily: 'Helvetica, Arial, sans-serif',
   themeVariables: {
     background: '#ffffff',
@@ -62,10 +63,11 @@ const EXPORT_THEME: MermaidConfig = {
   },
   flowchart: {
     curve: 'basis',
-    htmlLabels: false,
-    padding: 12,
+    padding: 16,
     useMaxWidth: true,
-    wrappingWidth: 240,
+    wrappingWidth: 200,
+    nodeSpacing: 36,
+    rankSpacing: 36,
   },
   pie: { textPosition: 0.62, useMaxWidth: true },
   xyChart: { useMaxWidth: true },

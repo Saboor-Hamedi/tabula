@@ -224,10 +224,10 @@ interface ReportDocument {
 const REPORT_CSS = `
 @page { size: A4; margin: 20mm; }
 .tabula-report {
-  color: #1e293b;
+  color: #14213d;
   font-family: 'Times New Roman', Times, 'Liberation Serif', Georgia, serif;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.48;
   text-align: left;
   background: #ffffff;
 }
@@ -240,28 +240,36 @@ const REPORT_CSS = `
   font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
-  color: #0f766e;
-  margin: 8px 0 4px;
+  text-align: left;
+  color: #0f4c5c;
+  margin: 10px 0 5px;
 }
 .tabula-report p {
-  margin: 0 0 6px;
+  margin: 0 0 7px;
   font-size: 12px;
   line-height: 1.5;
+  text-align: left;
   color: #1e293b;
 }
 .tabula-report ul,
-.tabula-report ol { margin: 4px 0 8px; padding-left: 16px; }
+.tabula-report ol {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+  text-align: left;
+  list-style-position: outside;
+}
 .tabula-report li {
   margin: 0 0 2px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 .tabula-report blockquote {
   margin: 6px 0;
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-left: 2px solid #cbd5e1;
   color: #475569;
   font-size: 12px;
+  text-align: left;
 }
 .tabula-report a { color: #0f766e; text-decoration: underline; }
 .tabula-report code {
@@ -274,10 +282,10 @@ const REPORT_CSS = `
 }
 .tabula-report pre {
   margin: 6px 0;
-  padding: 6px 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  background: #f8fafc;
+  padding: 7px 9px;
+  border: 1px solid #d7e1ec;
+  border-radius: 6px;
+  background: #f7fafc;
   color: #0f172a;
   font-family: Consolas, Menlo, Monaco, monospace;
   font-size: 9.5px;
@@ -287,8 +295,9 @@ const REPORT_CSS = `
   overflow-wrap: anywhere;
 }
 .tabula-report table {
-  width: 100%;
-  margin: 6px 0 10px;
+  width: 86%;
+  max-width: 520px;
+  margin: 7px auto 10px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 9.5px;
@@ -297,8 +306,8 @@ const REPORT_CSS = `
 .tabula-report td {
   padding: 3px 5px;
   border: 1px solid #cbd5e1;
-  text-align: left;
-  vertical-align: top;
+  text-align: center;
+  vertical-align: middle;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -310,12 +319,14 @@ const REPORT_CSS = `
 }
 .tabula-report td { color: #334155; }
 .tabula-report td.tabula-num {
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .tabula-report .tabula-figure {
-  margin: 8px 0;
+  width: 86%;
+  margin: 9px auto;
+  padding: 8px;
   text-align: center;
   page-break-inside: avoid;
   break-inside: avoid;
@@ -323,44 +334,32 @@ const REPORT_CSS = `
 .tabula-report .tabula-figure img {
   display: block;
   max-width: 100%;
-  max-height: 340px;
+  max-height: 280px;
   width: auto;
   height: auto;
   margin: 0 auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
   background: #ffffff;
 }
 .tabula-report .tabula-header {
   margin: 0 0 14px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #0f766e;
+  padding-bottom: 9px;
+  border-bottom: 2px solid #0f4c5c;
 }
 .tabula-report .tabula-brand-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 3px;
+  display: block;
+  margin: 0 0 2px;
+  text-align: left;
 }
 .tabula-report .tabula-brand {
-  color: #0f766e;
+  color: #0f4c5c;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.tabula-report .tabula-badge {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: #ccfbf1;
-  color: #0f766e;
-  font-size: 9px;
-  font-weight: 600;
-}
-.tabula-report .tabula-title { margin: 0 0 8px; color: #0f172a; }
-.tabula-report .tabula-meta { margin: 0; }
-.tabula-report .tabula-meta td { padding: 4px 6px; }
+.tabula-report .tabula-title { margin: 0 0 8px; text-align: left; color: #0f172a; }
+.tabula-report .tabula-meta { width: 100%; margin: 0; }
+.tabula-report .tabula-meta td { padding: 4px 5px; }
 .tabula-report .tabula-meta-label {
   color: #64748b;
   font-size: 8px;
@@ -370,26 +369,26 @@ const REPORT_CSS = `
 .tabula-report .tabula-meta-value { color: #0f172a; font-size: 11px; font-weight: 600; }
 .tabula-report .tabula-entry {
   margin: 0 0 12px;
-  border: 1px solid #e5e7eb;
-  border-left: 3px solid #0284c7;
-  border-radius: 4px;
+  border: 1px solid #d7e1ec;
+  border-radius: 7px;
   background: #ffffff;
   page-break-inside: auto;
 }
-.tabula-report .tabula-entry-user { border-left-color: #0f766e; background: #fdfdfd; }
+.tabula-report .tabula-entry-user { background: #ffffff; }
 .tabula-report .tabula-entry-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 8px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f8fafc;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f3f7fb;
+  text-align: left;
 }
-.tabula-report .tabula-entry-title { font-size: 12px; font-weight: 700; color: #0284c7; }
-.tabula-report .tabula-entry-user .tabula-entry-title { color: #0f766e; }
+.tabula-report .tabula-entry-title { font-size: 12px; font-weight: 700; color: #0f4c5c; }
+.tabula-report .tabula-entry-user .tabula-entry-title { color: #0f4c5c; }
 .tabula-report .tabula-entry-meta { color: #64748b; font-size: 9px; }
-.tabula-report .tabula-entry-body { padding: 6px 10px; }
+.tabula-report .tabula-entry-body { padding: 8px 12px 7px; }
 .tabula-report .tabula-entry-body > :last-child { margin-bottom: 0; }
 .tabula-report .tabula-footer {
   margin: 16px 0 0;
@@ -400,6 +399,7 @@ const REPORT_CSS = `
   gap: 8px;
   color: #94a3b8;
   font-size: 8px;
+  text-align: left;
 }
 `.trim()
 
@@ -555,7 +555,6 @@ async function buildExecutiveReportHtml(
       <header class="tabula-header">
         <div class="tabula-brand-row">
           <span class="tabula-brand">Tabula Sovereign Intelligence</span>
-          <span class="tabula-badge">100% In-Memory Sandbox</span>
         </div>
         <h1 class="tabula-title">${escapeHtml(title)}</h1>
         <table class="tabula-meta">
