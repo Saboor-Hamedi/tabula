@@ -8,9 +8,33 @@ import { LandingPage } from './features/landing/LandingPage'
 
 type ViewMode = 'landing' | 'auth' | 'app'
 
+/** Synchronously checks if Supabase has stored an authenticated session in localStorage */
+function hasStoredSession(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const val = localStorage.getItem(key)
+        if (val && JSON.parse(val)?.access_token) return true
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return false
+}
+
 function getInitialView(user: unknown, isConfigured: boolean): ViewMode {
   if (typeof window === 'undefined') return 'landing'
   const hash = window.location.hash.toLowerCase()
+  const isAuthed = !!user || hasStoredSession()
+
+  // If already authenticated and on login hash, redirect to app
+  if (isAuthed && (hash === '#login' || hash === '#signin' || hash === '#signup')) {
+    window.location.hash = '#app'
+    return 'app'
+  }
 
   if (hash === '#login' || hash === '#signin' || hash === '#signup') {
     return 'auth'
@@ -19,11 +43,11 @@ function getInitialView(user: unknown, isConfigured: boolean): ViewMode {
     return 'landing'
   }
   if (hash === '#app' || hash === '#workspace') {
-    return user || !isConfigured ? 'app' : 'auth'
+    return isAuthed || !isConfigured ? 'app' : 'auth'
   }
 
-  // Default: Authenticated users go straight to workspace; new visitors see the landing page!
-  return user ? 'app' : 'landing'
+  // Default: Authenticated users go straight to workspace; new visitors see the landing page
+  return isAuthed ? 'app' : 'landing'
 }
 
 function AppRoot() {
@@ -31,11 +55,15 @@ function AppRoot() {
   const [view, setView] = useState<ViewMode>(() => getInitialView(user, isConfigured))
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
 
-  // Synchronize view state if user logs in or out
+  // Synchronize view state when user session loads or changes
   useEffect(() => {
     if (!loading) {
-      if (user && view === 'auth') {
-        setView('app')
+      if (user) {
+        const hash = window.location.hash.toLowerCase()
+        if (hash === '#login' || hash === '#signin' || hash === '#signup' || view === 'auth') {
+          window.location.hash = '#app'
+          setView('app')
+        }
       }
     }
   }, [user, loading, view])
@@ -44,16 +72,28 @@ function AppRoot() {
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.toLowerCase()
+      const isAuthed = !!user || hasStoredSession()
+
       if (hash === '#login' || hash === '#signin') {
-        setAuthMode('signin')
-        setView('auth')
+        if (isAuthed) {
+          window.location.hash = '#app'
+          setView('app')
+        } else {
+          setAuthMode('signin')
+          setView('auth')
+        }
       } else if (hash === '#signup' || hash === '#register') {
-        setAuthMode('signup')
-        setView('auth')
+        if (isAuthed) {
+          window.location.hash = '#app'
+          setView('app')
+        } else {
+          setAuthMode('signup')
+          setView('auth')
+        }
       } else if (hash === '#landing' || hash === '#pricing' || hash === '#features' || hash === '#demo' || hash === '#faq') {
         setView('landing')
       } else if (hash === '#app' || hash === '#workspace') {
-        if (isConfigured && !user) {
+        if (isConfigured && !isAuthed) {
           setView('auth')
         } else {
           setView('app')
@@ -65,8 +105,8 @@ function AppRoot() {
     return () => window.removeEventListener('hashchange', handleHash)
   }, [user, isConfigured])
 
-  // If Supabase is configured and checking initial session, show a sleek loading splash
-  if (isConfigured && loading) {
+  // If Supabase is configured and verifying initial session, show sleek workspace loader
+  if (isConfigured && loading && hasStoredSession()) {
     return (
       <div className="auth-splash-loading">
         <div className="auth-splash-spinner" />
@@ -75,7 +115,7 @@ function AppRoot() {
     )
   }
 
-  // 1. Landing / Front Page (Clean, separated, totally amazing product showcase)
+  // 1. Landing / Front Page
   if (view === 'landing') {
     return (
       <LandingPage
@@ -87,7 +127,7 @@ function AppRoot() {
           setView('auth')
         }}
         onNavigateToApp={() => {
-          if (isConfigured && !user) {
+          if (isConfigured && !user && !hasStoredSession()) {
             setAuthMode('signin')
             setView('auth')
           } else {
@@ -99,8 +139,8 @@ function AppRoot() {
     )
   }
 
-  // 2. Authentication Screen (Strict gate before accessing workspace)
-  if (view === 'auth' || (isConfigured && !user)) {
+  // 2. Authentication Screen (Only when unauthenticated)
+  if (view === 'auth' || (isConfigured && !loading && !user && !hasStoredSession())) {
     return (
       <AuthScreen
         initialMode={authMode}
@@ -116,7 +156,7 @@ function AppRoot() {
     )
   }
 
-  // 3. Full Analytical Workspace (App Shell)
+  // 3. Full Analytical Workspace
   return (
     <SessionProvider>
       <AppShell />

@@ -80,6 +80,33 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
       node.style.setProperty('fill', textColor, 'important')
     })
 
+  // Convert HTML foreignObject elements into standard SVG <text> nodes.
+  // ForeignObjects in SVGs cause browser security sandboxes to reject <img> loading.
+  clone.querySelectorAll('foreignObject').forEach((fo) => {
+    const textContent = fo.textContent?.trim() || ''
+    if (!textContent) {
+      fo.remove()
+      return
+    }
+    const x = parseFloat(fo.getAttribute('x') || '0')
+    const y = parseFloat(fo.getAttribute('y') || '0')
+    const w = parseFloat(fo.getAttribute('width') || '0')
+    const h = parseFloat(fo.getAttribute('height') || '0')
+
+    const textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+    textNode.setAttribute('x', String(x + w / 2))
+    textNode.setAttribute('y', String(y + h / 2 + 4))
+    textNode.setAttribute('text-anchor', 'middle')
+    textNode.setAttribute('dominant-baseline', 'middle')
+    textNode.setAttribute('fill', textColor)
+    textNode.setAttribute('font-family', 'Inter, system-ui, -apple-system, sans-serif')
+    textNode.setAttribute('font-size', '12px')
+    textNode.setAttribute('font-weight', '550')
+    textNode.textContent = textContent
+
+    fo.parentNode?.replaceChild(textNode, fo)
+  })
+
   const markup = new XMLSerializer().serializeToString(clone)
   const source = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }))
 
@@ -143,13 +170,14 @@ export async function copyFigureImage(
 
   const blob = await svgToPngBlob(svg)
 
-  const canWrite = Boolean(navigator.clipboard?.write) && typeof ClipboardItem !== 'undefined'
-  if (canWrite) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
     try {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
       return 'copied'
-    } catch {
-      // Permission denied or unsupported type: fall through to download.
+    } catch (err) {
+      console.warn('Clipboard write permission denied or unsupported:', err)
+      downloadBlob(blob, fileName)
+      return 'downloaded'
     }
   }
 

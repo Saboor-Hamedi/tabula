@@ -5,7 +5,7 @@ import type { ContentBlock } from '../../core/types'
 import { ChartBlock } from '../render/ChartBlock'
 import { DataTable } from '../render/DataTable'
 import { MarkdownText } from '../render/MarkdownText'
-import { MermaidBlock } from '../render/MermaidBlock'
+import { MermaidBlock } from '../mermaid/MermaidBlock'
 
 /**
  * Renders one assistant message.

@@ -13,7 +13,6 @@ import {
   FileIcon,
   PdfIcon,
   PlusIcon,
-  SheetIcon,
 } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { UploadStatus } from '../upload/UploadStatus'
@@ -38,11 +37,82 @@ export function Sidebar({
   isCollapsed = false,
   onExpand,
 }: SidebarProps) {
-  const { sessions, activeSession, upload, messages } = useSessionState()
+  const { sessions, activeSession, upload, messages, pythonResult } = useSessionState()
   const { selectSession, uploadFile } = useSessionActions()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [exportType, setExportType] = useState<'pdf' | 'doc' | 'txt' | null>(null)
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
+
+  const handleExportPdf = async () => {
+    if (!activeSession) return
+    setMenuOpen(false)
+    setExportType('pdf')
+    setExportStatus('Preparing report layout…')
+    try {
+      await exportAnalysisAsPdf(activeSession, messages, pythonResult, (status) => {
+        setExportStatus(status)
+      })
+      setExportStatus('PDF Downloaded')
+      setTimeout(() => {
+        setExportType(null)
+        setExportStatus(null)
+      }, 1600)
+    } catch (err) {
+      console.error(err)
+      setExportStatus('Export failed')
+      setTimeout(() => {
+        setExportType(null)
+        setExportStatus(null)
+      }, 2000)
+    }
+  }
+
+  const handleExportDoc = async () => {
+    if (!activeSession) return
+    setMenuOpen(false)
+    setExportType('doc')
+    setExportStatus('Formatting Word document…')
+    try {
+      await exportAnalysisAsDoc(activeSession, messages, pythonResult, (status) => {
+        setExportStatus(status)
+      })
+      setExportStatus('Document Downloaded')
+      setTimeout(() => {
+        setExportType(null)
+        setExportStatus(null)
+      }, 1600)
+    } catch (err) {
+      console.error(err)
+      setExportStatus('Export failed')
+      setTimeout(() => {
+        setExportType(null)
+        setExportStatus(null)
+      }, 2000)
+    }
+  }
+
+  const handleExportText = () => {
+    if (!activeSession) return
+    setMenuOpen(false)
+    setExportType('txt')
+    setExportStatus('Generating text summary…')
+    try {
+      exportAnalysisAsText(activeSession, messages, pythonResult, (status) => {
+        setExportStatus(status)
+      })
+      setExportStatus('Summary Downloaded')
+      setTimeout(() => {
+        setExportType(null)
+        setExportStatus(null)
+      }, 1600)
+    } catch (err) {
+      console.error(err)
+      setExportType(null)
+      setExportStatus(null)
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return
@@ -96,92 +166,83 @@ export function Sidebar({
     <aside className="sidebar" aria-label="Sources">
       <SidebarHeader onClose={onClose} closable={closable} />
 
-      {/* Top File Export Card */}
+      {/* Dedicated Export Dropdown Panel with Dynamic Loader */}
       {activeSession ? (
-        <div className="sidebar-top-export-card">
-          <div className="top-export-row">
-            <span className="top-export-icon" aria-hidden>
-              <SheetIcon size={14} />
+        <div className="sidebar-export-panel" ref={menuRef}>
+          <button
+            type="button"
+            className={`sidebar-export-panel-btn ${menuOpen ? 'is-active' : ''} ${exportType ? 'is-exporting' : ''}`}
+            onClick={() => {
+              if (!exportType) setMenuOpen(!menuOpen)
+            }}
+            disabled={exportType !== null}
+            aria-expanded={menuOpen}
+            title={exportType ? (exportStatus ?? 'Exporting analysis…') : 'Export analysis reports'}
+          >
+            <span className="sidebar-export-panel-left">
+              <span className="sidebar-export-panel-icon" aria-hidden>
+                {exportType ? (
+                  <span className="export-spinner" />
+                ) : (
+                  <DownloadIcon size={14} />
+                )}
+              </span>
+              <span className="sidebar-export-panel-title">
+                {exportType ? exportStatus : 'Export Analysis'}
+              </span>
             </span>
-            <div className="top-export-info">
-              <span className="top-export-name" title={activeSession.fileName}>
-                {activeSession.fileName}
-              </span>
-              <span className="top-export-stats">
-                {activeSession.tables?.length || 1} table · {formatCount(activeSession.tables?.reduce((sum, t) => sum + (t.rowCount || 0), 0) || 0)} rows
-              </span>
-            </div>
+            {!exportType && (
+              <ChevronDownIcon size={12} className={menuOpen ? 'icon-rotated' : ''} />
+            )}
+          </button>
 
-            <div className="top-export-dropdown-wrapper" ref={menuRef}>
+          {menuOpen && !exportType && (
+            <div className="sidebar-dropdown-menu" role="menu">
+              <div className="dropdown-menu-header">Export Analysis</div>
               <button
                 type="button"
-                className={`top-export-btn ${menuOpen ? 'is-active' : ''}`}
-                onClick={() => setMenuOpen(!menuOpen)}
-                aria-expanded={menuOpen}
-                title="Export analysis document"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={handleExportPdf}
               >
-                <span>Export</span>
-                <ChevronDownIcon size={11} className={menuOpen ? 'icon-rotated' : ''} />
-              </button>
-
-              {menuOpen && (
-                <div className="sidebar-dropdown-menu" role="menu">
-                  <div className="dropdown-menu-header">Export Analysis</div>
-                  <button
-                    type="button"
-                    className="dropdown-menu-item"
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      void exportAnalysisAsPdf(activeSession, messages)
-                    }}
-                  >
-                    <span className="dropdown-item-icon pdf-icon">
-                      <PdfIcon size={13} />
-                    </span>
-                    <div className="dropdown-item-text">
-                      <span className="dropdown-item-title">Export as PDF</span>
-                      <span className="dropdown-item-hint">Executive report with charts & tables</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="dropdown-menu-item"
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      void exportAnalysisAsDoc(activeSession, messages)
-                    }}
-                  >
-                    <span className="dropdown-item-icon doc-icon">
-                      <FileIcon size={13} />
-                    </span>
-                    <div className="dropdown-item-text">
-                      <span className="dropdown-item-title">Export to Word (.doc)</span>
-                      <span className="dropdown-item-hint">Formatted document with tables</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="dropdown-menu-item"
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      exportAnalysisAsText(activeSession, messages)
-                    }}
-                  >
-                    <span className="dropdown-item-icon txt-icon">
-                      <DownloadIcon size={13} />
-                    </span>
-                    <div className="dropdown-item-text">
-                      <span className="dropdown-item-title">Export to Text (.txt)</span>
-                      <span className="dropdown-item-hint">Clean readable text summary</span>
-                    </div>
-                  </button>
+                <span className="dropdown-item-icon pdf-icon">
+                  <PdfIcon size={13} />
+                </span>
+                <div className="dropdown-item-text">
+                  <span className="dropdown-item-title">Export as PDF</span>
+                  <span className="dropdown-item-hint">Executive report with charts & tables</span>
                 </div>
-              )}
+              </button>
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={handleExportDoc}
+              >
+                <span className="dropdown-item-icon doc-icon">
+                  <FileIcon size={13} />
+                </span>
+                <div className="dropdown-item-text">
+                  <span className="dropdown-item-title">Export to Word (.docx)</span>
+                  <span className="dropdown-item-hint">Formatted document with tables</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={handleExportText}
+              >
+                <span className="dropdown-item-icon txt-icon">
+                  <DownloadIcon size={13} />
+                </span>
+                <div className="dropdown-item-text">
+                  <span className="dropdown-item-title">Export to Text (.txt)</span>
+                  <span className="dropdown-item-hint">Clean readable text summary</span>
+                </div>
+              </button>
             </div>
-          </div>
+          )}
         </div>
       ) : null}
 

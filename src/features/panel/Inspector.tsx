@@ -1,15 +1,16 @@
 import { formatCount } from '../../core/utils/format'
-import { ActivityIcon, CloseIcon } from '../common/Icons'
-import { IconButton } from '../common/IconButton'
+import { ActivityIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { StickyBoard } from '../theme'
 import { TraceEntry } from '../trace/TraceEntry'
+import { FilePanel } from './FilePanel'
 import { PythonPanel } from './PythonPanel'
 
 /**
  * Right-hand inspector.
  *
- * Workspace panel featuring:
+ * Workspace panel featuring 4 full-width, full-height tabs:
+ * - Data (file & schema inspection)
  * - Notes (interactive studio notes)
  * - Results (Python runtime results & plots)
  * - Activity (transparent agent trace)
@@ -22,10 +23,8 @@ export function Inspector() {
     activeSession,
     isStreaming,
     streamingSessionId,
-    pythonResult,
-    pythonStatus,
   } = useSessionState()
-  const { setPanelTab, closePanel } = useSessionActions()
+  const { setPanelTab } = useSessionActions()
 
   const streamingHere = isStreaming && streamingSessionId === activeSession?.id
 
@@ -33,6 +32,15 @@ export function Inspector() {
     <aside className="inspector" aria-label="Inspector">
       <div className="inspector-head">
         <div className="inspector-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === 'file'}
+            className={`inspector-tab ${panelTab === 'file' ? 'is-active' : ''}`}
+            onClick={() => setPanelTab('file')}
+          >
+            Data
+          </button>
           <button
             type="button"
             role="tab"
@@ -50,11 +58,6 @@ export function Inspector() {
             onClick={() => setPanelTab('python')}
           >
             Results
-            {pythonStatus === 'running' ? (
-              <span className="inspector-tab-count is-pulse">●</span>
-            ) : pythonResult?.images.length ? (
-              <span className="inspector-tab-count">{pythonResult.images.length}</span>
-            ) : null}
           </button>
           <button
             type="button"
@@ -64,29 +67,24 @@ export function Inspector() {
             onClick={() => setPanelTab('trace')}
           >
             Activity
-            {traces.length > 0 ? (
-              <span className="inspector-tab-count">{formatCount(traces.length)}</span>
-            ) : null}
           </button>
-        </div>
-
-        <div className="inspector-head-actions">
-          <IconButton label="Close inspector" size="sm" onClick={() => closePanel()}>
-            <CloseIcon size={15} />
-          </IconButton>
         </div>
       </div>
 
       <div
         className={`inspector-body ${
-          panelTab === 'python'
+          panelTab === 'file'
+            ? 'is-file-tab'
+            : panelTab === 'python'
             ? 'is-python-tab'
             : panelTab === 'notes'
             ? 'is-notes-tab'
             : ''
         }`}
       >
-        {panelTab === 'notes' ? (
+        {panelTab === 'file' ? (
+          <FilePanel />
+        ) : panelTab === 'notes' ? (
           <StickyBoard />
         ) : panelTab === 'python' ? (
           <PythonPanel />
