@@ -512,7 +512,7 @@ export function LandingPage({
               </div>
               <h3 className="landing-bento-title">Executive Summary Reports</h3>
               <p className="landing-bento-desc">
-                Turn hours of manual spreadsheet work into a clean, presentation-ready summary
+                Turn hours of manual spreadsheet work into a clean, executive summary
                 you can export to PDF and email to your team.
               </p>
             </div>
@@ -691,7 +691,7 @@ export function LandingPage({
                   <CheckIcon size={14} /> Automated executive summaries & insights
                 </li>
                 <li>
-                  <CheckIcon size={14} /> Presentation-ready PDF report downloads
+                  <CheckIcon size={14} /> PDF report downloads
                 </li>
                 <li>
                   <CheckIcon size={14} /> Connect and compare multiple files together

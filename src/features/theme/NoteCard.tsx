@@ -13,16 +13,17 @@ export interface NoteCardProps {
   onMove?: (id: string, x: number, y: number) => void;
   onRaise: (id: string) => void;
   onRemove: (id: string) => void;
+  onExpand?: (id: string) => void;
 }
 
 export const NoteCard = memo(function NoteCard({
   item,
-  index = 1,
   autoFocus = false,
   onText,
   onColor,
   onRaise,
   onRemove,
+  onExpand,
 }: NoteCardProps) {
   const palette = NOTE_COLORS[item.color] ?? NOTE_COLORS.butter;
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -43,11 +44,9 @@ export const NoteCard = memo(function NoteCard({
       }}
       onPointerDownCapture={() => onRaise(item.id)}
     >
-      {/* Header with note index, color palette swatches, and delete action */}
+      {/* Header with color palette swatches and actions (no number, no 'Note') */}
       <div className="sticky-note-header">
-        <span className="sticky-note-index">Note #{index}</span>
-
-        <div className="sticky-note-actions">
+        <div className="sticky-note-colors">
           {NOTE_COLOR_ORDER.map((color) => (
             <button
               key={color}
@@ -60,6 +59,25 @@ export const NoteCard = memo(function NoteCard({
               style={{ background: NOTE_COLORS[color].color }}
             />
           ))}
+        </div>
+
+        <div className="sticky-note-actions">
+          {onExpand && (
+            <button
+              type="button"
+              aria-label="Expand note in bigger modal"
+              title="Open note in bigger view"
+              onClick={() => onExpand(item.id)}
+              className="sticky-note-expand-btn"
+            >
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="10 2 14 2 14 6" />
+                <polyline points="6 14 2 14 2 10" />
+                <line x1="14" y1="2" x2="9.5" y2="6.5" />
+                <line x1="2" y1="14" x2="6.5" y2="9.5" />
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             aria-label="Delete note"

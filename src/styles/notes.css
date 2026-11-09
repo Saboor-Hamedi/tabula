@@ -1,0 +1,358 @@
+/* Sticky Notes & Canvas Styles */
+
+.sticky-board-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.sticky-toolbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.sticky-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sticky-add-note-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--accent);
+  color: #ffffff;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.sticky-add-note-btn:hover {
+  background: var(--accent-hover);
+}
+
+.sticky-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sticky-toolbar-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sticky-clear-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.sticky-clear-btn:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface-hover);
+}
+
+.sticky-clear-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sticky-clear-btn.is-confirming {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
+/* 3-Column Board Canvas */
+.sticky-board-canvas.sticky-notes-3col {
+  flex: 1;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.sticky-board-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--text-muted);
+}
+
+.sticky-board-empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+
+.sticky-board-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.sticky-board-empty-subtitle {
+  font-size: 11.5px;
+  line-height: 1.5;
+  max-width: 32ch;
+  margin: 0;
+}
+
+/* Individual Sticky Note Card */
+.sticky-note-card {
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: transform var(--transition), box-shadow var(--transition);
+  overflow: hidden;
+}
+
+.sticky-note-card:hover {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.sticky-note-header {
+  padding: 8px 8px 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+/* 4 Curated Color dots moved to center-right */
+.sticky-note-colors {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.sticky-note-color-btn {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--transition);
+}
+
+.sticky-note-color-btn:hover {
+  transform: scale(1.2);
+}
+
+.sticky-note-color-btn.is-selected {
+  outline: 1.5px solid rgba(0, 0, 0, 0.6);
+  outline-offset: 1px;
+}
+
+.sticky-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sticky-note-expand-btn,
+.sticky-note-delete-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  border: 0;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  opacity: 0.65;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all var(--transition);
+  padding: 0;
+}
+
+.sticky-note-expand-btn:hover,
+.sticky-note-delete-btn:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.sticky-note-x-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.sticky-note-content {
+  flex: 1;
+  display: flex;
+  padding: 4px 8px 8px;
+}
+
+.sticky-note-textarea {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  padding: 0;
+}
+
+.sticky-note-textarea::placeholder {
+  color: inherit;
+  opacity: 0.45;
+}
+
+/* ==========================================================================
+   Enlarged Note Modal - Resizable, Clean & Fully Visible Close Icon
+   ========================================================================== */
+
+.note-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: fadeIn 140ms ease;
+}
+
+.note-modal-dialog {
+  width: 640px;
+  height: 420px;
+  min-width: 360px;
+  min-height: 260px;
+  max-width: 90vw;
+  max-height: 85vh;
+  resize: both;
+  overflow: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  animation: scaleIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.note-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.note-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.note-modal-wordcount {
+  font-size: 11.5px;
+  font-weight: 600;
+  opacity: 0.65;
+  font-family: var(--font-mono);
+}
+
+.note-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.note-modal-colors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Highly Visible Close Button */
+.note-modal-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.note-modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.note-modal-body {
+  flex: 1;
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.note-modal-textarea {
+  width: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+.note-modal-textarea::placeholder {
+  color: inherit;
+  opacity: 0.45;
+}

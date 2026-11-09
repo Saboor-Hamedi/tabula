@@ -1,0 +1,235 @@
+/* Modal & Auth Dialog Styles */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 20, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: fadeIn 140ms ease;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+  padding: 24px;
+  box-sizing: border-box;
+  animation: scaleIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.modal-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Auth Profile / Account View */
+.auth-user-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-profile-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.auth-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.auth-profile-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.auth-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.auth-email {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.auth-tier-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.05em;
+}
+
+.auth-tier-pill.is-pro {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.auth-tier-pill.is-free {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.auth-status-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.auth-status-card {
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-status-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.auth-status-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.auth-signout-btn {
+  width: 100%;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.auth-signout-btn:hover {
+  background: var(--surface-hover);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Auth Sign in / Sign up Form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.auth-form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.auth-form-input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.auth-form-input:focus {
+  border-color: var(--accent);
+}
+
+.auth-submit-btn {
+  height: 38px;
+  background: var(--accent);
+  color: #ffffff;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+  margin-top: 6px;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-switch-text {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.auth-switch-btn {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 4px;
+  text-decoration: underline;
+}

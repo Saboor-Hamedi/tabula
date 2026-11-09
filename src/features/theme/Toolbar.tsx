@@ -1,6 +1,5 @@
 import { memo, useEffect, useState } from 'react';
 import { PlusIcon } from '../common/Icons';
-import { NOTE_COLORS, NOTE_COLOR_ORDER } from './colors';
 import type { NoteColor } from './types';
 
 interface ToolbarProps {
@@ -39,20 +38,6 @@ export const Toolbar = memo(function Toolbar({
           <PlusIcon size={12} />
           <span>New note</span>
         </button>
-
-        <div className="sticky-toolbar-swatches">
-          {NOTE_COLOR_ORDER.map((color) => (
-            <button
-              key={color}
-              type="button"
-              title={`${NOTE_COLORS[color].label} note`}
-              aria-label={`Add a ${NOTE_COLORS[color].label.toLowerCase()} note`}
-              onClick={() => onAddNote(color)}
-              className="sticky-swatch-btn"
-              style={{ background: NOTE_COLORS[color].gradient }}
-            />
-          ))}
-        </div>
       </div>
 
       <div className="sticky-toolbar-actions">

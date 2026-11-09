@@ -5,10 +5,6 @@ import { DeleteSessionButton } from '../session/DeleteSessionButton'
 
 /**
  * One dataset row in the sidebar.
- *
- * Kept intentionally quiet: file name, format, size, row count. The active row
- * gets a left accent bar rather than a filled card, so the list stays calm when
- * there are many datasets.
  */
 
 export interface SessionCardProps {

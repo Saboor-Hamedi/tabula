@@ -82,7 +82,7 @@ export function Composer() {
                 ? 'Upload a file to begin…'
                 : !dbReady
                   ? 'Initializing analysis engine…'
-                  : `Ask about ${activeSession.fileName}…`
+                  : 'Ask questions, analyze trends, or request a summary…'
           }
         />
       </div>
