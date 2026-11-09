@@ -1,3 +1,4 @@
+import { NEEDS_ACCESS_KEY } from '../../core/config'
 import { SettingsIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
@@ -17,7 +18,9 @@ export function SidebarFooter() {
       <button type="button" className="sidebar-settings" onClick={openSettings}>
         <SettingsIcon size={15} />
         <span>Settings</span>
-        {!apiKey ? <span className="sidebar-dot" aria-label="Access key required" /> : null}
+        {NEEDS_ACCESS_KEY && !apiKey ? (
+          <span className="sidebar-dot" aria-label="Access key required" />
+        ) : null}
       </button>
     </div>
   )

@@ -43,7 +43,7 @@ export function useWorkspacePersistence({
           traces: tracesBySession[session.id] ?? [],
           digest: digestBySession[session.id],
           updatedAt: Date.now(),
-        })
+        }).catch(() => undefined)
       }
     }, 350)
     return () => window.clearTimeout(timer)
@@ -59,6 +59,6 @@ export function useWorkspacePersistence({
 
   useEffect(() => {
     if (!ready.current) return
-    void saveActiveSessionId(activeSessionId)
+    void saveActiveSessionId(activeSessionId).catch(() => undefined)
   }, [activeSessionId, ready])
 }

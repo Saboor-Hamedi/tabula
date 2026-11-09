@@ -221,6 +221,15 @@ export function ExternalIcon(props: IconProps) {
   )
 }
 
+export function PrintIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" rx="1" />
+    </svg>
+  )
+}
+
 /** Camera/export glyph for "copy figure as image". */
 export function ImageIcon(props: IconProps) {
   return (
@@ -228,6 +237,16 @@ export function ImageIcon(props: IconProps) {
       <rect x="3" y="4" width="18" height="16" rx="2.5" />
       <circle cx="8.5" cy="9.5" r="1.6" />
       <path d="m4 17 4.5-4.5 3.5 3.5 3-3L20 17" />
+    </svg>
+  )
+}
+
+/** Small edit glyph for inline figure controls. */
+export function PencilIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="M13.5 6.5 17.5 10.5" />
     </svg>
   )
 }
@@ -282,6 +301,57 @@ export function RefreshIcon(props: IconProps) {
     <svg {...baseProps(props)}>
       <path d="M21 12a9 9 0 1 1-3-6.7" />
       <path d="M21 3v6h-6" />
+    </svg>
+  )
+}
+
+export function PlayIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function SunIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  )
+}
+
+export function MoonIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  )
+}
+
+export function PrinterIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <polyline points="6 9 6 2 18 2 18 9" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </svg>
+  )
+}
+
+export function CodeIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
     </svg>
   )
 }

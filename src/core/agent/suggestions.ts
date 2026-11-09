@@ -70,11 +70,14 @@ function normalizeDigest(digest: DatasetDigest | null): DatasetDigest | null {
 
 /** Picks the table with the most columns — usually the richest one. */
 function pickPrimaryTable(digest: DatasetDigest, session: Session): DigestTable | null {
-  const preferred = digest.tables.find((table) => table.name === session.primaryTable)
-  if (preferred && preferred.columns.length > 0) return preferred
+  const tables = Array.isArray(digest.tables) ? digest.tables : []
+  const preferred = tables.find((table) => table?.name === session.primaryTable)
+  if (preferred && Array.isArray(preferred.columns) && preferred.columns.length > 0) return preferred
 
-  const richest = [...digest.tables].sort((a, b) => b.columns.length - a.columns.length)[0]
-  return richest && richest.columns.length > 0 ? richest : null
+  const richest = [...tables].sort(
+    (a, b) => (b.columns?.length ?? 0) - (a.columns?.length ?? 0),
+  )[0]
+  return richest && Array.isArray(richest.columns) && richest.columns.length > 0 ? richest : null
 }
 
 /** Turns `order_total_usd` into `order total usd` for readable questions. */
@@ -129,8 +132,8 @@ export function buildLocalSuggestions(
 ): string[] {
   const safeDigest = normalizeDigest(digest)
   const table = safeDigest ? pickPrimaryTable(safeDigest, session) : null
-  const sessionTables = Array.isArray(session.tables) ? session.tables : []
-  const tableName = table?.name ?? session.primaryTable ?? sessionTables[0]?.name ?? 'the data'
+  const sessionTables = Array.isArray(session?.tables) ? session.tables : []
+  const tableName = table?.name ?? session?.primaryTable ?? sessionTables[0]?.name ?? 'the data'
   const columns = table?.columns ?? []
 
   const temporal = findTemporal(columns)
@@ -151,7 +154,7 @@ export function buildLocalSuggestions(
 
   // Composition questions anchored on an actual category value.
   if (dimension && measure) {
-    const topValue = dimension.topValues[0]
+    const topValue = Array.isArray(dimension.topValues) ? dimension.topValues[0] : undefined
     if (topValue) {
       questions.push(
         `What share of ${humanize(measure.name)} does ${quoteValue(topValue)} represent in ${humanize(dimension.name)}?`,
@@ -201,13 +204,16 @@ function dedupe(values: string[]): string[] {
 
 /** Renders the digest as compact text for the model prompt. */
 function describeDigest(digest: DatasetDigest): string {
-  return digest.tables
+  const tables = Array.isArray(digest.tables) ? digest.tables : []
+  return tables
     .map((table) => {
-      const fields = table.columns
+      const columns = Array.isArray(table.columns) ? table.columns : []
+      const fields = columns
         .map((column) => {
+          const topValues = Array.isArray(column.topValues) ? column.topValues : []
           const values =
-            column.topValues.length > 0
-              ? ` values: ${column.topValues.slice(0, 4).join(', ')}`
+            topValues.length > 0
+              ? ` values: ${topValues.slice(0, 4).join(', ')}`
               : ''
           return `${column.name} (${column.type}, ${column.distinctCount} distinct${values})`
         })
@@ -228,6 +234,7 @@ function cleanSuggestion(line: string): string {
 }
 
 function parseSuggestions(text: string): string[] {
+  if (typeof text !== 'string') return []
   const lines = text
     .split(/\r?\n/)
     .map(cleanSuggestion)

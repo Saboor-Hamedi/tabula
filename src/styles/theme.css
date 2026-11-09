@@ -85,7 +85,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #0b0d10;
     --surface: #12151a;
     --surface-2: #171b21;
@@ -118,6 +118,78 @@
     --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.6);
     --shadow-lg: 0 20px 52px -16px rgba(0, 0, 0, 0.8);
   }
+}
+
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --surface: #12151a;
+  --surface-2: #171b21;
+  --surface-3: #1e232b;
+  --surface-hover: #1b2028;
+
+  --border: #232830;
+  --border-strong: #333a45;
+
+  --text: #e8eaee;
+  --text-secondary: #a6adba;
+  --text-muted: #767e8c;
+
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --accent-contrast: #06231f;
+
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.12);
+
+  --code-bg: #0e1116;
+  --code-border: #232830;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 20px 52px -16px rgba(0, 0, 0, 0.8);
+}
+
+:root[data-theme='light'],
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --surface-3: #eef0f4;
+  --surface-hover: #f1f3f6;
+
+  --border: #e6e8ec;
+  --border-strong: #d3d7de;
+
+  --text: #14171c;
+  --text-secondary: #4a5160;
+  --text-muted: #868d9b;
+
+  --accent: #0f766e;
+  --accent-hover: #0d615a;
+  --accent-soft: #e8f3f1;
+  --accent-contrast: #ffffff;
+
+  --danger: #c0392b;
+  --danger-soft: #fdecea;
+  --success: #0f7b52;
+  --success-soft: #e7f5ee;
+  --warning: #9a6b00;
+  --warning-soft: #fdf4e3;
+
+  --code-bg: #f5f6f8;
+  --code-border: #e6e8ec;
+
+  --shadow-sm: 0 1px 2px rgba(16, 22, 32, 0.05);
+  --shadow-md: 0 4px 14px -4px rgba(16, 22, 32, 0.1), 0 1px 3px rgba(16, 22, 32, 0.04);
+  --shadow-lg: 0 18px 48px -16px rgba(16, 22, 32, 0.22), 0 2px 8px rgba(16, 22, 32, 0.05);
 }
 
 /* ==========================================================================

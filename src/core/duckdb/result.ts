@@ -43,8 +43,8 @@ export function tableColumns(table: ArrowTableLike | null | undefined): string[]
 
 export function firstScalar(table: ArrowTableLike, column: string): unknown {
   const rows = tableToRawRows(table)
-  if (rows.length === 0) return null
-  return rows[0][column] ?? null
+  if (!rows || rows.length === 0) return null
+  return rows[0]?.[column] ?? null
 }
 
 export function firstNumber(table: ArrowTableLike, column: string): number {

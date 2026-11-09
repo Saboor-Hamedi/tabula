@@ -1,22 +1,76 @@
 import { formatCount } from '../../core/utils/format'
-import { ActivityIcon, CloseIcon, DownloadIcon } from '../common/Icons'
+import { ActivityIcon, CloseIcon, DownloadIcon, PrinterIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useSessionActions, useSessionState } from '../SessionProvider'
+import { StickyBoard } from '../theme'
 import { TraceEntry } from '../trace/TraceEntry'
-import { FilePanel } from './FilePanel'
+import { PythonPanel } from './PythonPanel'
 
 /**
  * Right-hand inspector.
  *
- * One panel, two tabs: the uploaded file and the agent's tool trace. Tabs beat
- * two competing drawers because the user only ever needs one of them at a time.
+ * NotebookLM-style workspace panel featuring:
+ * - Notes & Studio (interactive sticky notes & stickers)
+ * - Python (analysis runtime results & plots)
+ * - Activity (transparent agent trace)
+ * - Print & Export controls
  */
 
 export function Inspector() {
-  const { panelTab, traces, activeSession, isStreaming, streamingSessionId } = useSessionState()
+  const {
+    panelTab,
+    traces,
+    activeSession,
+    isStreaming,
+    streamingSessionId,
+    pythonResult,
+    pythonStatus,
+  } = useSessionState()
   const { setPanelTab, closePanel, exportTrace } = useSessionActions()
 
   const streamingHere = isStreaming && streamingSessionId === activeSession?.id
+
+  const handleExport = () => {
+    if (panelTab === 'notes') {
+      try {
+        const raw = localStorage.getItem('tabula-sticky-notes:v1')
+        const items = raw ? (JSON.parse(raw) as Array<{ kind: string; text?: string; emoji?: string; color?: string }>) : []
+        let content = `# Tabula Studio Notes\n\nExported on ${new Date().toLocaleString()}\n\n`
+        if (items.length === 0) {
+          content += '_No notes currently on the board._\n'
+        } else {
+          items.forEach((item, index) => {
+            if (item.kind === 'note' && item.text?.trim()) {
+              content += `### Note ${index + 1} (${item.color || 'yellow'})\n${item.text}\n\n`
+            } else if (item.kind === 'sticker') {
+              content += `- Sticker: ${item.emoji}\n`
+            }
+          })
+        }
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `tabula-notes-${new Date().toISOString().slice(0, 10)}.md`
+        link.click()
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Failed to export notes', err)
+      }
+    } else if (panelTab === 'trace') {
+      exportTrace()
+    } else if (panelTab === 'python') {
+      if (pythonResult?.code) {
+        const blob = new Blob([pythonResult.code], { type: 'text/x-python;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `tabula-analysis-${new Date().toISOString().slice(0, 10)}.py`
+        link.click()
+        URL.revokeObjectURL(url)
+      }
+    }
+  }
 
   return (
     <aside className="inspector" aria-label="Inspector">
@@ -25,11 +79,25 @@ export function Inspector() {
           <button
             type="button"
             role="tab"
-            aria-selected={panelTab === 'file'}
-            className={`inspector-tab ${panelTab === 'file' ? 'is-active' : ''}`}
-            onClick={() => setPanelTab('file')}
+            aria-selected={panelTab === 'notes'}
+            className={`inspector-tab ${panelTab === 'notes' ? 'is-active' : ''}`}
+            onClick={() => setPanelTab('notes')}
           >
-            File
+            Notes
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === 'python'}
+            className={`inspector-tab ${panelTab === 'python' ? 'is-active' : ''}`}
+            onClick={() => setPanelTab('python')}
+          >
+            Python
+            {pythonStatus === 'running' ? (
+              <span className="inspector-tab-count is-pulse">●</span>
+            ) : pythonResult?.images.length ? (
+              <span className="inspector-tab-count">{pythonResult.images.length}</span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -46,25 +114,31 @@ export function Inspector() {
         </div>
 
         <div className="inspector-head-actions">
-          {panelTab === 'trace' ? (
-            <IconButton
-              label="Download activity"
-              size="sm"
-              onClick={exportTrace}
-              disabled={!activeSession || traces.length === 0}
-            >
-              <DownloadIcon size={15} />
-            </IconButton>
-          ) : null}
+          <IconButton label="Print workspace" size="sm" onClick={() => window.print()}>
+            <PrinterIcon size={15} />
+          </IconButton>
+          <IconButton label="Export panel" size="sm" onClick={handleExport}>
+            <DownloadIcon size={15} />
+          </IconButton>
           <IconButton label="Close inspector" size="sm" onClick={() => closePanel()}>
             <CloseIcon size={15} />
           </IconButton>
         </div>
       </div>
 
-      <div className="inspector-body">
-        {panelTab === 'file' ? (
-          <FilePanel />
+      <div
+        className={`inspector-body ${
+          panelTab === 'python'
+            ? 'is-python-tab'
+            : panelTab === 'notes'
+            ? 'is-notes-tab'
+            : ''
+        }`}
+      >
+        {panelTab === 'notes' ? (
+          <StickyBoard />
+        ) : panelTab === 'python' ? (
+          <PythonPanel />
         ) : traces.length === 0 ? (
           <div className="panel-empty">
             <ActivityIcon size={22} />

@@ -20,15 +20,14 @@ export const MODEL_OPTIONS: readonly ModelOption[] = [
   {
     id: 'deepseek-v4-flash',
     label: 'DeepSeek V4 Flash',
-    shortLabel: 'V4',
-    description: 'Fast, efficient everyday analysis.',
-    badge: 'Default',
+    shortLabel: 'V4 Flash',
+    description: 'Fast, efficient everyday analysis. Minimal token consumption.',
   },
   {
     id: 'deepseek-v4-pro',
     label: 'DeepSeek V4 Pro',
     shortLabel: 'V4 Pro',
-    description: 'Deeper reasoning for complex investigations.',
+    description: 'Deep reasoning for complex investigations.',
   },
 ]
 

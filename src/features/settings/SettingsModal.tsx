@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { maskApiKey, validateApiKey } from '../../core/storage/settings'
-import { AlertIcon, CloseIcon, EyeIcon, EyeOffIcon, KeyIcon } from '../common/Icons'
+import { getModelOption, MODEL_OPTIONS } from '../../core/agent/modelOptions'
+import { USES_SERVER_PROXY } from '../../core/config'
+import { getTelemetryEnabled, maskApiKey, saveTelemetryEnabled, validateApiKey } from '../../core/storage/settings'
+import { formatBytes } from '../../core/utils/format'
+import { AlertIcon, CheckIcon, CloseIcon, CpuIcon, EyeIcon, EyeOffIcon, KeyIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
@@ -18,8 +21,8 @@ export function SettingsModal() {
 }
 
 function SettingsDialog() {
-  const { apiKey } = useSessionState()
-  const { closeSettings, saveApiKey, clearApiKey } = useSessionActions()
+  const { apiKey, model } = useSessionState()
+  const { closeSettings, saveApiKey, clearApiKey, setModel } = useSessionActions()
   const [draftKey, setDraftKey] = useState(apiKey ?? '')
   const [showKey, setShowKey] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +75,22 @@ function SettingsDialog() {
         </div>
 
         <div className="modal-body">
+          {USES_SERVER_PROXY ? (
+            <div className="field">
+              <div className="field-head">
+                <span className="field-label">
+                  <KeyIcon size={14} />
+                  Tabula cloud connection
+                </span>
+                <span className="field-status is-ok">Connected</span>
+              </div>
+              <p className="field-help">
+                This workspace is connected through the Tabula server. No access key is stored in
+                your browser, and only the questions and results needed to answer are sent for
+                processing.
+              </p>
+            </div>
+          ) : (
           <div className="field">
             <div className="field-head">
               <label htmlFor="api-key" className="field-label">
@@ -125,26 +144,141 @@ function SettingsDialog() {
               local.
             </p>
           </div>
+          )}
+          {/* Model selection */}
+          <div className="field">
+            <div className="field-head">
+              <span className="field-label">
+                <CpuIcon size={14} />
+                Language model
+              </span>
+              <span className="field-status is-ok">{getModelOption(model).label}</span>
+            </div>
+            <div className="model-settings-options">
+              {MODEL_OPTIONS.map((option) => {
+                const isSelected = option.id === model
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`model-setting-card ${isSelected ? 'is-selected' : ''}`}
+                    onClick={() => setModel(option.id)}
+                  >
+                    <div className="model-setting-main">
+                      <strong className="model-setting-title">{option.label}</strong>
+                      <p className="model-setting-desc">{option.description}</p>
+                    </div>
+                    <div className="model-setting-check" aria-hidden>
+                      {isSelected ? <CheckIcon size={16} /> : null}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="field-help">
+              DeepSeek V4 Pro uses deeper reasoning for complex analytics. You can switch models anytime.
+            </p>
+          </div>
+
+          <StorageSettings />
         </div>
 
         <div className="modal-foot">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={handleClear}
-            disabled={!apiKey && draftKey.trim().length === 0}
-          >
-            Clear key
-          </button>
-          <div className="modal-foot-right">
-            <button type="button" className="btn btn-ghost" onClick={closeSettings}>
-              Cancel
+          {USES_SERVER_PROXY ? (
+            <button type="button" className="btn btn-primary" onClick={closeSettings}>
+              Done
             </button>
-            <button type="button" className="btn btn-primary" onClick={handleSave}>
-              Save
-            </button>
-          </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={handleClear}
+                disabled={!apiKey && draftKey.trim().length === 0}
+              >
+                Clear key
+              </button>
+              <div className="modal-foot-right">
+                <button type="button" className="btn btn-ghost" onClick={closeSettings}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleSave}>
+                  Save
+                </button>
+              </div>
+            </>
+          )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Privacy, storage and local cache controls. */
+function StorageSettings() {
+  const [telemetry, setTelemetry] = useState(getTelemetryEnabled)
+  const [usage, setUsage] = useState<number | null>(null)
+  const [clearing, setClearing] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    navigator.storage
+      ?.estimate()
+      .then((estimate) => {
+        if (active) setUsage(estimate.usage ?? null)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const clearCaches = async () => {
+    setClearing(true)
+    try {
+      const keys = await caches.keys()
+      await Promise.all(
+        keys.filter((key) => key.startsWith('tabula')).map((key) => caches.delete(key)),
+      )
+      const estimate = await navigator.storage?.estimate()
+      setUsage(estimate?.usage ?? null)
+    } catch {
+      // Cache access is optional.
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  return (
+    <div className="settings-extra">
+      <label className="settings-toggle">
+        <input
+          type="checkbox"
+          checked={telemetry}
+          onChange={(event) => {
+            setTelemetry(event.target.checked)
+            saveTelemetryEnabled(event.target.checked)
+          }}
+        />
+        <span>
+          <strong>Send anonymous error details</strong>
+          <small>Only if a reporting endpoint is configured by the site owner.</small>
+        </span>
+      </label>
+
+      <div className="settings-storage-row">
+        <span>
+          <strong>Browser storage</strong>
+          <small>{usage === null ? 'Checking…' : `${formatBytes(usage)} used`}</small>
+        </span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-small"
+          onClick={() => void clearCaches()}
+          disabled={clearing}
+        >
+          {clearing ? 'Clearing…' : 'Clear cached files'}
+        </button>
       </div>
     </div>
   )

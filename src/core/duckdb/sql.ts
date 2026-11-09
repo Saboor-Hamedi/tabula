@@ -1,11 +1,13 @@
 import { READ_ONLY_STATEMENTS } from '../constants'
 
 export function quoteIdent(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""')}"`
+  const safe = typeof identifier === 'string' ? identifier : String(identifier ?? '')
+  return `"${safe.replace(/"/g, '""')}"`
 }
 
 export function quoteString(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`
+  const safe = typeof value === 'string' ? value : String(value ?? '')
+  return `'${safe.replace(/'/g, "''")}'`
 }
 
 export function qualifiedName(schemaName: string, tableName: string): string {
@@ -13,7 +15,9 @@ export function qualifiedName(schemaName: string, tableName: string): string {
 }
 
 export function normalizeIdentifier(value: string, fallback: string): string {
-  const cleaned = value
+  const str = typeof value === 'string' ? value : String(value ?? '')
+  const fb = typeof fallback === 'string' ? fallback : 'data'
+  const cleaned = str
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -21,12 +25,12 @@ export function normalizeIdentifier(value: string, fallback: string): string {
     .replace(/^_+|_+$/g, '')
     .slice(0, 64)
 
-  const candidate = cleaned.length > 0 ? cleaned : fallback
+  const candidate = cleaned.length > 0 ? cleaned : fb
   return /^[0-9]/.test(candidate) ? `t_${candidate}` : candidate
 }
 
 export function uniqueIdentifier(base: string, used: Set<string>): string {
-  let candidate = base
+  let candidate = typeof base === 'string' && base.length > 0 ? base : 'data'
   let index = 2
   while (used.has(candidate)) {
     candidate = `${base}_${index}`
@@ -37,7 +41,8 @@ export function uniqueIdentifier(base: string, used: Set<string>): string {
 }
 
 export function stripFileName(fileName: string): string {
-  const withoutPath = fileName.split(/[\\/]/).pop() ?? fileName
+  const str = typeof fileName === 'string' ? fileName : 'data'
+  const withoutPath = str.split(/[\\/]/).pop() ?? str
   return withoutPath.replace(/\.[^.]+$/, '')
 }
 

@@ -58,6 +58,14 @@ export interface Session {
   schemaName: string
   tables: TableSummary[]
   primaryTable: string | null
+  /** Sheets chosen by the user for a large workbook. */
+  selectedSheets?: string[]
+}
+
+export interface SheetInfo {
+  name: string
+  rowCount: number
+  columnCount: number
 }
 
 export type ChatRole = 'user' | 'assistant'
@@ -68,6 +76,7 @@ export interface ChatMessage {
   content: string
   createdAt: number
   error?: boolean
+  model?: ModelId
   /** Marks the message the agent writes right after a file is ingested. */
   welcome?: boolean
   /** Data-derived follow-up questions rendered under the message. */
@@ -96,7 +105,7 @@ export interface ToolTraceEntry {
 }
 
 /** Tabs of the right-hand inspector. */
-export type PanelTab = 'file' | 'trace'
+export type PanelTab = 'file' | 'notes' | 'python' | 'trace'
 
 export type UploadPhase = 'idle' | 'reading' | 'ingesting' | 'done' | 'error'
 
@@ -177,7 +186,7 @@ export interface TableBlockData {
 
 export type RawBlock = MarkdownBlockData | MermaidBlockData | ChartBlockData | TableBlockData
 
-export type ToolName = 'inspect_schema' | 'run_sql'
+export type ToolName = 'inspect_schema' | 'run_sql' | 'run_python'
 
 export interface InspectSchemaArgs {
   table?: string
@@ -185,6 +194,11 @@ export interface InspectSchemaArgs {
 
 export interface RunSqlArgs {
   sql: string
+  purpose?: string
+}
+
+export interface RunPythonArgs {
+  code: string
   purpose?: string
 }
 

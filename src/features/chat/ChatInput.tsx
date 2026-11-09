@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
-import { SendIcon, StopIcon } from '../common/Icons'
+import { useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react'
+import { KeyIcon, SendIcon, StopIcon } from '../common/Icons'
 
 /**
  * Auto-growing composer textarea.
@@ -16,6 +16,12 @@ export interface ChatInputProps {
   disabled: boolean
   streaming: boolean
   placeholder: string
+  needsKey?: boolean
+  onDisabledClick?: () => void
+  disabledAction?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 const MAX_HEIGHT = 200
@@ -28,6 +34,9 @@ export function ChatInput({
   disabled,
   streaming,
   placeholder,
+  needsKey = false,
+  onDisabledClick,
+  disabledAction,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -39,35 +48,82 @@ export function ChatInput({
   }, [value])
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (disabled) {
+      if (event.key === 'Enter' && onDisabledClick) {
+        event.preventDefault()
+        onDisabledClick()
+      }
+      return
+    }
     if (event.key !== 'Enter' || event.shiftKey) return
     if (event.nativeEvent.isComposing) return
     event.preventDefault()
-    if (!disabled && !streaming && value.trim().length > 0) onSubmit()
+    if (!streaming && value.trim().length > 0) onSubmit()
+  }
+
+  const handleContainerClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (disabled && onDisabledClick) {
+      event.preventDefault()
+      onDisabledClick()
+    }
   }
 
   const canSend = !disabled && !streaming && value.trim().length > 0
 
   return (
-    <div className={`composer-field ${streaming ? 'is-streaming' : ''}`}>
+    <div
+      className={`composer-field ${streaming ? 'is-streaming' : ''} ${
+        disabled ? 'is-disabled' : ''
+      } ${needsKey ? 'needs-key' : ''}`}
+      onClick={handleContainerClick}
+    >
       <textarea
         ref={textareaRef}
         className="composer-textarea"
         value={value}
         rows={1}
         placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          if (!disabled) onChange(event.target.value)
+        }}
         onKeyDown={handleKeyDown}
-        disabled={disabled}
+        readOnly={disabled}
+        aria-disabled={disabled}
         aria-label="Message the data agent"
       />
 
       <div className="composer-field-foot">
-        <span className="composer-hint">
-          {streaming ? 'Working…' : 'Enter to send · Shift+Enter for a new line'}
-        </span>
+        <div className="composer-field-foot-left">
+          {disabledAction ? (
+            <button
+              type="button"
+              className="composer-action-pill"
+              onClick={(event) => {
+                event.stopPropagation()
+                disabledAction.onClick()
+              }}
+            >
+              <KeyIcon size={12} />
+              <span>{disabledAction.label}</span>
+            </button>
+          ) : (
+            <span className="composer-hint">
+              {streaming
+                ? 'Working…'
+                : disabled
+                  ? placeholder
+                  : 'Enter to send · Shift+Enter for a new line'}
+            </span>
+          )}
+        </div>
 
         {streaming ? (
-          <button type="button" className="composer-send is-stop" onClick={onStop} aria-label="Stop generating">
+          <button
+            type="button"
+            className="composer-send is-stop"
+            onClick={onStop}
+            aria-label="Stop generating"
+          >
             <StopIcon size={15} />
           </button>
         ) : (

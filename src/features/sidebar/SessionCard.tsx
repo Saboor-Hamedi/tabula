@@ -18,7 +18,7 @@ export interface SessionCardProps {
 }
 
 export function SessionCard({ session, active, onSelect }: SessionCardProps) {
-  const totalRows = session.tables.reduce((total, table) => total + table.rowCount, 0)
+  const totalRows = (session?.tables ?? []).reduce((total, table) => total + (table?.rowCount ?? 0), 0)
 
   return (
     <div className={`session-card ${active ? 'is-active' : ''}`}>

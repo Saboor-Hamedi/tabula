@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import type { FigureChanges } from '../../core/parsing/editFigure'
 import { parseMessageContent } from '../../core/parsing/parseMessage'
 import type { ContentBlock } from '../../core/types'
 import { ChartBlock } from '../render/ChartBlock'
@@ -18,14 +19,42 @@ export interface MessageRendererProps {
   content: string
   /** While streaming, hold back chart rendering until fences close. */
   streaming?: boolean
+  onEditFigure?: (figureIndex: number, changes: FigureChanges) => void
 }
 
-function renderBlock(block: ContentBlock, index: number, streaming: boolean) {
+function renderBlock(
+  block: ContentBlock,
+  index: number,
+  streaming: boolean,
+  figureIndex: number | null,
+  onEditFigure?: (figureIndex: number, changes: FigureChanges) => void,
+) {
   if (block.type === 'mermaid') {
-    return <MermaidBlock key={`mermaid-${index}`} code={block.code} streaming={streaming} />
+    return (
+      <MermaidBlock
+        key={`mermaid-${index}`}
+        code={block.code}
+        streaming={streaming}
+        onEdit={
+          onEditFigure && figureIndex !== null
+            ? (changes) => onEditFigure(figureIndex, changes)
+            : undefined
+        }
+      />
+    )
   }
   if (block.type === 'chart') {
-    return <ChartBlock key={`chart-${index}`} chart={block.chart} />
+    return (
+      <ChartBlock
+        key={`chart-${index}`}
+        chart={block.chart}
+        onEdit={
+          onEditFigure && figureIndex !== null
+            ? (changes) => onEditFigure(figureIndex, changes)
+            : undefined
+        }
+      />
+    )
   }
   if (block.type === 'table') {
     return <DataTable key={`table-${index}`} headers={block.headers} rows={block.rows} />
@@ -36,12 +65,18 @@ function renderBlock(block: ContentBlock, index: number, streaming: boolean) {
 export const MessageRenderer = memo(function MessageRenderer({
   content,
   streaming = false,
+  onEditFigure,
 }: MessageRendererProps) {
   const blocks = useMemo(() => parseMessageContent(content), [content])
 
+  let figureIndex = 0
   return (
     <div className="message-content">
-      {blocks.map((block, index) => renderBlock(block, index, streaming))}
+      {blocks.map((block, index) => {
+        const currentFigure =
+          block.type === 'mermaid' || block.type === 'chart' ? figureIndex++ : null
+        return renderBlock(block, index, streaming, currentFigure, onEditFigure)
+      })}
     </div>
   )
 })

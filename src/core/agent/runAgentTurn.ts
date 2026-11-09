@@ -35,17 +35,35 @@ export interface AgentTurnResult {
  * conversation. Keeping them out also stops the transcript from growing a
  * boilerplate preamble on every turn.
  */
-function toModelMessages(history: ChatMessage[], userText: string): ModelMessage[] {
-  const messages: ModelMessage[] = []
+const MAX_HISTORY_MESSAGES = 12
+const MAX_HISTORY_CHARS = 24_000
 
-  for (const message of history) {
-    const content = message.content.trim()
-    if (content.length === 0 || message.error || message.welcome) continue
-    messages.push({ role: message.role, content })
+function toModelMessages(history: ChatMessage[], userText: string): ModelMessage[] {
+  const safeHistory = Array.isArray(history) ? history : []
+  const cleaned = safeHistory
+    .filter(
+      (message) =>
+        typeof message?.content === 'string' &&
+        message.content.trim().length > 0 &&
+        !message.error &&
+        !message.welcome,
+    )
+    .slice(-MAX_HISTORY_MESSAGES)
+
+  // Keep the newest messages that fit the context budget, then restore order.
+  const selected: ModelMessage[] = []
+  let characters = 0
+  for (let index = cleaned.length - 1; index >= 0; index -= 1) {
+    const message = cleaned[index]
+    const content = typeof message?.content === 'string' ? message.content.trim() : ''
+    if (!content) continue
+    if (selected.length > 0 && characters + content.length > MAX_HISTORY_CHARS) break
+    selected.unshift({ role: message.role, content })
+    characters += content.length
   }
 
-  messages.push({ role: 'user', content: userText })
-  return messages
+  selected.push({ role: 'user', content: userText })
+  return selected
 }
 
 export async function runAgentTurn({
@@ -112,7 +130,9 @@ export async function runAgentTurn({
   if (streamError) throw streamError
   if (signal.aborted) return { text }
 
-  const answer = text.trim().length > 0 ? text : finalText
+  const safeText = typeof text === 'string' ? text.trim() : ''
+  const safeFinal = typeof finalText === 'string' ? finalText.trim() : ''
+  const answer = safeText.length > 0 ? text : safeFinal
   if (answer.trim().length === 0) {
     throw new Error('The model returned an empty response. Try asking again.')
   }

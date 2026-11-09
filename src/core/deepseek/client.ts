@@ -1,8 +1,13 @@
 import { createDeepSeek } from '@ai-sdk/deepseek'
+import { PROXY_BASE_URL, USES_SERVER_PROXY } from '../config'
 import type { ModelId } from '../types'
 
 export function createDeepSeekModel(apiKey: string, modelId: ModelId) {
-  const provider = createDeepSeek({ apiKey })
+  const provider = createDeepSeek(
+    USES_SERVER_PROXY
+      ? { apiKey: 'server-proxy', baseURL: PROXY_BASE_URL }
+      : { apiKey },
+  )
   return provider(modelId)
 }
 
@@ -11,7 +16,7 @@ export function buildProviderOptions(modelId: ModelId) {
     return {
       deepseek: {
         thinking: { type: 'enabled' as const },
-        reasoningEffort: 'high' as const,
+        reasoningEffort: 'low' as const,
       },
     }
   }

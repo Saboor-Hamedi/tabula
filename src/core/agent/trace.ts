@@ -35,6 +35,8 @@ export function summarizeToolResult(
   toolName: ToolName,
   result: Record<string, unknown>,
 ): string {
+  const reused = result.cached === true ? 'Reused · ' : ''
+
   if (toolName === 'inspect_schema') {
     const tables = Array.isArray(result.tables) ? result.tables : []
     const columnCount = tables.reduce((total, table) => {
@@ -42,8 +44,8 @@ export function summarizeToolResult(
       const columns = (table as { columns?: unknown }).columns
       return total + (Array.isArray(columns) ? columns.length : 0)
     }, 0)
-    if (tables.length === 0) return 'Schema inspected — no tables found'
-    return `Inspected ${tables.length} table${tables.length === 1 ? '' : 's'} · ${columnCount} columns`
+    if (tables.length === 0) return `${reused}No tables found`
+    return `${reused}Read ${tables.length} table${tables.length === 1 ? '' : 's'} · ${columnCount} columns`
   }
 
   if (toolName === 'run_sql') {
@@ -52,7 +54,14 @@ export function summarizeToolResult(
     const elapsedMs = typeof result.elapsedMs === 'number' ? result.elapsedMs : 0
     const truncated = result.truncated === true
     const shown = truncated ? `${returnedRows} of ${rowCount}` : `${rowCount}`
-    return `${shown} row${rowCount === 1 ? '' : 's'} · ${elapsedMs} ms`
+    return `${reused}${shown} row${rowCount === 1 ? '' : 's'} · ${elapsedMs} ms`
+  }
+
+  if (toolName === 'run_python') {
+    const elapsedMs = typeof result.elapsedMs === 'number' ? result.elapsedMs : 0
+    const plotCount = typeof result.plotCount === 'number' ? result.plotCount : 0
+    const plotSuffix = plotCount > 0 ? ` · ${plotCount} plot${plotCount === 1 ? '' : 's'}` : ''
+    return `Executed Python · ${elapsedMs} ms${plotSuffix}`
   }
 
   return 'Completed'

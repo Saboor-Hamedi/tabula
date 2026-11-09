@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { ACCEPTED_EXTENSIONS } from '../../core/constants'
-import { CloseIcon, DatabaseIcon, PlusIcon } from '../common/Icons'
+import { CloseIcon, DatabaseIcon, PlusIcon, SidebarIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useSessionActions } from '../SessionProvider'
 
@@ -10,9 +10,7 @@ import { useSessionActions } from '../SessionProvider'
  * Its height is bound to `--header-height`, the same variable the app header
  * uses, so the two bars always line up across the split.
  *
- * `closable` is only true when the sidebar is an overlay drawer: as a persistent
- * column the header toggle already collapses it, and a second close button in
- * the same view would be redundant.
+ * Contains brand, add dataset trigger, and collapse toggle button.
  */
 
 export interface SidebarHeaderProps {
@@ -37,11 +35,13 @@ export function SidebarHeader({ onClose, closable = false }: SidebarHeaderProps)
         <IconButton label="Add dataset" size="sm" onClick={() => inputRef.current?.click()}>
           <PlusIcon size={16} />
         </IconButton>
-        {closable ? (
-          <IconButton label="Close sidebar" size="sm" onClick={onClose}>
-            <CloseIcon size={16} />
-          </IconButton>
-        ) : null}
+        <IconButton
+          label={closable ? 'Close sidebar' : 'Collapse sidebar'}
+          size="sm"
+          onClick={onClose}
+        >
+          {closable ? <CloseIcon size={16} /> : <SidebarIcon size={16} />}
+        </IconButton>
       </div>
 
       <input

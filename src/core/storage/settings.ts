@@ -78,3 +78,14 @@ export function maskApiKey(key: string): string {
   if (key.length <= 10) return '••••••••'
   return `${key.slice(0, 5)}••••••••${key.slice(-4)}`
 }
+
+export function getTelemetryEnabled(): boolean {
+  const storage = getStorage()
+  return storage?.getItem(STORAGE_KEYS.telemetry) === '1'
+}
+
+export function saveTelemetryEnabled(enabled: boolean): void {
+  const storage = getStorage()
+  if (!storage) return
+  storage.setItem(STORAGE_KEYS.telemetry, enabled ? '1' : '0')
+}

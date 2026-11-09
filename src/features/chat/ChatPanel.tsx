@@ -21,6 +21,8 @@ export function ChatPanel() {
   const { messages, isStreaming, streamingSessionId, activeSession, traces } = useSessionState()
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
+  const lastSessionIdRef = useRef<string | null>(null)
+  const prevMessageCountRef = useRef(0)
 
   const streamingHere = isStreaming && streamingSessionId === activeSession?.id
 
@@ -44,15 +46,25 @@ export function ChatPanel() {
     const element = scrollRef.current
     if (!element) return
 
+    const isNewSession = activeSession?.id !== lastSessionIdRef.current
+    const isInitialMount = lastSessionIdRef.current === null
+    const isNewMessage = messages.length > prevMessageCountRef.current
+
+    lastSessionIdRef.current = activeSession?.id ?? null
+    prevMessageCountRef.current = messages.length
+
+    // Instant snap on refresh, initial load, or session switch; smooth scroll only for newly added messages
+    const behavior: ScrollBehavior =
+      isInitialMount || isNewSession || streamingHere || !isNewMessage ? 'auto' : 'smooth'
+
     const frame = window.requestAnimationFrame(() => {
       element.scrollTo({
         top: element.scrollHeight,
-        // Instant while streaming: smooth scrolling fights the token stream.
-        behavior: streamingHere ? 'auto' : 'smooth',
+        behavior,
       })
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [messages, streamingHere])
+  }, [messages, streamingHere, activeSession?.id])
 
   return (
     <div className="chat-panel">

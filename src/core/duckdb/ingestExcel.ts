@@ -18,6 +18,8 @@ export interface IngestExcelInput {
   sessionId: string
   /** Explicit schema for restored/replaced sessions. */
   schemaName?: string
+  /** Only import these worksheets; all sheets when omitted. */
+  selectedSheets?: string[]
 }
 
 /**
@@ -31,9 +33,10 @@ export async function ingestExcel({
   file,
   sessionId,
   schemaName: requestedSchema,
+  selectedSheets,
 }: IngestExcelInput): Promise<IngestResult> {
   const schemaName = requestedSchema ?? buildSchemaName(sessionId)
-  const sheets = await convertWorkbookInWorker(await file.arrayBuffer())
+  const sheets = await convertWorkbookInWorker(await file.arrayBuffer(), selectedSheets)
 
   await handle.connection.query(`CREATE SCHEMA IF NOT EXISTS ${quoteIdent(schemaName)}`)
 

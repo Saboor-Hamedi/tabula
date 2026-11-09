@@ -110,12 +110,13 @@ export async function buildDatasetDigest(
   connection: AsyncDuckDBConnection,
   session: Session,
 ): Promise<DatasetDigest> {
-  const primary = session.tables.find((table) => table.name === session.primaryTable)
-  const ranked = [...session.tables]
-    .filter((table) => table.name !== primary?.name)
+  const sessionTables = Array.isArray(session?.tables) ? session.tables : []
+  const primary = sessionTables.find((table) => table?.name === session.primaryTable)
+  const ranked = [...sessionTables]
+    .filter((table) => table && table.name !== primary?.name)
     .sort(
       (left, right) =>
-        right.rowCount - left.rowCount || right.columnCount - left.columnCount,
+        (right.rowCount ?? 0) - (left.rowCount ?? 0) || (right.columnCount ?? 0) - (left.columnCount ?? 0),
     )
   const selected = [primary, ...ranked].filter(
     (table): table is Session['tables'][number] => table !== undefined,
@@ -123,23 +124,26 @@ export async function buildDatasetDigest(
   const tables: DigestTable[] = []
 
   for (const table of selected.slice(0, DIGEST_MAX_TABLES)) {
-    const target = qualifiedName(session.schemaName, table.name)
+    if (!table || !table.name) continue
+    const schema = session?.schemaName || 'data'
+    const target = qualifiedName(schema, table.name)
 
     try {
-      const columns = await readColumns(connection, session.schemaName, table.name)
+      const columns = await readColumns(connection, schema, table.name)
       const described: DigestColumn[] = []
 
       for (const column of columns.slice(0, DIGEST_MAX_COLUMNS)) {
+        if (!column || !column.name) continue
         described.push(await describeColumn(connection, target, column.name, column.type))
       }
 
       tables.push({
         name: table.name,
-        rowCount: table.rowCount,
+        rowCount: table.rowCount ?? 0,
         columns: described,
       })
     } catch {
-      tables.push({ name: table.name, rowCount: table.rowCount, columns: [] })
+      tables.push({ name: table.name, rowCount: table.rowCount ?? 0, columns: [] })
     }
   }
 

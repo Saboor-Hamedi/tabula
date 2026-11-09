@@ -2,6 +2,7 @@ import type { DuckDBHandle } from '../duckdb/initDuckDB'
 import { listTables, tableExists } from '../duckdb/listTables'
 import { runSQL } from '../duckdb/runSQL'
 import { profileTable } from '../profiling/profileTable'
+import { runPython } from '../python'
 import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
 import type { TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
 import {
@@ -19,6 +20,27 @@ export interface ToolContext {
   tableNames: string[]
   tables: TableSummary[]
   onTrace: (entry: ToolTraceEntry) => void
+}
+
+const CACHE_LIMIT = 40
+const queryCache = new Map<string, ToolResultPayload>()
+const schemaCache = new Map<string, ToolResultPayload>()
+
+function cacheResult(
+  cache: Map<string, ToolResultPayload>,
+  key: string,
+  value: ToolResultPayload,
+): ToolResultPayload {
+  if (cache.size >= CACHE_LIMIT) {
+    const oldest = cache.keys().next().value
+    if (oldest !== undefined) cache.delete(oldest)
+  }
+  cache.set(key, value)
+  return value
+}
+
+function normalizeSql(sql: string): string {
+  return sql.replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -40,11 +62,15 @@ async function inspectSchema(
   context: ToolContext,
 ): Promise<ToolResultPayload> {
   const requestedTable = readString(args, 'table')
-  const available = context.tableNames.length > 0
+  const cacheKey = `${context.schemaName}:${requestedTable?.toLowerCase() ?? '*'}`
+  const cached = schemaCache.get(cacheKey)
+  if (cached) return { ...cached, cached: true }
+
+  const available = Array.isArray(context.tableNames) && context.tableNames.length > 0
     ? context.tableNames
     : (await listTables(context.handle.connection, context.schemaName)).map((table) => table.name)
 
-  if (available.length === 0) {
+  if (!available || available.length === 0) {
     return {
       error: 'This session has no tables. Ask the user to upload a CSV or XLSX file.',
       schema: context.schemaName,
@@ -52,10 +78,13 @@ async function inspectSchema(
     }
   }
 
-  const ranked = [...context.tables].sort(
-    (left, right) => right.rowCount - left.rowCount || right.columnCount - left.columnCount,
+  const safeTables = Array.isArray(context.tables) ? context.tables : []
+  const ranked = [...safeTables].sort(
+    (left, right) => (right.rowCount ?? 0) - (left.rowCount ?? 0) || (right.columnCount ?? 0) - (left.columnCount ?? 0),
   )
-  const rankedNames = ranked.map((table) => table.name)
+  const rankedNames = ranked
+    .map((table) => table?.name)
+    .filter((name): name is string => typeof name === 'string')
 
   const tablesToProfile: string[] = []
   if (requestedTable) {
@@ -76,12 +105,16 @@ async function inspectSchema(
 
   const profiles: TableProfile[] = []
   for (const tableName of tablesToProfile) {
-    const exists = await tableExists(context.handle.connection, context.schemaName, tableName)
-    if (!exists) continue
-    profiles.push(await profileTable(context.handle.connection, context.schemaName, tableName))
+    try {
+      const exists = await tableExists(context.handle.connection, context.schemaName, tableName)
+      if (!exists) continue
+      profiles.push(await profileTable(context.handle.connection, context.schemaName, tableName))
+    } catch {
+      // Ignore profiling failures on damaged tables
+    }
   }
 
-  return {
+  return cacheResult(schemaCache, cacheKey, {
     engine: 'DuckDB (in-memory)',
     schema: context.schemaName,
     scope: requestedTable ? 'single_table' : 'largest_tables',
@@ -93,7 +126,7 @@ async function inspectSchema(
       available.length > profiles.length
         ? `This workbook has ${available.length} tables. The largest ${profiles.length} are shown. Ask for a specific table by exact name when needed.`
         : 'Use the exact column names and types shown above. The schema is already on the search_path, so unqualified table names work. Explore distributions, nulls, cardinality, group-bys, and time trends before answering.',
-  }
+  })
 }
 
 async function runSql(
@@ -106,6 +139,10 @@ async function runSql(
   }
 
   const purpose = readString(args, 'purpose')
+  const cacheKey = `${context.schemaName}:${normalizeSql(sql)}`
+  const cached = queryCache.get(cacheKey)
+  if (cached) return { ...cached, cached: true }
+
   const result = await runSQL({
     handle: context.handle,
     sql,
@@ -114,12 +151,38 @@ async function runSql(
     readOnly: true,
   })
 
-  return {
+  return cacheResult(queryCache, cacheKey, {
     ...result,
     purpose: purpose ?? undefined,
     note: result.truncated
       ? `Results were capped at ${result.returnedRows} returned rows out of ${result.rowCount}. Aggregate or filter further if you need the full picture.`
       : undefined,
+  })
+}
+
+async function runPythonTool(
+  args: Record<string, unknown>,
+  context: ToolContext,
+): Promise<ToolResultPayload> {
+  const code = readString(args, 'code')
+  if (!code) {
+    return { error: 'The "code" argument is required and must be a non-empty string.' }
+  }
+
+  const primaryTable = context.tableNames[0]
+  const result = await runPython(code, {
+    connection: context.handle.connection,
+    schemaName: context.schemaName,
+    tableName: primaryTable,
+  })
+
+  return {
+    stdout: result.stdout,
+    stderr: result.stderr,
+    hasPlots: result.images.length > 0,
+    plotCount: result.images.length,
+    elapsedMs: result.elapsedMs,
+    error: result.error,
   }
 }
 
@@ -147,10 +210,14 @@ export async function executeTool(
   )
 
   try {
-    const result =
-      toolName === 'inspect_schema'
-        ? await inspectSchema(args, context)
-        : await runSql(args, context)
+    let result: ToolResultPayload
+    if (toolName === 'inspect_schema') {
+      result = await inspectSchema(args, context)
+    } else if (toolName === 'run_sql') {
+      result = await runSql(args, context)
+    } else {
+      result = await runPythonTool(args, context)
+    }
 
     const summary = result.error
       ? summarizeToolError(result.error)

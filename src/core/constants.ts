@@ -18,16 +18,17 @@ export const STORAGE_KEYS = {
   sidebarWidth: 'data-agent:ui:sidebar-width',
   panelWidth: 'data-agent:ui:panel-width',
   workspaceCache: 'data-agent:workspace-cache',
+  telemetry: 'data-agent:ui:telemetry',
 } as const
 
 export const DEFAULT_MODEL = 'deepseek-v4-flash'
 
 /** How many rows a single SQL result may return before it is truncated. */
-export const MAX_RESULT_ROWS = 250
+export const MAX_RESULT_ROWS = 60
 /** Hard cap on rows rendered inside a chat table. */
-export const MAX_PREVIEW_ROWS = 120
+export const MAX_PREVIEW_ROWS = 60
 export const MAX_SAMPLE_ROWS = 6
-export const MAX_AGENT_STEPS = 8
+export const MAX_AGENT_STEPS = 6
 export const MAX_PROFILED_COLUMNS = 160
 export const MAX_UPLOAD_BYTES = 80 * 1024 * 1024
 export const TRACE_DETAIL_LIMIT = 8000

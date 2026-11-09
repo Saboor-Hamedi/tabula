@@ -42,13 +42,15 @@ function CellValue({ value }: { value: string }) {
   )
 }
 
-export const DataTable = memo(function DataTable({ headers, rows }: DataTableProps) {
-  const visibleRows = useMemo(() => rows.slice(0, MAX_PREVIEW_ROWS), [rows])
+export const DataTable = memo(function DataTable({ headers = [], rows = [] }: DataTableProps) {
+  const safeHeaders = Array.isArray(headers) ? headers : []
+  const safeRows = Array.isArray(rows) ? rows : []
+  const visibleRows = useMemo(() => safeRows.slice(0, MAX_PREVIEW_ROWS), [safeRows])
   const handleDownload = useCallback(() => {
-    downloadCsv('tabula-table.csv', buildCsv(headers, rows))
-  }, [headers, rows])
+    downloadCsv('tabula-table.csv', buildCsv(safeHeaders, safeRows))
+  }, [safeHeaders, safeRows])
 
-  if (headers.length === 0) return null
+  if (safeHeaders.length === 0) return null
 
   return (
     <div className="data-table-block">
@@ -56,7 +58,7 @@ export const DataTable = memo(function DataTable({ headers, rows }: DataTablePro
         <table className="data-table">
           <thead>
             <tr>
-              {headers.map((header, index) => (
+              {safeHeaders.map((header, index) => (
                 <th key={`${header}-${index}`} scope="col">
                   <CellValue value={header} />
                 </th>

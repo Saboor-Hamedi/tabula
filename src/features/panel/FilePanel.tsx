@@ -19,7 +19,7 @@ export function FilePanel() {
 
   const totalRows = useMemo(
     () =>
-      activeSession?.tables.reduce((total, table) => total + table.rowCount, 0) ?? 0,
+      (activeSession?.tables ?? []).reduce((total, table) => total + (table?.rowCount ?? 0), 0),
     [activeSession],
   )
 
@@ -85,7 +85,7 @@ export function FilePanel() {
       <div className="file-facts">
         <div className="file-fact">
           <span className="file-fact-label">Tables</span>
-          <span className="file-fact-value">{activeSession.tables.length}</span>
+          <span className="file-fact-value">{activeSession.tables?.length ?? 0}</span>
         </div>
         <div className="file-fact">
           <span className="file-fact-label">Rows</span>
@@ -107,13 +107,13 @@ export function FilePanel() {
             </header>
 
             <ul className="file-columns">
-              {table.columns.map((column) => (
+              {(table.columns ?? []).map((column) => (
                 <li key={column.name} className="file-column">
                   <span className="file-column-name">{column.name}</span>
                   <span className="file-column-type">{column.type.toLowerCase()}</span>
                 </li>
               ))}
-              {table.columns.length === 0 ? (
+              {(table.columns?.length ?? 0) === 0 ? (
                 <li className="file-column is-empty">No columns readable</li>
               ) : null}
             </ul>
@@ -122,10 +122,10 @@ export function FilePanel() {
 
         {!digest ? (
           <div className="file-panel-note">Reading columns…</div>
-        ) : digest.tables.length < activeSession.tables.length ? (
+        ) : (digest.tables?.length ?? 0) < (activeSession.tables?.length ?? 0) ? (
           <div className="file-panel-note">
-            Showing the {formatCount(digest.tables.length)} largest of{' '}
-            {formatCount(activeSession.tables.length)} tables. Ask about a specific sheet or column
+            Showing the {formatCount(digest.tables?.length ?? 0)} largest of{' '}
+            {formatCount(activeSession.tables?.length ?? 0)} tables. Ask about a specific sheet or column
             for more detail.
           </div>
         ) : null}

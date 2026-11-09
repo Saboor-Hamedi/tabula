@@ -7,6 +7,9 @@
  * monitoring service or collecting user data.
  */
 
+import { TELEMETRY_ENDPOINT } from './config'
+import { getTelemetryEnabled } from './storage/settings'
+
 const STORAGE_KEY = 'data-agent:diagnostics'
 
 export interface DiagnosticEvent {
@@ -57,6 +60,16 @@ export function reportDiagnostic(
   writeEvents(events)
 
   console.error(`[Tabula:${source}]`, normalized, context)
+
+  if (TELEMETRY_ENDPOINT && getTelemetryEnabled()) {
+    void fetch(TELEMETRY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(event),
+      keepalive: true,
+    }).catch(() => undefined)
+  }
+
   return event
 }
 

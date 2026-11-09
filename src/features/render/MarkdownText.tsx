@@ -2,12 +2,14 @@ import { memo } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
+import { CodeBlock } from './CodeBlock'
 
 /**
  * Markdown renderer for assistant prose.
  *
  * GFM tables are wrapped in a scroll container so a wide table never stretches
- * the message column. Links open in a new tab.
+ * the message column. Links open in a new tab. Code blocks feature a copy button
+ * and interactive execution for Python.
  */
 
 const components: Components = {
@@ -21,6 +23,19 @@ const components: Components = {
       <table>{children}</table>
     </div>
   ),
+  pre: ({ children }) => <>{children}</>,
+  code: ({ className, children, ...props }) => {
+    const text = String(children).replace(/\n$/, '')
+    const isBlock = Boolean(className) || text.includes('\n')
+    if (isBlock) {
+      return <CodeBlock code={text} className={className} />
+    }
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    )
+  },
 }
 
 export const MarkdownText = memo(function MarkdownText({ content }: { content: string }) {

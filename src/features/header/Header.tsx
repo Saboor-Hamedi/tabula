@@ -4,35 +4,38 @@ import {
   CheckIcon,
   CpuIcon,
   DownloadIcon,
+  FileIcon,
+  MoonIcon,
   PanelRightIcon,
-  SidebarIcon,
+  SunIcon,
 } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
+import { useOnline } from '../common/useOnline'
+import { useTheme } from '../common/useTheme'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
 /**
  * Header.
  *
- * Left: sidebar toggle and the active dataset name.
- * Right: the model switcher and the inspector toggle.
- *
- * The model switcher is the single place the model can be changed. Settings no
- * longer repeats it, so there is exactly one control per concern.
+ * Left: active dataset name and status.
+ * Right: report/export, model switcher, theme toggle, and the inspector toggle.
  */
 
 export function Header() {
-  const { activeSession, messages, model, sidebarOpen, panelOpen } = useSessionState()
+  const { activeSession, messages, model, panelOpen } = useSessionState()
   const {
-    toggleSidebar,
     openPanel,
     closePanel,
     renameSession,
     exportTranscript,
+    openReport,
   } = useSessionActions()
+  const { theme, toggleTheme } = useTheme()
   const [editingName, setEditingName] = useState(false)
   const [draftName, setDraftName] = useState('')
+  const online = useOnline()
 
-  const canExport = messages.some((message) => message.role === 'user')
+  const canExport = messages.length > 0
 
   const beginRename = () => {
     if (!activeSession) return
@@ -48,14 +51,6 @@ export function Header() {
   return (
     <header className="app-header">
       <div className="app-header-left">
-        <IconButton
-          label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-          active={sidebarOpen}
-          onClick={toggleSidebar}
-        >
-          <SidebarIcon size={17} />
-        </IconButton>
-
         <div className="header-title">
           {editingName ? (
             <input
@@ -82,8 +77,8 @@ export function Header() {
           )}
           {activeSession ? (
             <span className="header-title-meta">
-              {activeSession.tables.length} table
-              {activeSession.tables.length === 1 ? '' : 's'}
+              {(activeSession.tables?.length ?? 0)} table
+              {(activeSession.tables?.length ?? 0) === 1 ? '' : 's'}
             </span>
           ) : (
             <span className="header-title-meta">No dataset loaded</span>
@@ -92,20 +87,32 @@ export function Header() {
       </div>
 
       <div className="app-header-right">
+        {!online ? <span className="offline-pill">Offline</span> : null}
         {activeSession ? (
-          <IconButton
-            label="Download conversation"
-            disabled={!canExport}
-            onClick={exportTranscript}
-          >
-            <DownloadIcon size={16} />
-          </IconButton>
+          <>
+            <IconButton label="Open report" disabled={!canExport} onClick={openReport}>
+              <FileIcon size={16} />
+            </IconButton>
+            <IconButton
+              label="Download conversation"
+              disabled={!canExport}
+              onClick={exportTranscript}
+            >
+              <DownloadIcon size={16} />
+            </IconButton>
+          </>
         ) : null}
         <ModelMenu model={model} />
         <IconButton
+          label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          onClick={(e) => toggleTheme(e)}
+        >
+          {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+        </IconButton>
+        <IconButton
           label={panelOpen ? 'Hide inspector' : 'Show inspector'}
           active={panelOpen}
-          onClick={() => (panelOpen ? closePanel() : openPanel('file'))}
+          onClick={() => (panelOpen ? closePanel() : openPanel('notes'))}
         >
           <PanelRightIcon size={17} />
         </IconButton>
@@ -173,16 +180,13 @@ function ModelMenu({ model }: { model: ReturnType<typeof getModelOption>['id'] }
                   setOpen(false)
                 }}
               >
-                <span className="model-option-main">
-                  <span className="model-option-name">
-                    {option.label}
-                    {option.badge ? (
-                      <span className="model-option-badge">{option.badge}</span>
-                    ) : null}
-                  </span>
+                <div className="model-option-main">
+                  <span className="model-option-name">{option.label}</span>
                   <span className="model-option-desc">{option.description}</span>
-                </span>
-                {selected ? <CheckIcon size={15} /> : null}
+                </div>
+                <div className="model-option-check" aria-hidden>
+                  {selected ? <CheckIcon size={16} /> : null}
+                </div>
               </button>
             )
           })}

@@ -3,12 +3,12 @@ import { defineConfig, type Plugin } from 'vite'
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval' blob:",
-  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://api.deepseek.com https://*.deepseek.com blob:",
-  "worker-src 'self' blob:",
+  "connect-src 'self' https://api.deepseek.com https://*.deepseek.com https://cdn.jsdelivr.net blob: data:",
+  "worker-src 'self' blob: https://cdn.jsdelivr.net",
   "child-src 'self' blob:",
   "frame-src 'self' blob:",
   "object-src 'none'",
@@ -32,4 +32,12 @@ function productionCsp(): Plugin {
 
 export default defineConfig({
   plugins: [react(), productionCsp()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: false,
+      },
+    },
+  },
 })

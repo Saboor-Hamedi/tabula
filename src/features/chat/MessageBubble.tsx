@@ -1,4 +1,5 @@
 import { memo, useState } from 'react'
+import { getModelOption } from '../../core/agent/modelOptions'
 import type { ChatMessage } from '../../core/types'
 import { formatCompact, formatTime } from '../../core/utils/format'
 import { CheckIcon, CopyIcon } from '../common/Icons'
@@ -28,7 +29,7 @@ export const MessageBubble = memo(function MessageBubble({
   activity,
   busy,
 }: MessageBubbleProps) {
-  const { sendMessage } = useSessionActions()
+  const { editFigure, sendMessage } = useSessionActions()
   const [copied, setCopied] = useState(false)
   const content = typeof message.content === 'string' ? message.content : ''
 
@@ -66,7 +67,13 @@ export const MessageBubble = memo(function MessageBubble({
           <span>{activity ?? 'Reading your data…'}</span>
         </div>
       ) : (
-        <MessageRenderer content={content} streaming={streaming} />
+        <MessageRenderer
+          content={content}
+          streaming={streaming}
+          onEditFigure={(figureIndex, changes) =>
+            editFigure(message.id, figureIndex, changes)
+          }
+        />
       )}
 
       {streaming && !isThinking ? <span className="stream-caret" aria-hidden /> : null}
@@ -77,6 +84,11 @@ export const MessageBubble = memo(function MessageBubble({
             {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
+          {message.model ? (
+            <span className="message-time" title={getModelOption(message.model).label}>
+              {getModelOption(message.model).shortLabel}
+            </span>
+          ) : null}
           {message.usage ? (
             <span className="message-time">
               {formatCompact(message.usage.inputTokens + message.usage.outputTokens)} tokens

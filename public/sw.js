@@ -1,5 +1,5 @@
 /* Tabula service worker: app shell + heavy analysis assets after first use. */
-const CACHE = 'tabula-v1'
+const CACHE = 'tabula-v2'
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg']
 
 self.addEventListener('install', (event) => {
@@ -56,4 +56,10 @@ self.addEventListener('fetch', (event) => {
       })
     }),
   )
+})
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })

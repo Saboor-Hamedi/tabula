@@ -17,25 +17,27 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
   const highlightColor = data.textColor ?? CHART_COLORS.highlight
 
   const geometry = useMemo(() => {
+    const pointsList = Array.isArray(data?.points) ? data.points : []
     const plotWidth = WIDTH - MARGIN.left - MARGIN.right
     const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom
-    const rawMax = Math.max(...data.points.map((point) => point.value), 0)
-    const rawMin = Math.min(...data.points.map((point) => point.value), 0)
+    const rawMax = Math.max(...pointsList.map((point) => point?.value ?? 0), 0)
+    const rawMin = Math.min(...pointsList.map((point) => point?.value ?? 0), 0)
     const yMax = niceMax(rawMax)
     const yMin = rawMin < 0 ? -niceMax(-rawMin) : 0
     const ySpan = yMax - yMin || 1
-    const slot = plotWidth / data.points.length
+    const count = Math.max(pointsList.length, 1)
+    const slot = plotWidth / count
     const barWidth = Math.max(4, Math.min(54, slot * 0.62))
 
     const y = (value: number) =>
       MARGIN.top + plotHeight - ((value - yMin) / ySpan) * plotHeight
     const centerX = (index: number) => MARGIN.left + slot * (index + 0.5)
 
-    const points = data.points.map((point, index) => ({
+    const points = pointsList.map((point, index) => ({
       ...point,
       index,
       x: centerX(index),
-      y: y(point.value),
+      y: y(point?.value ?? 0),
     }))
     const line = points
       .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`)
@@ -46,14 +48,16 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
     })
 
     return { plotWidth, plotHeight, points, line, yTicks, barWidth, slot }
-  }, [data.points])
+  }, [data?.points])
 
   const highlighted =
-    data.highlightIndex !== undefined ? geometry.points[data.highlightIndex] : undefined
+    data?.highlightIndex !== undefined && geometry.points[data.highlightIndex]
+      ? geometry.points[data.highlightIndex]
+      : undefined
   const calloutLabel =
-    data.highlightLabel ??
-    (highlighted ? `${highlighted.label}: ${formatCompact(highlighted.value)}` : '')
-  const calloutWidth = Math.max(112, calloutLabel.length * 7.4 + 26)
+    data?.highlightLabel ??
+    (highlighted ? `${highlighted.label ?? ''}: ${formatCompact(highlighted.value ?? 0)}` : '')
+  const calloutWidth = Math.max(112, (calloutLabel?.length ?? 0) * 7.4 + 26)
   const calloutX = highlighted
     ? Math.min(
         WIDTH - MARGIN.right - calloutWidth / 2,
@@ -63,7 +67,7 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
   const calloutY = highlighted
     ? Math.max(MARGIN.top + 18, highlighted.y - 30)
     : 0
-  const labelStep = Math.ceil(data.points.length / 12)
+  const labelStep = Math.ceil(Math.max(geometry.points.length, 1) / 12)
 
   return (
     <div className="series-chart">

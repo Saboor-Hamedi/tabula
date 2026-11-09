@@ -22,6 +22,7 @@ const COLORS = {
 } as const
 
 function closestPoint(points: ElbowPoint[], elbowX: number): ElbowPoint {
+  if (!points || points.length === 0) return { x: 0, y: 0 }
   return points.reduce((best, point) =>
     Math.abs(point.x - elbowX) < Math.abs(best.x - elbowX) ? point : best,
   )
@@ -29,23 +30,23 @@ function closestPoint(points: ElbowPoint[], elbowX: number): ElbowPoint {
 
 export function ElbowChart({ data }: { data: ElbowChartData }) {
   const gradientId = `elbow-fill-${useId().replace(/:/g, '')}`
-  const points = data.points
-  const elbow = closestPoint(points, data.elbowX)
+  const points = Array.isArray(data?.points) ? data.points : []
+  const elbow = closestPoint(points, data?.elbowX ?? 0)
   // In the app the title follows the active theme; exports override this to ink
   // (or the agent-requested color) so it stays readable on a white document.
-  const textColor = data.textColor ?? 'var(--text)'
-  const annotationColor = data.textColor ?? COLORS.elbow
+  const textColor = data?.textColor ?? 'var(--text)'
+  const annotationColor = data?.textColor ?? COLORS.elbow
   const annotationFill = annotationBackground(annotationColor)
 
   const geometry = useMemo(() => {
     const plotWidth = WIDTH - MARGIN.left - MARGIN.right
     const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom
-    const rawMax = Math.max(...points.map((point) => point.y), 0)
-    const rawMin = Math.min(...points.map((point) => point.y), 0)
+    const rawMax = Math.max(...points.map((point) => point?.y ?? 0), 0)
+    const rawMin = Math.min(...points.map((point) => point?.y ?? 0), 0)
     const yMax = niceMax(rawMax)
     const yMin = rawMin < 0 ? -niceMax(-rawMin) : 0
-    const xMin = Math.min(...points.map((point) => point.x))
-    const xMax = Math.max(...points.map((point) => point.x))
+    const xMin = points.length > 0 ? Math.min(...points.map((point) => point?.x ?? 0)) : 0
+    const xMax = points.length > 0 ? Math.max(...points.map((point) => point?.x ?? 0)) : 1
     const xSpan = xMax - xMin || 1
     const ySpan = yMax - yMin || 1
 

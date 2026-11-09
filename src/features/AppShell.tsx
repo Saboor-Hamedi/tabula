@@ -9,14 +9,19 @@ import {
 } from '../core/storage/uiPrefs'
 import { ChatPanel } from './chat/ChatPanel'
 import { useKeyboardShortcuts } from './common/useKeyboardShortcuts'
+import { useServiceWorkerUpdate } from './common/useServiceWorkerUpdate'
 import { Header } from './header/Header'
 import { ResizeHandle } from './layout/ResizeHandle'
 import { useSessionActions, useSessionState } from './SessionProvider'
 import { Sidebar } from './sidebar/Sidebar'
+import { SheetPicker } from './upload/SheetPicker'
 import { UploadZone } from './upload/UploadZone'
 
 const Inspector = lazy(() =>
   import('./panel/Inspector').then((module) => ({ default: module.Inspector })),
+)
+const ReportView = lazy(() =>
+  import('./report/ReportView').then((module) => ({ default: module.ReportView })),
 )
 const SettingsModal = lazy(() =>
   import('./settings/SettingsModal').then((module) => ({ default: module.SettingsModal })),
@@ -49,11 +54,12 @@ function useMediaQuery(query: string): boolean {
 }
 
 export function AppShell() {
-  const { activeSession, sidebarOpen, panelOpen, settingsOpen } = useSessionState()
+  const { activeSession, sidebarOpen, panelOpen, settingsOpen, reportOpen, sheetPicker } = useSessionState()
   const { closePanel, exportTranscript, setSidebarOpen } = useSessionActions()
   const sidebarOverlay = useMediaQuery(SIDEBAR_OVERLAY_QUERY)
   const panelOverlay = useMediaQuery(PANEL_OVERLAY_QUERY)
   useKeyboardShortcuts({ exportTranscript })
+  const { updateReady, applyUpdate } = useServiceWorkerUpdate()
 
   const [sidebarWidth, setSidebarWidth] = useState(getSidebarWidth)
   const [panelWidth, setPanelWidth] = useState(getPanelWidth)
@@ -71,6 +77,7 @@ export function AppShell() {
   }, [closePanel, panelOverlay])
 
   const sidebarInGrid = sidebarOpen && !sidebarOverlay
+  const sidebarCollapsedInGrid = !sidebarOpen && !sidebarOverlay
   const panelInGrid = panelOpen && !panelOverlay
   const sidebarAsOverlay = sidebarOpen && sidebarOverlay
 
@@ -92,9 +99,13 @@ export function AppShell() {
   return (
     <div className="app-shell" style={layoutStyle}>
       <div
-        className={`app-grid ${sidebarInGrid ? 'has-sidebar' : ''} ${
-          panelInGrid ? 'has-panel' : ''
-        }`}
+        className={`app-grid ${
+          sidebarInGrid
+            ? 'has-sidebar'
+            : sidebarCollapsedInGrid
+            ? 'has-sidebar-collapsed'
+            : ''
+        } ${panelInGrid ? 'has-panel' : ''}`}
       >
         {sidebarInGrid ? (
           <>
@@ -108,6 +119,12 @@ export function AppShell() {
               onResize={updateSidebarWidth}
             />
           </>
+        ) : sidebarCollapsedInGrid ? (
+          <Sidebar
+            isCollapsed
+            onClose={() => setSidebarOpen(false)}
+            onExpand={() => setSidebarOpen(true)}
+          />
         ) : null}
 
         <div className="app-main">
@@ -151,6 +168,20 @@ export function AppShell() {
         <Suspense fallback={null}>
           <SettingsModal />
         </Suspense>
+      ) : null}
+      {reportOpen ? (
+        <Suspense fallback={null}>
+          <ReportView />
+        </Suspense>
+      ) : null}
+      {sheetPicker ? <SheetPicker /> : null}
+      {updateReady ? (
+        <div className="update-toast" role="status">
+          <span>A new version is ready.</span>
+          <button type="button" className="btn btn-small btn-primary" onClick={applyUpdate}>
+            Update
+          </button>
+        </div>
       ) : null}
     </div>
   )

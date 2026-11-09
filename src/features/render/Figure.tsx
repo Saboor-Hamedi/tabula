@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { copyFigureImage, downloadFigureImage, type ImageExportMode } from '../../core/utils/image'
-import { CheckIcon, DownloadIcon, ImageIcon } from '../common/Icons'
+import { CheckIcon, DownloadIcon, ImageIcon, PencilIcon } from '../common/Icons'
 
 /**
  * Chart container.
@@ -14,9 +14,10 @@ export interface FigureProps {
   /** File-safe base name, e.g. `chart-monthly-revenue`. */
   name: string
   children: React.ReactNode
+  onEdit?: () => void
 }
 
-export function Figure({ name, children }: FigureProps) {
+export function Figure({ name, children, onEdit }: FigureProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<ImageExportMode | null>(null)
 
@@ -57,6 +58,12 @@ export function Figure({ name, children }: FigureProps) {
           <DownloadIcon size={13} />
           <span>PNG</span>
         </button>
+        {onEdit ? (
+          <button type="button" className="tool-btn" onClick={onEdit}>
+            <PencilIcon size={13} />
+            <span>Edit</span>
+          </button>
+        ) : null}
       </figcaption>
     </figure>
   )

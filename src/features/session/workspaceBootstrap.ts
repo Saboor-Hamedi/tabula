@@ -10,10 +10,22 @@ import type { ChatMessage, DatasetDigest, Session, ToolTraceEntry } from '../../
 
 /** Restores fields missing from sessions saved by an earlier app version. */
 export function normalizeSession(session: Session): Session {
+  if (!session || typeof session !== 'object') {
+    return {
+      id: '',
+      fileName: 'Untitled',
+      fileType: 'csv',
+      fileSize: 0,
+      uploadedAt: Date.now(),
+      schemaName: '',
+      tables: [],
+      primaryTable: null,
+    }
+  }
   const tables = Array.isArray(session.tables) ? session.tables : []
   return {
     ...session,
-    fileSize: session.fileSize ?? 0,
+    fileSize: typeof session.fileSize === 'number' ? session.fileSize : 0,
     tables,
     primaryTable: session.primaryTable ?? tables[0]?.name ?? null,
   }
@@ -54,11 +66,14 @@ export async function bootstrapWorkspace(): Promise<BootstrapResult> {
   const tracesBySession: Record<string, ToolTraceEntry[]> = {}
   const digestBySession: Record<string, DatasetDigest> = {}
 
-  for (const record of persisted.sessions) {
+  const persistedSessions = Array.isArray(persisted?.sessions) ? persisted.sessions : []
+  for (const record of persistedSessions) {
+    if (!record || !record.session) continue
     const session = normalizeSession(record.session)
+    if (!session.id) continue
     sessions.push(session)
     messagesBySession[session.id] = normalizeMessages(record.messages)
-    tracesBySession[session.id] = record.traces ?? []
+    tracesBySession[session.id] = Array.isArray(record.traces) ? record.traces : []
     if (record.digest) digestBySession[session.id] = record.digest
     registerSession(session)
 
@@ -69,12 +84,18 @@ export async function bootstrapWorkspace(): Promise<BootstrapResult> {
       if (session.fileType === 'csv') {
         await ingestCSV({ handle, file, sessionId: session.id, schemaName: session.schemaName })
       } else {
-        await ingestExcel({ handle, file, sessionId: session.id, schemaName: session.schemaName })
+        await ingestExcel({
+          handle,
+          file,
+          sessionId: session.id,
+          schemaName: session.schemaName,
+          selectedSheets: session.selectedSheets,
+        })
       }
 
       const digest = await buildDatasetDigest(handle.connection, session)
       digestBySession[session.id] = digest
-      messagesBySession[session.id] = messagesBySession[session.id].map((message) =>
+      messagesBySession[session.id] = (messagesBySession[session.id] ?? []).map((message) =>
         message.welcome
           ? {
               ...message,

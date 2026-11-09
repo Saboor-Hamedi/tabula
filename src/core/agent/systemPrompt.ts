@@ -17,45 +17,50 @@ export interface SystemPromptInput {
   digest?: DatasetDigest | null
 }
 
-function describeTables(tables: TableSummary[]): string {
-  if (tables.length === 0) return '- (no tables loaded)'
+function describeTables(tables?: TableSummary[]): string {
+  const safeTables = Array.isArray(tables) ? tables : []
+  if (safeTables.length === 0) return '- (no tables loaded)'
 
-  const ranked = [...tables].sort(
-    (left, right) => right.rowCount - left.rowCount || right.columnCount - left.columnCount,
+  const ranked = [...safeTables].sort(
+    (left, right) => (right.rowCount ?? 0) - (left.rowCount ?? 0) || (right.columnCount ?? 0) - (left.columnCount ?? 0),
   )
   const listed = ranked.slice(0, PROMPT_MAX_TABLES)
   const lines = listed.map(
     (table) =>
-      `- \`${table.name}\` — ${table.rowCount.toLocaleString()} rows, ${table.columnCount} columns`,
+      `- \`${table.name}\` — ${(table.rowCount ?? 0).toLocaleString()} rows, ${(table.columnCount ?? 0)} columns`,
   )
-  if (tables.length > listed.length) {
-    lines.push(`- …and ${tables.length - listed.length} more tables (ask for one by name)`)
+  if (safeTables.length > listed.length) {
+    lines.push(`- …and ${safeTables.length - listed.length} more tables (ask for one by name)`)
   }
   return lines.join('\n')
 }
 
 /** Compact column digest: name, type, cardinality, and a few real values. */
 function describeDigest(digest: DatasetDigest): string {
-  return digest.tables
+  const tables = Array.isArray(digest.tables) ? digest.tables : []
+  return tables
     .map((table) => {
-      const fields = table.columns
+      const columns = Array.isArray(table.columns) ? table.columns : []
+      const fields = columns
         .map((column) => {
+          const topValues = Array.isArray(column.topValues) ? column.topValues : []
           const values =
-            column.topValues.length > 0
-              ? ` | frequent: ${column.topValues.slice(0, 4).join(', ')}`
+            topValues.length > 0
+              ? ` | frequent: ${topValues.slice(0, 4).join(', ')}`
               : ''
           return `  - ${column.name} (${column.type}, ${column.distinctCount} distinct)${values}`
         })
         .join('\n')
-      return `### ${table.name} — ${table.rowCount.toLocaleString()} rows\n${fields}`
+      return `### ${table.name} — ${(table.rowCount ?? 0).toLocaleString()} rows\n${fields}`
     })
     .join('\n')
 }
 
 export function buildSystemPrompt({ fileName, tables, digest }: SystemPromptInput): string {
+  const hasTables = digest && Array.isArray(digest.tables) && digest.tables.length > 0
   const digestSection =
-    digest && digest.tables.length > 0
-      ? `\n## Column digest (already profiled for you)\nThis is a live snapshot of the data. Use these exact column names. You still call \`inspect_schema\` when you need null counts, min/max, or a column not listed here.\n\n${describeDigest(digest)}\n`
+    hasTables
+      ? `\n## Column digest (already profiled for you)\nThis is a live snapshot of the data. Use these exact column names. You still call \`inspect_schema\` when you need null counts, min/max, or a column not listed here.\n\n${describeDigest(digest!)}\n`
       : ''
 
   return `You are Tabula, a senior data analyst embedded in a browser analytics workspace. You answer questions about tabular data by querying DuckDB-WASM directly.
@@ -75,9 +80,27 @@ ${digestSection}
 ## Tools
 1. \`inspect_schema\` — tables with column names, types, null counts, distinct counts, min/max, and sample values. Pass a table name to narrow it.
 2. \`run_sql\` — one read-only DuckDB statement. Returns columns, capped rows, the true row count, and timing. Always include a short \`purpose\`.
+3. \`run_python\` — execute Python (pandas, numpy, scipy, matplotlib) in the browser to compute complex statistics or generate plots. The table is pre-loaded as \`df\`.
+
+## Python Analysis & Coding Guidelines
+- **Ground Code in the Real Data**: When asked to write or run Python, always examine the Column Digest and use the exact column names, types, and values from the active dataset. Never invent dummy column names (like 'col1', 'column_a', 'val', or 'category') or generic placeholders. Your code MUST run successfully on the user's actual data in \`df\`.
+- **Pre-loaded Environment**: The active table is already pre-loaded into memory as a pandas DataFrame named \`df\`.
+  - DO NOT call \`pd.read_csv(...)\` or attempt to reload the file. \`df\` is already in scope.
+  - \`matplotlib.pyplot as plt\`, \`pandas as pd\`, \`numpy as np\`, \`scipy\`, and \`sklearn\` (scikit-learn) are available.
+- **Defensive Pandas Practices (Zero Assumptions)**:
+  - Verify columns exist before indexing or slicing: \`features = [c for c in candidate_cols if c in df.columns]\`.
+  - Boolean columns (e.g. \`df['passed'] = df['G3'] >= 10\`) have \`bool\` dtype, not \`number\`. When selecting numeric columns via \`df.select_dtypes(include='number')\`, boolean columns are excluded.
+  - When dropping columns from an Index or DataFrame, ALWAYS use \`errors='ignore'\` (e.g. \`cols.drop(['passed', 'at_risk'], errors='ignore')\`) or list comprehensions (\`[c for c in cols if c not in ... and c in df.columns]\`) to prevent \`KeyError\`.
+  - Handle potential division by zero or empty datasets gracefully (\`if len(df) > 0:\`).
+- **Visualizations & Plots**:
+  - Always use \`fig, ax = plt.subplots(...)\` or \`plt.figure(...)\`.
+  - Add descriptive titles, axis labels, and call \`plt.tight_layout()\`.
+  - Do NOT call \`plt.show()\` (all matplotlib figures are captured automatically and rendered on the right-side Python Results Inspector).
+- **Execution & Output**: Provide clean, runnable \`\`\`python code blocks. The user has an interactive **Run** button directly on the code block that executes it in Pyodide WASM and automatically displays high-resolution plots, console stdout, and data summaries on the right-side Python Results Inspector. Discuss the data insights, findings, and trends in your prose.
 
 ## Workflow
-1. The column digest above is already the result of a schema inspection. Do not re-inspect just to learn column names — go straight to SQL when the digest covers what you need. Call \`inspect_schema\` only when you need null counts, min/max, or a table missing from the digest.
+1. Start with one short plain sentence describing the plan, then continue with the analysis. Keep it under 20 words.
+2. The column digest above is already the result of a schema inspection. Do not re-inspect just to learn column names — go straight to SQL when the digest covers what you need. Call \`inspect_schema\` only when you need null counts, min/max, or a table missing from the digest.
 2. Be fast. One focused query is often enough: the aggregate that answers the question plus one comparison if it changes the conclusion. Run at most three queries unless the data is genuinely ambiguous.
 3. Skip exploratory queries whose answer is already visible in the digest. Do not profile columns for their own sake.
 4. Start answering as soon as you have enough evidence; do not over-analyze a simple question.

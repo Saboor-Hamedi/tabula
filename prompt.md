@@ -1,176 +1,236 @@
-Here's the updated prompt with the new requirements folded in. Feed this whole block to your agent.
+import warnings
+warnings.filterwarnings("ignore")
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
----
+# ============================================================
+# 1. DATA AUDIT
+# ============================================================
 
-# Updated Prompt (feed to agent)
+print("=" * 62)
+print("1. DATA AUDIT")
+print("=" * 62)
+print(f"Rows: {len(df):,} Columns: {df.shape[1]}")
+print(f"Duplicate rows: {df.duplicated().sum()}")
+print(f"Total missing cells: {int(df.isna().sum().sum())}")
 
-> Build a React + TypeScript + Vite single-page app called **data-agent**. It runs fully in the browser; no backend, no Docker, no Python, no Vercel cloud services.
->
-> **Core behavior**
-> - User uploads a `.csv` or `.xlsx` file. The file is ingested into DuckDB-WASM in the browser. Each Excel sheet becomes a table; a CSV becomes one table.
-> - No DuckDB persistence to IndexedDB. Session data lives only in React state and in-memory DuckDB. **Exception:** the DeepSeek API key and the selected model are stored in `localStorage` (see below).
-> - A chat UI lets the user converse with a DeepSeek-powered agent. The agent has tools: `inspect_schema` (column names, types, per-column profile: null count, distinct count, min/max, sample values) and `run_sql` (executes DuckDB SQL, caps returned rows, returns rows as JSON plus a row-count summary).
-> - The agent must always call `inspect_schema` before writing SQL. It must never invent column names.
-> - A "Delete session" button unmounts the workspace, calls `db.close()`, clears all state, and aborts in-flight requests via `AbortController`.
-> - A collapsible in-memory "trace" panel shows every tool call (name, arguments, result summary). Exportable as JSON before deletion. Never persisted.
->
-> **Agent intelligence requirements (critical)**
-> - The system prompt must instruct the agent to **dig deep**: before answering, inspect the schema, then run multiple exploratory SQL queries (distributions, cardinality, null patterns, group-by summaries, time trends if a date column exists), and only then answer.
-> - For visualizations, the agent must produce **well-designed Mermaid diagrams with thoughtful layout** — appropriate chart type for the question (`xychart-beta` for trends, `pie` for composition, `flowchart` for relationships, `mindmap` for hierarchy), sensible axis labels, units, and titles. Never emit a bare or lazy chart.
-> - When the user asks for "full details" or "everything," the agent must combine a narrative answer + one or more Mermaid charts + one or more data tables, not just prose.
-> - The system prompt should include examples of good vs bad agent behavior (good: inspect → explore → visualize → explain; bad: guess a column, return a single number with no context).
->
-> **DeepSeek key & model selection**
-> - A settings panel/modal where the user enters their DeepSeek API key. On save, it's written to `localStorage` under `data-agent:deepseek-key`. On load, the app reads it and uses it; if absent, the chat is disabled with a prompt to open settings.
-> - A model toggle in the UI (near the composer or in the header) to switch between **DeepSeek V4 Flash** (latest, faster, cheaper — default) and **DeepSeek V4 Pro** (deeper reasoning). The selection is stored in `localStorage` under `data-agent:model` and passed to the AI SDK on every turn.
-> - Changing the key or model mid-session takes effect on the next agent turn, without destroying the session.
->
-> **Layout & UX (must look great, not prototype-grade)**
-> - **Sidebar (left):** lists uploaded files as **sessions/cards** — filename, table name, row count, column count, upload time. The active session is highlighted. The user can switch between uploaded files; each file retains its own tables in DuckDB. A "Delete session" action sits on each card (with confirm) and in the header.
-> - **Main pane:** chat conversation. Message bubbles must be visually polished — proper spacing, readable typography (system font stack or Inter), subtle borders, distinct user vs assistant styling, monospace for SQL, smooth scroll-to-bottom on new messages.
-> - **Composer:** a rich chat composer at the bottom — auto-growing textarea, keyboard shortcut (Enter to send, Shift+Enter for newline), disabled while the agent is streaming, a subtle "thinking…" indicator during tool calls, and a send button that matches the design system. Above the composer, show the current file name and selected model as small chips.
-> - **Trace panel:** right-side collapsible drawer (not a modal), showing the tool-call timeline for the active session.
-> - **Upload zone:** a drag-and-drop card inside the main pane when no session exists; after upload it collapses into the sidebar.
-> - **Design system:** use CSS variables in `src/styles/theme.css` for colors, spacing, radii. Light and dark mode via `prefers-color-scheme`. No CSS framework required — plain CSS modules or a single `styles/app.css` is fine. The result must look intentional, not default Vite.
->
-> **Folder structure (strict)**
-> - `src/core/` — all `.ts` files. No JSX, no React. Pure logic: DuckDB init/teardown, ingestion, schema profiling, tool definitions and implementations, DeepSeek client wiring, prompt strings, Mermaid/table block extraction, types, localStorage helpers.
-> - `src/features/` — all `.tsx` files. React components only. May import from `src/core/`, never the reverse.
->
-> **Additional files to include in `core/`**
-> - `core/storage/settings.ts` — read/write DeepSeek key and model to `localStorage` (keys: `data-agent:deepseek-key`, `data-agent:model`).
-> - `core/storage/sessions.ts` — in-memory session registry (filename, tables, timestamps); not persisted.
-> - `core/agent/modelOptions.ts` — the list of selectable models (V4 Flash, V4 Pro) with labels and descriptions.
->
-> **Additional files to include in `features/`**
-> - `features/settings/SettingsModal.tsx` — key input + save, with validation and a "clear key" button.
-> - `features/settings/ModelToggle.tsx` — segmented control for V4 Flash / V4 Pro.
-> - `features/sidebar/Sidebar.tsx` — session cards list, active highlight, delete.
-> - `features/sidebar/SessionCard.tsx` — one session card.
-> - `features/composer/Composer.tsx` — the polished composer described above.
->
-> **Constraints**
-> - TypeScript everywhere. No `any` in exported signatures.
-> - DuckDB via `@duckdb/duckdb-wasm`. CSV via `read_csv_auto`; Excel via `xlsx` npm parser, then inserted into DuckDB as a table.
-> - DeepSeek via `@ai-sdk/deepseek` using `streamText` with tools and a multi-step loop.
-> - Mermaid loaded via `React.lazy` inside `MermaidBlock.tsx` — not in the main bundle, not in a Web Worker.
-> - `useMemo` for schema profile computation and table row rendering. Async queries via `useEffect` + state.
-> - No `localStorage` for data or chat — only for the API key and the model choice.
->
-> Produce every file explicitly with its full path. Every component and every core module gets its own file. Do not collapse unrelated logic into a single file.
+target = "G3"
+df["passed"] = df[target] >= 10  # 10 = pass threshold on the 0-20 scale
+df["at_risk"] = df[target] < 10
+df["grade_drop"] = df["G2"] - df["G3"]
+df["avg_parent_edu"] = (df["Mother_edu"] + df["Father_edu"]) / 2
 
----
+print(f"\nG3 range: {df[target].min()}-{df[target].max()} mean {df[target].mean():.2f} median {df[target].median():.0f}")
+print(f"G3 = 0 (likely withdrew) : {(df[target] == 0).sum()} ({(df[target] == 0).mean()*100:.1f}%)")
+print(f"Pass rate (G3 >= 10)     : {df.passed.mean()*100:.1f}% ({df.passed.sum()}/{len(df)})")
+print(f"G1 -> G3 mean drop       : {(df['G1'] - df['G3']).mean():.2f} points")
+print(f"G2 -> G3 mean drop       : {df.grade_drop.mean():.2f} points")
 
-# Updated Installation
+print("\nCategorical sanity check (distinct values):")
+cat_cols = df.select_dtypes(include=["object", "bool"]).columns
+for c in cat_cols:
+    print(f"  {c:28s} {df[c].nunique():>2} -> {list(df[c].unique())[:6]}")
 
-```bash
-npm create vite@latest data-agent -- --template react-ts
-cd data-agent
+# ============================================================
+# 2. NUMERIC DESCRIPTIVES
+# ============================================================
 
-npm install @duckdb/duckdb-wasm apache-arrow
-npm install ai @ai-sdk/deepseek
-npm install xlsx
-npm install mermaid
-npm install react-markdown remark-gfm
+print("\n" + "=" * 62)
+print("2. NUMERIC DESCRIPTIVES")
+print("=" * 62)
+num_cols = df.select_dtypes(include="number").columns.drop(["passed", "at_risk"], errors="ignore")
+desc = df[num_cols].describe().T[["mean", "std", "min", "25%", "50%", "75%", "max"]]
+print(desc.round(2).to_string())
 
-npm install -D typescript @types/react @types/react-dom
+# ============================================================
+# 3. HOW FEATURES RELATE TO THE FINAL GRADE
+# ============================================================
 
-npm run dev
-```
+print("\n" + "=" * 62)
+print("3. CORRELATION WITH G3 (numeric features)")
+print("=" * 62)
+corr_g3 = (df[num_cols].corr()[target]
+           .drop([target, "G1", "G2"], errors="ignore")
+           .sort_values())
+print(corr_g3.round(3).to_string())
+print(f"\nG2 vs G3 r = {df[['G2','G3']].corr().iloc[0,1]:.3f} (prior grade is by far the strongest signal)")
 
-No `.env` needed anymore — the DeepSeek key lives in `localStorage` and is entered via the Settings modal on first run.
+def group_effect(col, by="passed"):
+    """Mean G3 and pass rate per category."""
+    out = (df.groupby(col)
+           .agg(n=("G3", "size"), mean_G3=("G3", "mean"), pass_rate=("passed", "mean"))
+           .sort_values("mean_G3", ascending=False))
+    out["pass_rate"] = (out["pass_rate"] * 100).round(1)
+    out["mean_G3"] = out["mean_G3"].round(2)
+    return out
 
----
+print("\n" + "=" * 62)
+print("4. GROUP COMPARISONS (mean G3, pass rate %)")
+print("=" * 62)
+for col in ["sex", "school", "address", "famsize", "Parrent_status",
+            "extra_paid_class", "extra_edu_supp", "family_edu_supp",
+            "internet_access", "romantic_relationship",
+            "Interested_in_higher_edu", "extra_curr_activities"]:
+    if col in df.columns:
+        print(f"\n--- {col} ---")
+        print(group_effect(col).to_string())
 
-# Updated Project Structure
+# ============================================================
+# 5. ORDINAL / BINNED FEATURES
+# ============================================================
 
-```
-data-agent/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── src/
-    ├── main.tsx
-    ├── App.tsx
-    │
-    ├── styles/
-    │   ├── theme.css                  # CSS variables, light/dark
-    │   └── app.css                    # Global layout styles
-    │
-    ├── core/                          # ALL .ts — pure logic, no React
-    │   ├── types.ts
-    │   ├── constants.ts
-    │   │
-    │   ├── duckdb/
-    │   │   ├── initDuckDB.ts
-    │   │   ├── closeDuckDB.ts
-    │   │   ├── ingestCSV.ts
-    │   │   ├── ingestExcel.ts
-    │   │   ├── listTables.ts
-    │   │   └── runSQL.ts
-    │   │
-    │   ├── profiling/
-    │   │   ├── profileTable.ts
-    │   │   └── sampleRows.ts
-    │   │
-    │   ├── agent/
-    │   │   ├── systemPrompt.ts        # Includes "dig deep" + Mermaid layout guidance + good/bad examples
-    │   │   ├── tools.ts
-    │   │   ├── executeTool.ts
-    │   │   ├── runAgentTurn.ts
-    │   │   ├── trace.ts
-    │   │   └── modelOptions.ts        # V4 Flash, V4 Pro
-    │   │
-    │   ├── deepseek/
-    │   │   └── client.ts              # Reads key from localStorage via settings.ts
-    │   │
-    │   ├── storage/
-    │   │   ├── settings.ts            # get/set DeepSeek key + model
-    │   │   └── sessions.ts            # In-memory session registry
-    │   │
-    │   └── parsing/
-    │       ├── extractMermaidBlocks.ts
-    │       └── extractTableBlocks.ts
-    │
-    └── features/                      # ALL .tsx — React components only
-        ├── AppShell.tsx               # Sidebar + main pane + trace drawer
-        ├── SessionProvider.tsx        # Context: db, sessions, messages, trace, activeSession
-        │
-        ├── sidebar/
-        │   ├── Sidebar.tsx
-        │   └── SessionCard.tsx
-        │
-        ├── upload/
-        │   ├── UploadZone.tsx
-        │   └── UploadStatus.tsx
-        │
-        ├── chat/
-        │   ├── ChatPanel.tsx
-        │   ├── MessageBubble.tsx
-        │   ├── MessageRenderer.tsx
-        │   └── ChatInput.tsx
-        │
-        ├── composer/
-        │   └── Composer.tsx           # Auto-grow textarea, chips, send button, streaming state
-        │
-        ├── settings/
-        │   ├── SettingsModal.tsx
-        │   └── ModelToggle.tsx
-        │
-        ├── render/
-        │   ├── MermaidBlock.tsx       # lazy-loaded
-        │   ├── MermaidFallback.tsx
-        │   ├── DataTable.tsx
-        │   └── MarkdownText.tsx
-        │
-        ├── trace/
-        │   ├── TracePanel.tsx
-        │   └── TraceEntry.tsx
-        │
-        └── session/
-            ├── DeleteSessionButton.tsx
-            └── SessionInfo.tsx
-```
+print("\n" + "=" * 62)
+print("5. ORDINAL FEATURES")
+print("=" * 62)
+ordinal_cols = ["failures", "weekly_studytime", "traveltime", "goout_with_friends",
+                "freetime_after_school", "workday_alcohol_consum", "weekend_alcohol_consum",
+                "health_status", "Family_quality_reln", "Mother_edu", "Father_edu", "age"]
+for col in ordinal_cols:
+    if col in df.columns:
+        g = df.groupby(col).agg(n=("G3", "size"), mean_G3=("G3", "mean"))
+        g["mean_G3"] = g["mean_G3"].round(2)
+        spread = g.mean_G3.max() - g.mean_G3.min()
+        print(f"{col:24s} spread {spread:5.2f} pts | " +
+              " ".join(f"{k}:{v:.1f}" for k, v in g.mean_G3.items()))
 
-Feed this to your agent and see what it produces. The two riskiest parts to watch: (1) the system prompt actually producing good Mermaid layouts rather than trivial charts, and (2) the AI SDK tool loop calling DeepSeek cleanly with model switching mid-session. Everything else is straightforward React wiring.
+if "absences" in df.columns:
+    df["absence_band"] = pd.cut(df.absences, [-1, 0, 4, 10, 100],
+                                labels=["0", "1-4", "5-10", "11+"])
+    print("\n--- absences band ---")
+    print(df.groupby("absence_band", observed=True)
+          .agg(n=("G3", "size"), mean_G3=("G3", "mean"), pass_rate=("passed", "mean"))
+          .round(2).to_string())
+
+# ============================================================
+# 6. COMBINED RISK SEGMENTATION
+# ============================================================
+
+print("\n" + "=" * 62)
+print("6. RISK SEGMENTATION (failures x study time)")
+print("=" * 62)
+if "failures" in df.columns and "weekly_studytime" in df.columns:
+    risk = (df.groupby(["failures", "weekly_studytime"])
+            .agg(n=("G3", "size"), mean_G3=("G3", "mean"), pass_rate=("passed", "mean"))
+            .round(2))
+    print(risk.to_string())
+
+    df["risk_segment"] = np.select(
+        [df.failures >= 2,
+         (df.failures == 1) & (df.weekly_studytime <= 2),
+         (df.failures == 0) & (df.weekly_studytime >= 3)],
+        ["High risk", "Watch", "Strong"], default="Average")
+
+    print("\n--- composite segment ---")
+    print(df.groupby("risk_segment")
+          .agg(n=("G3", "size"), share=("G3", lambda s: len(s) / len(df) * 100),
+               mean_G3=("G3", "mean"), pass_rate=("passed", lambda s: s.mean() * 100))
+          .round(2).sort_values("mean_G3", ascending=False).to_string())
+
+# ============================================================
+# 7. SIMPLE LINEAR DRIVER MODEL
+# ============================================================
+
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_absolute_error
+
+features = [c for c in ["G2", "failures", "weekly_studytime", "absences", "goout_with_friends",
+                        "Mother_edu", "Father_edu", "age", "health_status", "Family_quality_reln",
+                        "weekend_alcohol_consum", "traveltime"] if c in df.columns]
+if len(features) > 0 and target in df.columns:
+    X = pd.get_dummies(df[features], drop_first=True)
+    y = df[target]
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, random_state=42)
+    model = LinearRegression().fit(X_tr, y_tr)
+    pred = model.predict(X_te)
+
+    print("\n" + "=" * 62)
+    print("7. LINEAR MODEL (predicting G3, 75/25 split)")
+    print("=" * 62)
+    print(f"Train R2 {model.score(X_tr, y_tr):.3f} | Test R2 {r2_score(y_te, pred):.3f} | "
+          f"MAE {mean_absolute_error(y_te, pred):.2f} points")
+
+    if "G2" in X.columns:
+        X_no = X.drop(columns=["G2"])
+        Xn_tr, Xn_te, y_n_tr, y_n_te = train_test_split(X_no, y, test_size=0.25, random_state=42)
+        m2 = LinearRegression().fit(Xn_tr, y_n_tr)
+        print(f"Without G2 (background only): Test R2 {r2_score(y_n_te, m2.predict(Xn_te)):.3f} "
+              f"| MAE {mean_absolute_error(y_n_te, m2.predict(Xn_te)):.2f}")
+
+    coefs = (pd.Series(model.coef_, index=X.columns)
+             .sort_values(key=abs, ascending=False).head(10))
+    print("\nTop standardized drivers (points of G3 per unit):")
+    print(coefs.round(3).to_string())
+
+# ============================================================
+# 8. VISUALISATIONS
+# ============================================================
+
+fig, axes = plt.subplots(2, 3, figsize=(17, 9))
+
+# (a) G3 distribution
+if target in df.columns:
+    axes[0, 0].hist(df[target], bins=21, color="#2563eb", edgecolor="white")
+    axes[0, 0].axvline(10, color="#dc2626", ls="--", lw=2, label="Pass = 10")
+    axes[0, 0].set(title="Final grade distribution (G3)", xlabel="G3 (0-20)", ylabel="Students")
+    axes[0, 0].legend()
+
+# (b) G2 vs G3
+if "G2" in df.columns and "G3" in df.columns:
+    axes[0, 1].scatter(df.G2, df.G3, s=14, alpha=0.55, color="#8b5cf6")
+    axes[0, 1].plot([0, 20], [0, 20], color="#6b7280", ls=":", lw=1)
+    axes[0, 1].set(title="Prior grade G2 predicts G3", xlabel="G2", ylabel="G3")
+
+# (c) failures vs mean G3
+if "failures" in df.columns and "G3" in df.columns:
+    g = df.groupby("failures").G3.agg(["mean", "size"])
+    axes[0, 2].bar(g.index.astype(str), g["mean"],
+                   color=["#16a34a", "#f59e0b", "#f97316", "#dc2626"][:len(g)], edgecolor="white")
+    for i, (m, n) in enumerate(zip(g["mean"], g["size"])):
+        axes[0, 2].text(i, m + 0.25, f"{m:.1f}\n(n={n})", ha="center", fontsize=8)
+    axes[0, 2].set(title="Each past failure costs grade points",
+                   xlabel="Past class failures", ylabel="Mean G3")
+
+# (d) study time
+if "weekly_studytime" in df.columns and "G3" in df.columns:
+    g = df.groupby("weekly_studytime").G3.mean()
+    axes[1, 0].bar(g.index.astype(str), g.values, color="#2563eb", edgecolor="white")
+    axes[1, 0].set(title="Weekly study time (1 = <2h, 4 = >10h)",
+                   xlabel="Study time band", ylabel="Mean G3")
+
+# (e) go out with friends
+if "goout_with_friends" in df.columns and "G3" in df.columns:
+    g = df.groupby("goout_with_friends").G3.mean()
+    axes[1, 1].bar(g.index.astype(str), g.values, color="#8b5cf6", edgecolor="white")
+    axes[1, 1].set(title="Socialising frequency vs mean G3",
+                   xlabel="Go out with friends (1 = very low, 5 = very high)", ylabel="Mean G3")
+
+# (f) sex x alcohol
+if "sex" in df.columns and "weekend_alcohol_consum" in df.columns and "G3" in df.columns:
+    pivot = df.pivot_table(index="sex", columns="weekend_alcohol_consum", values="G3", aggfunc="mean")
+    pivot.T.plot(ax=axes[1, 2], marker="o")
+    axes[1, 2].set(title="Weekend alcohol vs mean G3, by sex",
+                   xlabel="Weekend alcohol (1 = very low, 5 = very high)", ylabel="Mean G3")
+    axes[1, 2].legend(title="sex")
+
+plt.tight_layout()
+
+# ============================================================
+# 9. KEY TAKEAWAYS
+# ============================================================
+
+print("\n" + "=" * 62)
+print("9. KEY TAKEAWAYS")
+print("=" * 62)
+if "risk_segment" in df.columns:
+    strong = df.risk_segment.eq("Strong")
+    high = df.risk_segment.eq("High risk")
+    print(f"- Mean final grade {df.G3.mean():.1f}/20; {df.passed.mean()*100:.1f}% pass, "
+          f"{df[target].eq(0).sum()} students scored 0 (probable dropout).")
+    if "failures" in df.columns:
+        print(f"- Past failures is the strongest background predictor.")
+    print(f"- Strong segment: {strong.sum()} students ({strong.mean()*100:.0f}%), "
+          f"pass rate {df[strong].passed.mean()*100:.0f}%.")
+    print(f"- High-risk segment: {high.sum()} students ({high.mean()*100:.0f}%), "
+          f"pass rate {df[high].passed.mean()*100:.0f}%.")
