@@ -7,7 +7,6 @@ import {
   DatabaseIcon,
   FileIcon,
   SearchIcon,
-  ShieldCheckIcon,
   TableIcon,
   UploadIcon,
 } from '../common/Icons'
@@ -62,21 +61,7 @@ export function UploadZone() {
   return (
     <div className="empty-screen">
       <div className="empty-inner">
-        {/* 1. Sovereign Security & Trust Banner */}
-        <div className="workspace-security-banner">
-          <div className="security-banner-icon">
-            <ShieldCheckIcon size={18} />
-          </div>
-          <div className="security-banner-content">
-            <span className="security-banner-title">100% In-Memory Sandbox · Zero Server Uploads</span>
-            <span className="security-banner-text">
-              Your files are processed strictly inside your computer's RAM. No rows or numbers are ever transmitted, saved, or uploaded to any server.
-            </span>
-          </div>
-          <div className="security-banner-pill">Verified Private</div>
-        </div>
-
-        {/* 2. NotebookLM-Style Studio Welcome Header */}
+        {/* 1. NotebookLM-Style Studio Welcome Header */}
         <div className="workspace-welcome-head">
           <div className="workspace-welcome-mark">
             <DatabaseIcon size={20} />
@@ -87,8 +72,8 @@ export function UploadZone() {
           </p>
         </div>
 
-        {/* 3. Dual Source Onboarding Cards */}
-        <div className="workspace-source-cards">
+        {/* 2. Drag and Drop Area with Small Sample Dataset Link */}
+        <div className="workspace-upload-area">
           {/* Main Drop Area Card */}
           <div
             className={`source-drop-card ${dragging ? 'is-dragging' : ''} ${busy ? 'is-busy' : ''}`}
@@ -107,7 +92,7 @@ export function UploadZone() {
             aria-label="Upload a spreadsheet"
           >
             <div className="source-drop-icon">
-              <UploadIcon size={24} />
+              <UploadIcon size={26} />
             </div>
             <div className="source-drop-main">
               <span className="source-drop-title">
@@ -138,27 +123,18 @@ export function UploadZone() {
             />
           </div>
 
-          {/* Quick-Start Demo Card */}
-          <div className="source-sample-card">
-            <div className="sample-card-top">
-              <div className="sample-card-icon">
-                <FileIcon size={20} />
-              </div>
-              <div className="sample-card-info">
-                <span className="sample-card-title">Sample Dataset</span>
-                <span className="sample-card-meta">orders.csv · 1.2M rows · 84 MB</span>
-              </div>
-            </div>
-            <p className="sample-card-desc">
-              Try Tabula immediately with a pre-configured customer orders and revenue dataset.
-            </p>
+          {/* Small Sample Dataset Action Under Drag and Drop */}
+          <div className="sample-dataset-small">
+            <span className="sample-dataset-hint">No file right now?</span>
             <button
               type="button"
-              className="sample-load-btn"
+              className="sample-dataset-btn"
               onClick={() => void loadSample()}
               disabled={busy || sampleLoading}
             >
-              {sampleLoading ? 'Loading sample…' : 'Load Sample Dataset →'}
+              <FileIcon size={13} />
+              <span>{sampleLoading ? 'Loading sample…' : 'Try a sample dataset'}</span>
+              <span className="sample-dataset-tag">orders.csv · 420 rows</span>
             </button>
           </div>
         </div>

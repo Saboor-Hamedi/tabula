@@ -10,16 +10,15 @@ import {
 import { ChatPanel } from './chat/ChatPanel'
 import { useKeyboardShortcuts } from './common/useKeyboardShortcuts'
 import { useServiceWorkerUpdate } from './common/useServiceWorkerUpdate'
+import { ConfirmModal } from './common/ConfirmModal'
 import { Header } from './header/Header'
 import { ResizeHandle } from './layout/ResizeHandle'
 import { useSessionActions, useSessionState } from './SessionProvider'
+import { Inspector } from './panel/Inspector'
 import { Sidebar } from './sidebar/Sidebar'
 import { SheetPicker } from './upload/SheetPicker'
 import { UploadZone } from './upload/UploadZone'
 
-const Inspector = lazy(() =>
-  import('./panel/Inspector').then((module) => ({ default: module.Inspector })),
-)
 const ReportView = lazy(() =>
   import('./report/ReportView').then((module) => ({ default: module.ReportView })),
 )
@@ -53,11 +52,52 @@ function useMediaQuery(query: string): boolean {
   return matches
 }
 
-export function AppShell() {
-  const { activeSession, sidebarOpen, panelOpen, settingsOpen, reportOpen, sheetPicker } = useSessionState()
-  const { closePanel, openPanel, exportTranscript, setSidebarOpen, toggleSidebar, openSettings } = useSessionActions()
+export interface AppShellProps {
+  isDemoMode?: boolean
+}
+
+export function AppShell({ isDemoMode = false }: AppShellProps) {
+  const {
+    activeSession,
+    sessions,
+    sidebarOpen,
+    panelOpen,
+    settingsOpen,
+    reportOpen,
+    sheetPicker,
+    clearChatConfirmOpen,
+  } = useSessionState()
+  const {
+    closePanel,
+    openPanel,
+    exportTranscript,
+    setSidebarOpen,
+    toggleSidebar,
+    openSettings,
+    cancelClearChat,
+    confirmClearChat,
+    uploadFile,
+  } = useSessionActions()
   const sidebarOverlay = useMediaQuery(SIDEBAR_OVERLAY_QUERY)
   const panelOverlay = useMediaQuery(PANEL_OVERLAY_QUERY)
+
+  // In demo mode: auto-load sample dataset if no session exists yet (Prompt 4.6)
+  useEffect(() => {
+    if (isDemoMode && !activeSession && sessions.length === 0) {
+      void (async () => {
+        try {
+          const res = await fetch('/orders.csv')
+          if (res.ok) {
+            const blob = await res.blob()
+            const file = new File([blob], 'orders.csv', { type: 'text/csv' })
+            await uploadFile(file)
+          }
+        } catch {
+          // Ignore demo load errors
+        }
+      })()
+    }
+  }, [isDemoMode, activeSession, sessions.length, uploadFile])
   useKeyboardShortcuts({
     exportTranscript,
     toggleSidebar,
@@ -133,6 +173,23 @@ export function AppShell() {
         ) : null}
 
         <div className="app-main">
+          {isDemoMode && (
+            <div className="demo-mode-strip">
+              <span className="demo-mode-pill">Interactive Demo</span>
+              <span className="demo-mode-text">
+                Exploring Tabula with sample orders dataset. Raw rows never leave your computer.
+              </span>
+              <button
+                type="button"
+                className="demo-mode-btn"
+                onClick={() => {
+                  window.location.hash = '#signup'
+                }}
+              >
+                Create account to analyze your own files →
+              </button>
+            </div>
+          )}
           <Header />
           <main className="app-content">
             {activeSession ? <ChatPanel /> : <UploadZone />}
@@ -149,11 +206,7 @@ export function AppShell() {
             onResize={updatePanelWidth}
           />
         ) : null}
-        {panelOpen ? (
-          <Suspense fallback={<aside className="inspector" aria-hidden />}>
-            <Inspector />
-          </Suspense>
-        ) : null}
+        {panelOpen ? <Inspector /> : null}
       </div>
 
       {sidebarAsOverlay ? (
@@ -180,6 +233,15 @@ export function AppShell() {
         </Suspense>
       ) : null}
       {sheetPicker ? <SheetPicker /> : null}
+      <ConfirmModal
+        open={clearChatConfirmOpen}
+        title="Delete history"
+        message="All contents will be deleted, are you sure?"
+        confirmText="Confirm"
+        cancelText="Cancel"
+        onConfirm={() => void confirmClearChat()}
+        onCancel={cancelClearChat}
+      />
       {updateReady ? (
         <div className="update-toast" role="status">
           <span>A new version is ready.</span>

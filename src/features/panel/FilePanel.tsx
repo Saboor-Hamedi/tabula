@@ -1,21 +1,17 @@
-import { useMemo, useRef } from 'react'
-import { ACCEPTED_EXTENSIONS } from '../../core/constants'
-import { formatBytes, formatCount, formatRelativeTime } from '../../core/utils/format'
-import { ExternalIcon, SheetIcon, TableIcon, UploadIcon } from '../common/Icons'
-import { useSessionActions, useSessionState } from '../SessionProvider'
+import { useMemo } from 'react'
+import { formatCount } from '../../core/utils/format'
+import { TableIcon } from '../common/Icons'
+import { useSessionState } from '../SessionProvider'
 
 /**
- * File inspector.
+ * Tables & schema inspector.
  *
- * Shows the uploaded file as a card the user can click to open it in Excel, plus
- * the tables and columns the agent is working from. Column metadata comes from
+ * Shows the tables and columns the agent is working from. Column metadata comes from
  * the live digest, so what is shown here is exactly what the agent sees.
  */
 
 export function FilePanel() {
   const { activeSession, digest } = useSessionState()
-  const { openActiveFile, replaceActiveFile } = useSessionActions()
-  const replaceRef = useRef<HTMLInputElement>(null)
 
   const totalRows = useMemo(
     () =>
@@ -26,74 +22,23 @@ export function FilePanel() {
   if (!activeSession) {
     return (
       <div className="panel-empty">
-        <SheetIcon size={22} />
-        <p>No file loaded</p>
-        <span>Upload a CSV or Excel workbook to inspect it here.</span>
+        <TableIcon size={22} />
+        <p>No tables loaded</p>
+        <span>Upload a spreadsheet to inspect its schema and columns here.</span>
       </div>
     )
   }
 
   return (
     <div className="file-panel">
-      <button
-        type="button"
-        className="file-card"
-        onClick={() => void openActiveFile()}
-        title={`Open ${activeSession.fileName} in Excel`}
-      >
-        <span className="file-card-icon" aria-hidden>
-          <SheetIcon size={20} />
-        </span>
-        <span className="file-card-body">
-          <span className="file-card-name">{activeSession.fileName}</span>
-          <span className="file-card-meta">
-            {activeSession.fileType.toUpperCase()}
-            <span className="dot" />
-            {formatBytes(activeSession.fileSize)}
-            <span className="dot" />
-            {formatCount(totalRows)} rows
-          </span>
-          <span className="file-card-hint">
-            <ExternalIcon size={12} />
-            Open in Excel
-          </span>
-        </span>
-      </button>
-
-      <div className="file-panel-actions">
-        <button
-          type="button"
-          className="btn btn-ghost btn-small"
-          onClick={() => replaceRef.current?.click()}
-        >
-          <UploadIcon size={13} />
-          <span>Replace file</span>
-        </button>
-        <input
-          ref={replaceRef}
-          type="file"
-          accept={ACCEPTED_EXTENSIONS.join(',')}
-          className="visually-hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            if (file) void replaceActiveFile(file)
-            event.target.value = ''
-          }}
-        />
-      </div>
-
       <div className="file-facts">
         <div className="file-fact">
           <span className="file-fact-label">Tables</span>
           <span className="file-fact-value">{activeSession.tables?.length ?? 0}</span>
         </div>
         <div className="file-fact">
-          <span className="file-fact-label">Rows</span>
+          <span className="file-fact-label">Total Rows</span>
           <span className="file-fact-value">{formatCount(totalRows)}</span>
-        </div>
-        <div className="file-fact">
-          <span className="file-fact-label">Added</span>
-          <span className="file-fact-value">{formatRelativeTime(activeSession.uploadedAt)}</span>
         </div>
       </div>
 

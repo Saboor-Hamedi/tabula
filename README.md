@@ -1,34 +1,69 @@
-# Tabula
+# Tabula — Private In-Browser Data Workbench
 
-Tabula is a local-first workspace for asking questions about CSV and Excel files. Upload a workbook, inspect the detected columns, and chat with an agent that explores the data and answers with findings, tables, and charts.
+[![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-tabula.app-0f766e.svg)](https://tabula.app/#demo)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Client--Side-emerald.svg)](https://tabula.app/#privacy)
 
-Files and results stay in the browser. Only the question, a compact column summary, and the results needed for an answer are sent to DeepSeek.
+Tabula is a fast, local-first conversational workbench for exploring CSV and Excel workbooks. Drop in your files, ask questions in plain English, and get automated charts, business metrics, and executive summaries.
 
-## Stack
+**The core promise:** Raw spreadsheet rows never leave your device. All calculations run strictly inside your web browser using DuckDB-WASM and Pyodide.
 
-- React 19 + TypeScript + Vite
-- DuckDB-WASM for in-browser analysis
-- DeepSeek through the AI SDK
-- Mermaid plus custom SVG figures for charts
-- IndexedDB for durable sessions and localStorage for instant startup/layout state
+---
 
-## Development
+## Key Features
+
+- **100% Client-Side Calculations:** Query millions of rows with sub-second response times directly on your CPU.
+- **Natural Language Analysis:** Ask questions, compute growth trends, identify customer churn, and find statistical outliers.
+- **Automatic Visualizations:** Generates comparative bar charts, distributions, and trend lines with one-click PNG export.
+- **Word & Docs Ready:** 1-click copy formatted tables directly to Microsoft Word or Google Docs, or download executive PDF dossiers.
+- **Interactive Studio Notes:** Built-in sticky notes board for pinning key findings, thoughts, and hypothesis tracking.
+- **Offline Capable:** Works without an internet connection once loaded — perfect for flights and confidential business meetings.
+
+---
+
+## Privacy Guarantee
+
+Your data security is guaranteed by design:
+1. Spreadsheets are parsed into computer memory (RAM) via web workers.
+2. Calculations run in DuckDB-WASM and client-side Python (Pyodide).
+3. Only your question and a compact schema dictionary (column names and types) are sent to the AI model.
+4. No numbers, customer names, or confidential rows are ever uploaded or saved to any cloud database.
+
+---
+
+## Tech Stack
+
+- **Frontend:** React 19, TypeScript, Vite
+- **Analytics Engine:** DuckDB-WASM, Pyodide (Python 3.11 in WebAssembly)
+- **Visualizations:** Mermaid SVG diagrams and custom data canvas
+- **Storage:** IndexedDB for durable local session caching and schema catalogs
+- **Auth & Subscriptions:** Supabase Auth with email verification gate
+
+---
+
+## Getting Started
 
 ```bash
+# Clone the repository
+git clone https://github.com/tabula/tabula.git
+cd tabula
+
+# Install dependencies
 npm install
+
+# Start local development server
 npm run dev
 ```
 
-Open the local URL, add a DeepSeek access key from **Settings**, then upload a CSV/XLSX file or choose **Try a sample dataset**.
+Open `http://localhost:5173` to explore the interactive demo or upload your own spreadsheets.
 
 ## Scripts
 
 ```bash
-npm run dev      # local development
-npm run lint     # static checks
-npm run test     # core unit tests
-npm run build    # typecheck + production build
-npm run preview  # serve the production build
+npm run dev      # Run local dev server with HMR
+npm run test     # Run Vitest test suites
+npm run build    # Typecheck and production bundle build
+npm run preview  # Serve production build locally
 ```
 
 ## Architecture

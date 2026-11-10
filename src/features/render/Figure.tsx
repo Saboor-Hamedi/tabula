@@ -50,20 +50,31 @@ export function Figure({ name, children, onEdit }: FigureProps) {
       </div>
 
       <figcaption className="figure-tools">
-        <button type="button" className="tool-btn" onClick={handleCopy}>
-          {status === 'copied' ? <CheckIcon size={13} /> : <ImageIcon size={13} />}
-          <span>{status === 'copied' ? 'Copied' : status === 'downloaded' ? 'Saved' : 'Copy image'}</span>
-        </button>
-        <button type="button" className="tool-btn" onClick={handleDownload}>
-          <DownloadIcon size={13} />
-          <span>PNG</span>
-        </button>
-        {onEdit ? (
-          <button type="button" className="tool-btn" onClick={onEdit}>
-            <PencilIcon size={13} />
-            <span>Edit</span>
+        <a
+          href="https://tabula.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="figure-watermark"
+          title="Made with Tabula · Private Data Workbench"
+        >
+          Made with Tabula
+        </a>
+        <div className="figure-actions">
+          <button type="button" className="tool-btn" onClick={handleCopy}>
+            {status === 'copied' ? <CheckIcon size={13} /> : <ImageIcon size={13} />}
+            <span>{status === 'copied' ? 'Copied' : status === 'downloaded' ? 'Saved' : 'Copy image'}</span>
           </button>
-        ) : null}
+          <button type="button" className="tool-btn" onClick={handleDownload}>
+            <DownloadIcon size={13} />
+            <span>PNG</span>
+          </button>
+          {onEdit ? (
+            <button type="button" className="tool-btn" onClick={onEdit}>
+              <PencilIcon size={13} />
+              <span>Edit</span>
+            </button>
+          ) : null}
+        </div>
       </figcaption>
     </figure>
   )

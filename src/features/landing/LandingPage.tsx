@@ -18,6 +18,7 @@ import { useTheme } from '../common/useTheme'
 interface LandingPageProps {
   onNavigateToAuth: (mode?: 'signin' | 'signup') => void
   onNavigateToApp: () => void
+  onTryDemo?: () => void
   isAuthenticated: boolean
   userEmail?: string
 }
@@ -121,6 +122,7 @@ const FAQS = [
 export function LandingPage({
   onNavigateToAuth,
   onNavigateToApp,
+  onTryDemo,
   isAuthenticated,
 }: LandingPageProps) {
   const { theme, toggleTheme } = useTheme()
@@ -204,6 +206,16 @@ export function LandingPage({
               </button>
             ) : (
               <>
+                {onTryDemo && (
+                  <button
+                    type="button"
+                    className="landing-btn landing-btn-demo"
+                    onClick={onTryDemo}
+                    title="Try Tabula immediately with sample data, no account required"
+                  >
+                    Try Demo
+                  </button>
+                )}
                 <button
                   type="button"
                   className="landing-btn landing-btn-ghost"
@@ -250,14 +262,26 @@ export function LandingPage({
                 <ArrowRightIcon size={14} />
               </button>
             ) : (
-              <button
-                type="button"
-                className="landing-cta-btn landing-cta-primary"
-                onClick={() => onNavigateToAuth('signup')}
-              >
-                <span>Start Analyzing Free</span>
-                <ArrowRightIcon size={14} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="landing-cta-btn landing-cta-primary"
+                  onClick={() => onNavigateToAuth('signup')}
+                >
+                  <span>Start Analyzing Free</span>
+                  <ArrowRightIcon size={14} />
+                </button>
+                {onTryDemo && (
+                  <button
+                    type="button"
+                    className="landing-cta-btn landing-cta-demo"
+                    onClick={onTryDemo}
+                  >
+                    <span>Try the Demo (No Signup)</span>
+                    <ArrowRightIcon size={14} />
+                  </button>
+                )}
+              </>
             )}
 
             <button
@@ -265,7 +289,7 @@ export function LandingPage({
               className="landing-cta-btn landing-cta-secondary"
               onClick={() => scrollTo('demo')}
             >
-              <span>See Live Demo</span>
+              <span>See Walkthrough</span>
               <ChevronDownIcon size={13} />
             </button>
           </div>

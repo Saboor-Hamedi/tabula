@@ -1,7 +1,6 @@
 import {
   MoonIcon,
   PanelRightIcon,
-  ShieldCheckIcon,
   SunIcon,
   TrashIcon,
 } from '../common/Icons'
@@ -13,7 +12,7 @@ import { useSessionActions, useSessionState } from '../SessionProvider'
 /**
  * Header.
  *
- * Left: App branding and sovereign privacy badge.
+ * Left: App branding.
  * Right: Tour & pricing, clear chat history, theme toggle, and the inspector toggle.
  */
 
@@ -22,7 +21,7 @@ export function Header() {
   const {
     openPanel,
     closePanel,
-    clearChat,
+    requestClearChat,
   } = useSessionActions()
   const { theme, toggleTheme } = useTheme()
   const online = useOnline()
@@ -32,13 +31,6 @@ export function Header() {
       <div className="app-header-left">
         <div className="header-brand-title">
           <span className="header-brand-name">Tabula</span>
-          <span
-            className="header-security-compact"
-            title="100% Private In-Memory Sandbox: Zero server uploads. Data never leaves your device."
-          >
-            <ShieldCheckIcon size={12} />
-            <span className="header-security-compact-text">100% Private Sandbox</span>
-          </span>
         </div>
       </div>
 
@@ -57,11 +49,7 @@ export function Header() {
         {activeSession && messages.length > 0 ? (
           <IconButton
             label="Clear chat history"
-            onClick={() => {
-              if (window.confirm('Clear all chat messages and reset conversation?')) {
-                void clearChat()
-              }
-            }}
+            onClick={requestClearChat}
           >
             <TrashIcon size={16} />
           </IconButton>

@@ -9,6 +9,8 @@ export interface AuthState {
   profile: UserProfile | null
   tier: PricingTier
   isPro: boolean
+  isVerified: boolean
+  needsVerification: boolean
   loading: boolean
   isConfigured: boolean
 }
@@ -83,8 +85,80 @@ export function useAuth() {
     setProfile(null)
   }, [])
 
+  const refreshSession = useCallback(async () => {
+    if (!supabase) return null
+    try {
+      const { data, error } = await supabase.auth.refreshSession()
+      if (error) {
+        // Fall back to getSession if refresh fails
+        const { data: fallback } = await supabase.auth.getSession()
+        if (fallback.session) {
+          setSession(fallback.session)
+          setUser(fallback.session.user)
+          return fallback.session
+        }
+        return null
+      }
+      if (data.session) {
+        setSession(data.session)
+        setUser(data.session.user)
+        return data.session
+      }
+      return null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const resendVerificationEmail = useCallback(async (targetEmail?: string) => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+    const emailToSend = targetEmail || user?.email
+    if (!emailToSend) return { error: new Error('No email address provided.') }
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: emailToSend,
+    })
+    return { error: error ? new Error(error.message) : null }
+  }, [user])
+
+  const resetPasswordForEmail = useCallback(async (targetEmail: string) => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+    const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+      redirectTo: `${window.location.origin}/#login`,
+    })
+    return { error: error ? new Error(error.message) : null }
+  }, [])
+
+  const signInWithOAuth = useCallback(async (provider: 'google' | 'github') => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/#app`,
+      },
+    })
+    return { error: error ? new Error(error.message) : null }
+  }, [])
+
+  const signInWithOtp = useCallback(async (targetEmail: string) => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+    const { error } = await supabase.auth.signInWithOtp({
+      email: targetEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/#app`,
+      },
+    })
+    return { error: error ? new Error(error.message) : null }
+  }, [])
+
   const tier: PricingTier = profile?.tier ?? 'free'
   const isPro = tier === 'pro' || tier === 'enterprise'
+
+  // Verification status (Prompt 4.2)
+  // When email confirmation is enabled in Supabase, email_confirmed_at is set once confirmed.
+  // OAuth providers (Google/GitHub) automatically set email_confirmed_at.
+  const isVerified = Boolean(user && (!user.email || user.email_confirmed_at))
+  const needsVerification = Boolean(user && user.email && !user.email_confirmed_at)
 
   return {
     user,
@@ -92,9 +166,16 @@ export function useAuth() {
     profile,
     tier,
     isPro,
+    isVerified,
+    needsVerification,
     loading,
     isConfigured: isSupabaseConfigured,
     signOut,
+    refreshSession,
+    resendVerificationEmail,
+    resetPasswordForEmail,
+    signInWithOAuth,
+    signInWithOtp,
     refreshProfile: () => (user ? fetchProfile(user.id).then(setProfile) : Promise.resolve(null)),
   }
 }

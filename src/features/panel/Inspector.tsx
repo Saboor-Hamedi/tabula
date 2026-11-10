@@ -10,7 +10,7 @@ import { PythonPanel } from './PythonPanel'
  * Right-hand inspector.
  *
  * Workspace panel featuring 4 full-width, full-height tabs:
- * - Data (file & schema inspection)
+ * - Data (tables & schema columns inspection)
  * - Notes (interactive studio notes)
  * - Results (Python runtime results & plots)
  * - Activity (transparent agent trace)
@@ -23,6 +23,7 @@ export function Inspector() {
     activeSession,
     isStreaming,
     streamingSessionId,
+    notesVersion,
   } = useSessionState()
   const { setPanelTab } = useSessionActions()
 
@@ -85,7 +86,7 @@ export function Inspector() {
         {panelTab === 'file' ? (
           <FilePanel />
         ) : panelTab === 'notes' ? (
-          <StickyBoard />
+          <StickyBoard key={notesVersion} />
         ) : panelTab === 'python' ? (
           <PythonPanel />
         ) : traces.length === 0 ? (

@@ -16,12 +16,27 @@ import { CheckIcon, CopyIcon, DownloadIcon } from '../common/Icons'
 export interface DataTableProps {
   headers: string[]
   rows: string[][]
+  alignments?: ('left' | 'right' | 'center')[]
 }
 
-function isNumericCell(value: string): boolean {
-  const trimmed = value.trim().replace(/[,%$€£₨]/g, '')
-  if (trimmed.length === 0) return false
-  return /^-?\d+(\.\d+)?$/.test(trimmed)
+export type ColumnAlign = 'left' | 'right' | 'center'
+
+export function isNumericOrStatValue(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === 'N/A' || trimmed === 'NA' || trimmed === 'null') {
+    return true
+  }
+  // Strip common currency symbols, commas, and enclosing whitespace
+  const cleaned = trimmed.replace(/^[$€£₨¥]/, '').replace(/,/g, '').trim()
+  // Pure float, integer, percentage, or scientific notation: e.g. 16.70, 17, -1.28, 100%, 1.2e-4
+  if (/^-?\d+(\.\d+)?%?([eE][+-]?\d+)?$/.test(cleaned)) return true
+  // Ratio / counts: e.g. 395 / 395, 395/395, 20/50
+  if (/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(trimmed)) return true
+  // Range: e.g. 10 - 20, 16.7–18.2
+  if (/^-?\d+(\.\d+)?\s*[-–—]\s*-?\d+(\.\d+)?$/.test(trimmed)) return true
+  // Mean ± SD / parens: e.g. 16.70 ± 1.28, 16.70 (1.28), 16.70 +/- 1.28
+  if (/^-?\d+(\.\d+)?\s*(±|\+\/-|\()\s*-?\d+(\.\d+)?\)?$/.test(trimmed)) return true
+  return false
 }
 
 /** Renders a cell's inline markdown tokens. */
@@ -42,24 +57,65 @@ function CellValue({ value }: { value: string }) {
   )
 }
 
-export const DataTable = memo(function DataTable({ headers = [], rows = [] }: DataTableProps) {
+export const DataTable = memo(function DataTable({
+  headers = [],
+  rows = [],
+  alignments = [],
+}: DataTableProps) {
   const [copied, setCopied] = useState(false)
   const safeHeaders = Array.isArray(headers) ? headers : []
   const safeRows = Array.isArray(rows) ? rows : []
   const visibleRows = useMemo(() => safeRows.slice(0, MAX_PREVIEW_ROWS), [safeRows])
 
+  // Automatically detect proper alignment for each column (no hardcoding):
+  // 1. Column 0 is the row label / measure name (always left)
+  // 2. Data columns (col > 0) are analyzed across all rows: if values are numbers, ratios, or stats -> 'right'
+  // 3. Explicit markdown alignment separator (:---:, ---:) is respected if provided.
+  const columnAlignments = useMemo<ColumnAlign[]>(() => {
+    return safeHeaders.map((_header, colIndex) => {
+      const explicit = alignments[colIndex]
+      if (explicit) return explicit
+
+      if (colIndex === 0) return 'left'
+
+      let statCount = 0
+      let totalNonEmpty = 0
+
+      for (const row of safeRows) {
+        const cell = (row[colIndex] ?? '').trim()
+        if (cell) {
+          totalNonEmpty++
+          if (isNumericOrStatValue(cell)) {
+            statCount++
+          }
+        }
+      }
+
+      if (totalNonEmpty > 0 && statCount / totalNonEmpty >= 0.5) {
+        return 'right'
+      }
+
+      return 'left'
+    })
+  }, [safeHeaders, safeRows, alignments])
+
   const handleCopyTable = useCallback(async () => {
     if (safeHeaders.length === 0) return
 
     const allRows = [safeHeaders, ...safeRows]
-    const html = `<table style="border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10pt; width: 100%;">${allRows
+    const html = `<table style="border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10pt;">${allRows
       .map(
         (row, rIdx) => `<tr>${row
-          .map((cell) => {
+          .map((cell, cIdx) => {
             const isHeader = rIdx === 0
             const tag = isHeader ? 'th' : 'td'
-            const bg = isHeader ? 'background-color: #f3f4f6; font-weight: bold;' : ''
-            return `<${tag} style="border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; ${bg}">${cell}</${tag}>`
+            const align = columnAlignments[cIdx] ?? 'left'
+            const bg = isHeader
+              ? 'background-color: #f3f4f6; font-weight: 600;'
+              : rIdx % 2 === 0
+              ? 'background-color: #fbfbfc;'
+              : 'background-color: #ffffff;'
+            return `<${tag} style="border: 1px solid #d1d5db; padding: 6px 12px; text-align: ${align}; ${bg}">${cell}</${tag}>`
           })
           .join('')}</tr>`,
       )
@@ -84,7 +140,7 @@ export const DataTable = memo(function DataTable({ headers = [], rows = [] }: Da
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1600)
     }
-  }, [safeHeaders, safeRows])
+  }, [safeHeaders, safeRows, columnAlignments])
 
   const handleDownload = useCallback(() => {
     downloadCsv('tabula-table.csv', buildCsv(safeHeaders, safeRows))
@@ -98,11 +154,18 @@ export const DataTable = memo(function DataTable({ headers = [], rows = [] }: Da
         <table className="data-table">
           <thead>
             <tr>
-              {safeHeaders.map((header, index) => (
-                <th key={`${header}-${index}`} scope="col">
-                  <CellValue value={header} />
-                </th>
-              ))}
+              {safeHeaders.map((header, index) => {
+                const align = columnAlignments[index] ?? 'left'
+                return (
+                  <th
+                    key={`${header}-${index}`}
+                    scope="col"
+                    className={`col-align-${align} ${align === 'right' ? 'is-numeric' : ''}`}
+                  >
+                    <CellValue value={header} />
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
@@ -110,10 +173,12 @@ export const DataTable = memo(function DataTable({ headers = [], rows = [] }: Da
               <tr key={rowIndex}>
                 {headers.map((header, cellIndex) => {
                   const value = row[cellIndex] ?? ''
+                  const align = columnAlignments[cellIndex] ?? 'left'
+                  const isNum = align === 'right' || isNumericOrStatValue(value)
                   return (
                     <td
                       key={`${rowIndex}-${header}-${cellIndex}`}
-                      className={isNumericCell(value) ? 'is-numeric' : ''}
+                      className={`col-align-${align} ${isNum ? 'is-numeric' : ''}`}
                     >
                       <CellValue value={value} />
                     </td>

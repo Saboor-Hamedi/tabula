@@ -154,11 +154,11 @@ function isBoardItem(value: unknown): value is BoardItem {
 function loadItems(key: string): BoardItem[] | null {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return null;
+    if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isBoardItem) : null;
+    return Array.isArray(parsed) ? parsed.filter(isBoardItem) : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -192,6 +192,26 @@ export function addNoteToBoard(
   return note;
 }
 
+export function clearBoardNotes(storageKey = 'tabula-sticky-notes:v1'): void {
+  try {
+    saveItems(storageKey, []);
+    if (typeof localStorage !== 'undefined') {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('tabula-sticky-notes') || k === storageKey)) {
+          localStorage.setItem(k, '[]');
+        }
+      }
+      localStorage.setItem(storageKey, '[]');
+    }
+  } catch {
+    // ignore
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tabula:board-cleared'));
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Hook                                                                */
 /* ------------------------------------------------------------------ */
@@ -202,7 +222,7 @@ export function useBoard(storageKey: string, initialItems: readonly BoardItem[] 
     return { items, topZ: items.reduce((max, item) => Math.max(max, item.z), 0) };
   });
 
-  // Listen for externally added notes (e.g. from chat responses)
+  // Listen for externally added notes or board clearing (e.g. from chat responses or clear history)
   useEffect(() => {
     const handleNoteAdded = (event: Event) => {
       const custom = event as CustomEvent<NoteItem>;
@@ -210,8 +230,15 @@ export function useBoard(storageKey: string, initialItems: readonly BoardItem[] 
         dispatch({ type: 'add', item: custom.detail });
       }
     };
+    const handleBoardCleared = () => {
+      dispatch({ type: 'clear' });
+    };
     window.addEventListener('tabula:note-added', handleNoteAdded);
-    return () => window.removeEventListener('tabula:note-added', handleNoteAdded);
+    window.addEventListener('tabula:board-cleared', handleBoardCleared);
+    return () => {
+      window.removeEventListener('tabula:note-added', handleNoteAdded);
+      window.removeEventListener('tabula:board-cleared', handleBoardCleared);
+    };
   }, []);
 
   // Save shortly after changes settle, and once more when the page is hidden.

@@ -161,7 +161,7 @@ export type ContentBlock =
   | { type: 'markdown'; content: string }
   | { type: 'mermaid'; code: string }
   | { type: 'chart'; chart: ChartData }
-  | { type: 'table'; headers: string[]; rows: string[][] }
+  | { type: 'table'; headers: string[]; rows: string[][]; alignments?: ('left' | 'right' | 'center')[] }
 
 export interface MermaidBlockData {
   type: 'mermaid'
@@ -182,6 +182,7 @@ export interface TableBlockData {
   type: 'table'
   headers: string[]
   rows: string[][]
+  alignments?: ('left' | 'right' | 'center')[]
 }
 
 export type RawBlock = MarkdownBlockData | MermaidBlockData | ChartBlockData | TableBlockData

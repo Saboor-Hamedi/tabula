@@ -34,6 +34,19 @@ function looksLikeSeparator(line: string): boolean {
   return /^\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?$/.test(trimmed)
 }
 
+function parseSeparatorAlignments(line: string): ('left' | 'right' | 'center' | null)[] {
+  const parts = splitRow(line)
+  return parts.map((part) => {
+    const trimmed = part.trim()
+    const leftColon = trimmed.startsWith(':')
+    const rightColon = trimmed.endsWith(':')
+    if (leftColon && rightColon) return 'center'
+    if (rightColon) return 'right'
+    if (leftColon) return 'left'
+    return null
+  })
+}
+
 function looksLikeTableHeader(line: string): boolean {
   const trimmed = line.trim()
   if (!trimmed.includes('|')) return false
@@ -97,7 +110,13 @@ export function extractTableBlocks(text: string): RawBlock[] {
         index += 1
       }
 
-      blocks.push({ type: 'table', headers, rows })
+      const separatorAlignments = parseSeparatorAlignments(next)
+      const hasAlignments = separatorAlignments.some((a) => a !== null)
+      const alignments = hasAlignments
+        ? (headers.map((_, i) => separatorAlignments[i] ?? 'left') as ('left' | 'right' | 'center')[])
+        : undefined
+
+      blocks.push({ type: 'table', headers, rows, alignments })
       continue
     }
 

@@ -41,6 +41,8 @@ export interface SessionState {
   pythonResult: PythonExecutionResult | null
   pythonHistory: PythonExecutionResult[]
   pythonStatus: PythonStatus
+  clearChatConfirmOpen: boolean
+  notesVersion: number
 }
 
 export interface SessionActions {
@@ -78,6 +80,9 @@ export interface SessionActions {
   clearPythonResult: () => void
   removePythonRun: (index: number) => void
   saveToNotes: (text: string) => void
+  requestClearChat: () => void
+  cancelClearChat: () => void
+  confirmClearChat: () => Promise<void>
   clearChat: () => Promise<void>
 }
 

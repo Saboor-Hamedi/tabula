@@ -21,7 +21,7 @@ const STICK_THRESHOLD = 120
 
 export function ChatPanel() {
   const { messages, isStreaming, streamingSessionId, activeSession, traces } = useSessionState()
-  const { clearChat } = useSessionActions()
+  const { requestClearChat } = useSessionActions()
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
   const lastSessionIdRef = useRef<string | null>(null)
@@ -85,11 +85,7 @@ export function ChatPanel() {
                 <button
                   type="button"
                   className="chat-clear-history-btn"
-                  onClick={() => {
-                    if (window.confirm('Delete all messages and clear chat history?')) {
-                      void clearChat()
-                    }
-                  }}
+                  onClick={requestClearChat}
                   title="Clear chat history"
                 >
                   <TrashIcon size={12} />

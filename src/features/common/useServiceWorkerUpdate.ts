@@ -6,7 +6,19 @@ export function useServiceWorkerUpdate() {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null)
 
   useEffect(() => {
-    if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
+    if (!import.meta.env.PROD || !('serviceWorker' in navigator)) {
+      if (!import.meta.env.PROD && 'serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) => {
+            for (const registration of registrations) {
+              registration.unregister().catch(() => undefined)
+            }
+          })
+          .catch(() => undefined)
+      }
+      return
+    }
 
     let active = true
     navigator.serviceWorker

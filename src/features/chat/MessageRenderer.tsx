@@ -57,7 +57,14 @@ function renderBlock(
     )
   }
   if (block.type === 'table') {
-    return <DataTable key={`table-${index}`} headers={block.headers} rows={block.rows} />
+    return (
+      <DataTable
+        key={`table-${index}`}
+        headers={block.headers}
+        rows={block.rows}
+        alignments={block.alignments}
+      />
+    )
   }
   return <MarkdownText key={`markdown-${index}`} content={block.content} />
 }

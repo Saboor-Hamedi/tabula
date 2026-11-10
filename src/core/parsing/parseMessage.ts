@@ -35,7 +35,12 @@ function parse(text: string): ContentBlock[] {
 
       for (const inner of extractTableBlocks(chartBlock.content)) {
         if (inner.type === 'table') {
-          blocks.push({ type: 'table', headers: inner.headers, rows: inner.rows })
+          blocks.push({
+            type: 'table',
+            headers: inner.headers,
+            rows: inner.rows,
+            alignments: inner.alignments,
+          })
         } else if (inner.type === 'markdown' && inner.content.trim().length > 0) {
           blocks.push({ type: 'markdown', content: inner.content.trim() })
         }

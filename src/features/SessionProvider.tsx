@@ -117,7 +117,7 @@ import {
   type SessionActions,
   type SessionContextValue,
 } from "./session/sessionContext";
-import { addNoteToBoard } from "./theme";
+import { addNoteToBoard, clearBoardNotes } from "./theme";
 
 export {
   useSession,
@@ -208,9 +208,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [pythonResult, setPythonResult] = useState<PythonExecutionResult | null>(null);
   const [pythonHistory, setPythonHistory] = useState<PythonExecutionResult[]>([]);
   const [pythonStatus, setPythonStatus] = useState<PythonStatus>('idle');
+  const [clearChatConfirmOpen, setClearChatConfirmOpen] = useState(false);
+  const [notesVersion, setNotesVersion] = useState(0);
 
   useEffect(() => {
     return subscribePythonStatus(setPythonStatus);
+  }, []);
+
+  const clearPythonResult = useCallback(() => {
+    resetPythonEngine();
+    setPythonResult(null);
+    setPythonHistory([]);
   }, []);
 
   const dbHandleRef = useRef<DuckDBHandle | null>(null);
@@ -640,13 +648,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [activeSession, refreshDigest, refreshSuggestions],
   );
 
-  const selectSession = useCallback((sessionId: string) => {
-    setActiveSessionId(sessionId);
-    void saveActiveSessionId(sessionId).catch(() => undefined);
-  }, []);
+  const selectSession = useCallback(
+    (sessionId: string) => {
+      if (sessionId !== activeSessionId) {
+        clearPythonResult();
+      }
+      setActiveSessionId(sessionId);
+      void saveActiveSessionId(sessionId).catch(() => undefined);
+    },
+    [activeSessionId, clearPythonResult],
+  );
 
   const deleteSession = useCallback(
     async (sessionId: string) => {
+      if (sessionId === activeSessionId || sessions.length <= 1) {
+        clearPythonResult();
+        clearBoardNotes();
+        setNotesVersion((v) => v + 1);
+      }
       if (streamingSessionRef.current === sessionId) {
         abortRef.current?.abort();
         abortRef.current = null;
@@ -938,6 +957,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const clearChat = useCallback(async () => {
     if (!activeSession) return;
     const sessionId = activeSession.id;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setMessagesBySession((previous) => ({
       ...previous,
       [sessionId]: [],
@@ -946,6 +967,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ...previous,
       [sessionId]: [],
     }));
+    clearPythonResult();
+    clearBoardNotes();
+    setNotesVersion((v) => v + 1);
     void savePersistedSession({
       id: sessionId,
       session: activeSession,
@@ -954,7 +978,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       digest: digestBySession[sessionId] ?? undefined,
       updatedAt: Date.now(),
     }).catch(() => undefined);
-  }, [activeSession, digestBySession]);
+  }, [activeSession, clearPythonResult, digestBySession]);
+
+  const requestClearChat = useCallback(() => {
+    setClearChatConfirmOpen(true);
+  }, []);
+
+  const cancelClearChat = useCallback(() => {
+    setClearChatConfirmOpen(false);
+  }, []);
+
+  const confirmClearChat = useCallback(async () => {
+    setClearChatConfirmOpen(false);
+    await clearChat();
+  }, [clearChat]);
 
   const closePanel = useCallback((persist = true) => {
     setPanelOpenState(false);
@@ -1131,12 +1168,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [activeSession],
   );
 
-  const clearPythonResult = useCallback(() => {
-    resetPythonEngine();
-    setPythonResult(null);
-    setPythonHistory([]);
-  }, []);
-
   const removePythonRun = useCallback((index: number) => {
     setPythonHistory((prev) => {
       const next = prev.filter((_, i) => i !== index);
@@ -1182,16 +1213,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pythonResult,
       pythonHistory,
       pythonStatus,
+      clearChatConfirmOpen,
+      notesVersion,
     }),
     [
       activeSession,
       apiKey,
+      clearChatConfirmOpen,
       dbError,
       dbReady,
       digest,
       isStreaming,
       messages,
       model,
+      notesVersion,
       panelOpen,
       panelTab,
       pythonResult,
@@ -1240,13 +1275,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       clearPythonResult,
       removePythonRun,
       saveToNotes,
+      requestClearChat,
+      cancelClearChat,
+      confirmClearChat,
       clearChat,
     }),
     [
+      cancelClearChat,
       cancelSheetSelection,
       clearApiKey,
       clearChat,
       clearPythonResult,
+      confirmClearChat,
       removePythonRun,
       closePanel,
       closeReport,
@@ -1262,6 +1302,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openPanel,
       openReport,
       openSettings,
+      requestClearChat,
       runPythonCode,
       saveApiKey,
       saveToNotes,
