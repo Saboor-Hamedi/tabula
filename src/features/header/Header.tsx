@@ -6,6 +6,7 @@ import { useAuthUser, useProfile, useUserSlug } from '../auth/useProfile'
 import {
   MoonIcon,
   PanelRightIcon,
+  SidebarIcon,
   SunIcon,
   TrashIcon,
 } from '../common/Icons'
@@ -60,6 +61,16 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
   return (
     <header className={`app-header ${isWorkspace ? 'is-workspace' : isDashboard ? 'is-dashboard' : 'is-page'}`}>
       <div className="app-header-left">
+        {isWorkspace && session && actions ? (
+          <IconButton
+            label={session.sidebarOpen ? 'Hide sources' : 'Show sources'}
+            active={session.sidebarOpen}
+            onClick={() => actions.toggleSidebar()}
+          >
+            <SidebarIcon size={17} />
+          </IconButton>
+        ) : null}
+
         {!isWorkspace ? (
           <>
             <Brand to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />

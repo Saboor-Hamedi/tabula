@@ -117,7 +117,6 @@ export function AppShell() {
   }, [closePanel, panelOverlay])
 
   const sidebarInGrid = sidebarOpen && !sidebarOverlay
-  const sidebarCollapsedInGrid = !sidebarOpen && !sidebarOverlay
   const panelInGrid = panelOpen && !panelOverlay
   const sidebarAsOverlay = sidebarOpen && sidebarOverlay
 
@@ -139,13 +138,9 @@ export function AppShell() {
   return (
     <div className="app-shell" style={layoutStyle}>
       <div
-        className={`app-grid ${
-          sidebarInGrid
-            ? 'has-sidebar'
-            : sidebarCollapsedInGrid
-            ? 'has-sidebar-collapsed'
-            : ''
-        } ${panelInGrid ? 'has-panel' : ''}`}
+        className={`app-grid ${sidebarInGrid ? 'has-sidebar' : ''} ${
+          panelInGrid ? 'has-panel' : ''
+        }`}
       >
         {sidebarInGrid ? (
           <>
@@ -159,12 +154,6 @@ export function AppShell() {
               onResize={updateSidebarWidth}
             />
           </>
-        ) : sidebarCollapsedInGrid ? (
-          <Sidebar
-            isCollapsed
-            onClose={() => setSidebarOpen(false)}
-            onExpand={() => setSidebarOpen(true)}
-          />
         ) : null}
 
         <div className="app-main">
