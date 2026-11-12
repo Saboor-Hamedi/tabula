@@ -16,6 +16,13 @@ export interface PythonExecutionResult {
     shape: [number, number]
     columns: string[]
   }
+  dfPreview?: {
+    columns: string[]
+    rows: string[][]
+    totalRows: number
+    totalCols: number
+  }
+  dfCsv?: string
 }
 
 export interface PythonWorkerRequest {

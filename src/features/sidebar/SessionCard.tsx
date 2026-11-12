@@ -1,7 +1,8 @@
 import type { Session } from '../../core/types'
 import { formatCount, formatRelativeTime } from '../../core/utils/format'
-import { SheetIcon } from '../common/Icons'
+import { ExternalIcon, SheetIcon } from '../common/Icons'
 import { DeleteSessionButton } from '../session/DeleteSessionButton'
+import { useSessionActions } from '../SessionProvider'
 
 /**
  * One dataset row in the sidebar.
@@ -14,6 +15,7 @@ export interface SessionCardProps {
 }
 
 export function SessionCard({ session, active, onSelect }: SessionCardProps) {
+  const { openSpreadsheet } = useSessionActions()
   const totalRows = (session?.tables ?? []).reduce((total, table) => total + (table?.rowCount ?? 0), 0)
 
   return (
@@ -41,6 +43,26 @@ export function SessionCard({ session, active, onSelect }: SessionCardProps) {
       </button>
 
       <div className="session-actions">
+        {(session.tables?.length ?? 0) > 0 ? (
+          <button
+            type="button"
+            className="icon-btn is-sm"
+            aria-label={`Open ${session.fileName} in spreadsheet view`}
+            title="Open Excel view"
+            onClick={(e) => {
+              e.stopPropagation()
+              openSpreadsheet({
+                kind: 'session',
+                title: session.fileName,
+                schemaName: session.schemaName,
+                tables: session.tables,
+                initialTableName: session.primaryTable ?? session.tables[0]?.name,
+              })
+            }}
+          >
+            <ExternalIcon size={13} />
+          </button>
+        ) : null}
         <DeleteSessionButton sessionId={session.id} />
       </div>
     </div>

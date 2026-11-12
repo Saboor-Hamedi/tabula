@@ -1,23 +1,23 @@
 import { useEffect, useState } from 'react'
-import { AlertIcon, CheckIcon, DatabaseIcon, MoonIcon, SunIcon } from '../common/Icons'
-import { useTheme } from '../common/useTheme'
+import { useRouter } from '../../core/router'
+import { ROUTES } from '../../core/router/paths'
+import { signOutAccount } from '../../core/supabase/signOut'
+import { AlertIcon, CheckIcon } from '../common/Icons'
+import { Header } from '../header/Header'
+import { useAuth } from './auth'
 
-export interface VerifyEmailScreenProps {
-  email?: string
-  onVerified: () => void
-  onRefresh: () => Promise<unknown>
-  onResend: () => Promise<{ error: Error | null }>
-  onSignOut: () => Promise<void>
-}
+export function VerifyEmailScreen() {
+  const { navigate } = useRouter()
+  const { user, refreshSession, resendVerificationEmail } = useAuth()
+  const email = user?.email
 
-export function VerifyEmailScreen({
-  email,
-  onVerified,
-  onRefresh,
-  onResend,
-  onSignOut,
-}: VerifyEmailScreenProps) {
-  const { theme, toggleTheme } = useTheme()
+  const onVerified = () => navigate(ROUTES.workspace, { replace: true })
+  const onRefresh = () => refreshSession()
+  const onResend = () => resendVerificationEmail()
+  const onSignOut = async () => {
+    await signOutAccount()
+    navigate(ROUTES.landing)
+  }
   const [cooldown, setCooldown] = useState(0)
   const [checking, setChecking] = useState(false)
   const [resending, setResending] = useState(false)
@@ -76,26 +76,7 @@ export function VerifyEmailScreen({
 
   return (
     <div className="auth-screen">
-      <header className="auth-header">
-        <div className="auth-header-left">
-          <div className="auth-header-logo">
-            <DatabaseIcon size={16} />
-          </div>
-          <span className="auth-header-brand">Tabula</span>
-          <span className="auth-header-tag">Access Verification</span>
-        </div>
-
-        <div className="auth-header-right">
-          <button
-            type="button"
-            className="auth-theme-toggle"
-            onClick={(e) => toggleTheme(e)}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            {theme === 'dark' ? <SunIcon size={15} /> : <MoonIcon size={15} />}
-          </button>
-        </div>
-      </header>
+      <Header variant="page" />
 
       <div className="auth-screen-container verify-screen-container">
         <div className="auth-screen-card verify-screen-card">

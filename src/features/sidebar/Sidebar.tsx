@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ACCEPTED_EXTENSIONS } from '../../core/constants'
+import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
 import {
   exportAnalysisAsDoc,
   exportAnalysisAsPdf,
@@ -39,6 +40,8 @@ export function Sidebar({
 }: SidebarProps) {
   const { sessions, activeSession, upload, messages, pythonResult } = useSessionState()
   const { selectSession, uploadFile } = useSessionActions()
+  const { usage } = useUsageStatus()
+  const trialExpired = Boolean(usage?.trialExpired)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -259,11 +262,21 @@ export function Sidebar({
         <button
           type="button"
           className="sidebar-add-source-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Add a new spreadsheet or CSV source"
+          onClick={() => {
+            if (trialExpired) {
+              openPricingModal('trial-expired')
+              return
+            }
+            fileInputRef.current?.click()
+          }}
+          title={
+            trialExpired
+              ? 'Trial ended — upgrade to add new datasets'
+              : 'Add a new spreadsheet or CSV source'
+          }
         >
           <PlusIcon size={14} />
-          <span>Add Source</span>
+          <span>{trialExpired ? 'Upgrade to Add Source' : 'Add Source'}</span>
         </button>
 
         <input

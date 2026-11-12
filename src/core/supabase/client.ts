@@ -17,9 +17,9 @@ function sanitizeSupabaseUrl(rawUrl?: string): string | undefined {
 }
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const supabaseUrl = sanitizeSupabaseUrl(rawUrl)
+export const supabaseUrl = sanitizeSupabaseUrl(rawUrl)
 const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-const supabaseAnonKey = rawKey?.trim().replace(/^['"]|['"]$/g, '')
+export const supabaseAnonKey = rawKey?.trim().replace(/^['"]|['"]$/g, '')
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&

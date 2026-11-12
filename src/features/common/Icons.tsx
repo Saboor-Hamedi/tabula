@@ -412,6 +412,15 @@ export function ArrowRightIcon(props: IconProps) {
   )
 }
 
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  )
+}
+
 export function SparklesIcon(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
@@ -438,6 +447,29 @@ export function BarChartIcon(props: IconProps) {
       <line x1="12" y1="20" x2="12" y2="10" />
       <line x1="18" y1="20" x2="18" y2="4" />
       <line x1="6" y1="20" x2="6" y2="16" />
+    </svg>
+  )
+}
+
+/** Globe: publishing an insight to the public page. */
+export function GlobeIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z" />
+    </svg>
+  )
+}
+
+/** Spark-free "adjustments" glyph for the publish options. */
+export function SlidersIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="16" cy="18" r="2" />
     </svg>
   )
 }

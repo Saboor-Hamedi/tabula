@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react'
+import { useRouter } from '../core/router'
+import { refreshUsage } from '../core/supabase/usage'
 import {
   getPanelWidth,
   getSidebarWidth,
@@ -7,7 +9,7 @@ import {
   saveSidebarWidth,
   SIDEBAR_WIDTH,
 } from '../core/storage/uiPrefs'
-import { ChatPanel } from './chat/ChatPanel'
+import { Panel } from './chat'
 import { useKeyboardShortcuts } from './common/useKeyboardShortcuts'
 import { useServiceWorkerUpdate } from './common/useServiceWorkerUpdate'
 import { ConfirmModal } from './common/ConfirmModal'
@@ -24,6 +26,11 @@ const ReportView = lazy(() =>
 )
 const SettingsModal = lazy(() =>
   import('./settings/SettingsModal').then((module) => ({ default: module.SettingsModal })),
+)
+const SpreadsheetModal = lazy(() =>
+  import('./spreadsheet/SpreadsheetModal').then((module) => ({
+    default: module.SpreadsheetModal,
+  })),
 )
 
 /**
@@ -52,20 +59,17 @@ function useMediaQuery(query: string): boolean {
   return matches
 }
 
-export interface AppShellProps {
-  isDemoMode?: boolean
-}
-
-export function AppShell({ isDemoMode = false }: AppShellProps) {
+export function AppShell() {
+  const { query, path, navigate } = useRouter()
   const {
     activeSession,
-    sessions,
     sidebarOpen,
     panelOpen,
     settingsOpen,
     reportOpen,
     sheetPicker,
     clearChatConfirmOpen,
+    spreadsheetSource,
   } = useSessionState()
   const {
     closePanel,
@@ -76,28 +80,19 @@ export function AppShell({ isDemoMode = false }: AppShellProps) {
     openSettings,
     cancelClearChat,
     confirmClearChat,
-    uploadFile,
+    closeSpreadsheet,
   } = useSessionActions()
   const sidebarOverlay = useMediaQuery(SIDEBAR_OVERLAY_QUERY)
   const panelOverlay = useMediaQuery(PANEL_OVERLAY_QUERY)
 
-  // In demo mode: auto-load sample dataset if no session exists yet (Prompt 4.6)
+  // Refresh entitlement immediately after returning from Stripe Checkout
   useEffect(() => {
-    if (isDemoMode && !activeSession && sessions.length === 0) {
-      void (async () => {
-        try {
-          const res = await fetch('/orders.csv')
-          if (res.ok) {
-            const blob = await res.blob()
-            const file = new File([blob], 'orders.csv', { type: 'text/csv' })
-            await uploadFile(file)
-          }
-        } catch {
-          // Ignore demo load errors
-        }
-      })()
+    const billing = query.get('billing')
+    if (billing === 'success' || billing === 'canceled') {
+      void refreshUsage()
+      navigate(path, { replace: true })
     }
-  }, [isDemoMode, activeSession, sessions.length, uploadFile])
+  }, [query, path, navigate])
   useKeyboardShortcuts({
     exportTranscript,
     toggleSidebar,
@@ -173,26 +168,9 @@ export function AppShell({ isDemoMode = false }: AppShellProps) {
         ) : null}
 
         <div className="app-main">
-          {isDemoMode && (
-            <div className="demo-mode-strip">
-              <span className="demo-mode-pill">Interactive Demo</span>
-              <span className="demo-mode-text">
-                Exploring Tabula with sample orders dataset. Raw rows never leave your computer.
-              </span>
-              <button
-                type="button"
-                className="demo-mode-btn"
-                onClick={() => {
-                  window.location.hash = '#signup'
-                }}
-              >
-                Create account to analyze your own files →
-              </button>
-            </div>
-          )}
-          <Header />
+          <Header variant="workspace" />
           <main className="app-content">
-            {activeSession ? <ChatPanel /> : <UploadZone />}
+            {activeSession ? <Panel /> : <UploadZone />}
           </main>
         </div>
 
@@ -230,6 +208,11 @@ export function AppShell({ isDemoMode = false }: AppShellProps) {
       {reportOpen ? (
         <Suspense fallback={null}>
           <ReportView />
+        </Suspense>
+      ) : null}
+      {spreadsheetSource ? (
+        <Suspense fallback={null}>
+          <SpreadsheetModal source={spreadsheetSource} onClose={closeSpreadsheet} />
         </Suspense>
       ) : null}
       {sheetPicker ? <SheetPicker /> : null}

@@ -1,32 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
-import { NEEDS_ACCESS_KEY } from '../../core/config'
+import { useRouter } from '../../core/router'
+import { ROUTES, userPath } from '../../core/router/paths'
+import { signOutAccount } from '../../core/supabase/signOut'
 import { SettingsIcon, UserIcon } from '../common/Icons'
-import { useSessionActions, useSessionState } from '../SessionProvider'
-import { useAuth } from '../auth/useAuth'
+import { useSessionActions } from '../SessionProvider'
+import { useAuthUser, useIsAdmin, useProfile, useUserSlug } from '../auth/useProfile'
+import { UsageQuotaCard } from '../billing/UsageQuotaCard'
 
 /**
  * Sidebar footer.
  *
- * Houses Settings and the Account & Subscription popover menu.
- * Robust on-device dropdown that opens upward without breaking modals.
+ * Shows the user account menu (plus Dashboard link for administrators and Sign out),
+ * and the Settings button for administrators only.
  */
-
 export function SidebarFooter() {
-  const { apiKey } = useSessionState()
   const { openSettings } = useSessionActions()
-  const { user, profile, isPro, isConfigured, signOut } = useAuth()
+  const { navigate } = useRouter()
+  const user = useAuthUser()
+  const profile = useProfile()
+  const isAdmin = useIsAdmin()
+  const userSlug = useUserSlug()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!menuOpen) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false)
       }
     }
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleKeyDown)
@@ -36,26 +41,21 @@ export function SidebarFooter() {
     }
   }, [menuOpen])
 
-  const initial = profile?.display_name
-    ? profile.display_name.charAt(0).toUpperCase()
-    : user?.email?.charAt(0).toUpperCase() || 'U'
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'User'
+  const initial = displayName.trim().charAt(0).toUpperCase() || 'U'
 
   return (
-    <div className="sidebar-footer" ref={menuRef}>
-      {/* Account Popover Menu */}
-      {menuOpen && (
+    <>
+      {user ? <UsageQuotaCard /> : null}
+      <div className="sidebar-footer" ref={menuRef}>
+      {menuOpen && user ? (
         <div className="sidebar-account-menu" role="menu">
           <div className="account-menu-header">
             <div className="account-menu-avatar">{initial}</div>
             <div className="account-menu-user-info">
-              <span className="account-menu-name">
-                {profile?.display_name || user?.email?.split('@')[0] || 'User'}
-              </span>
-              <span className="account-menu-email">{user?.email || 'Local User'}</span>
+              <span className="account-menu-name">{displayName}</span>
+              <span className="account-menu-email">{user.email}</span>
             </div>
-            <span className={`account-menu-tier-pill ${isPro ? 'is-pro' : 'is-free'}`}>
-              {isPro ? 'PRO' : 'FREE'}
-            </span>
           </div>
 
           <div className="account-menu-divider" />
@@ -63,89 +63,68 @@ export function SidebarFooter() {
           <button
             type="button"
             className="account-menu-item"
+            role="menuitem"
             onClick={() => {
               setMenuOpen(false)
-              window.location.hash = '#landing'
+              navigate(userPath('/app', userSlug))
             }}
           >
-            <span>{isPro ? 'View Subscription Plans' : 'Upgrade to Pro ($19/mo)'}</span>
+            <span>Dashboard & Quota</span>
           </button>
 
           <button
             type="button"
-            className="account-menu-item"
+            className="account-menu-item is-danger"
+            role="menuitem"
             onClick={() => {
               setMenuOpen(false)
-              openSettings()
+              void signOutAccount()
             }}
           >
-            <span>Workspace Settings</span>
+            <span>Sign out</span>
           </button>
-
-          {user && (
-            <>
-              <div className="account-menu-divider" />
-              <button
-                type="button"
-                className="account-menu-item is-danger"
-                onClick={() => {
-                  setMenuOpen(false)
-                  void signOut()
-                }}
-              >
-                <span>Sign out</span>
-              </button>
-            </>
-          )}
         </div>
-      )}
+      ) : null}
 
-      {/* Account Button */}
-      {isConfigured && user ? (
-        <button
-          type="button"
-          className={`sidebar-account-btn ${menuOpen ? 'is-active' : ''}`}
-          onClick={() => setMenuOpen(!menuOpen)}
-          title={`Account: ${user.email} (${isPro ? 'Pro' : 'Free'})`}
-          aria-expanded={menuOpen}
-        >
-          <span className="sidebar-account-avatar">{initial}</span>
-          <span className="sidebar-account-name">
-            {profile?.display_name || user.email?.split('@')[0]}
-          </span>
-          <span className={`sidebar-account-badge ${isPro ? 'is-pro' : 'is-free'}`}>
-            {isPro ? 'PRO' : 'FREE'}
-          </span>
-        </button>
+      {user ? (
+        <div className="sidebar-account-block">
+          <button
+            type="button"
+            className={`sidebar-account-btn ${menuOpen ? 'is-active' : ''}`}
+            onClick={() => setMenuOpen(!menuOpen)}
+            title={`Account: ${user.email}`}
+            aria-expanded={menuOpen}
+          >
+            <span className="sidebar-account-avatar">{initial}</span>
+            <span className="sidebar-account-name">{displayName}</span>
+            {isAdmin ? <span className="sidebar-account-badge is-pro">Admin</span> : null}
+          </button>
+        </div>
       ) : (
         <button
           type="button"
           className="sidebar-account-btn"
-          onClick={() => {
-            window.location.hash = '#landing'
-          }}
-          title="Sign in or view plans"
+          onClick={() => navigate(ROUTES.signIn)}
+          title="Sign in"
         >
           <span className="sidebar-account-avatar">
             <UserIcon size={12} />
           </span>
           <span className="sidebar-account-name">Guest</span>
-          <span className="sidebar-account-badge is-free">FREE</span>
         </button>
       )}
 
-      {/* Settings Button */}
-      <button
-        type="button"
-        className="sidebar-settings-btn"
-        onClick={openSettings}
-        title="Settings"
-      >
-        <SettingsIcon size={15} />
-        {NEEDS_ACCESS_KEY && !apiKey ? (
-          <span className="sidebar-dot" aria-label="Access key required" />
-        ) : null}
-      </button>
-    </div>
+      {isAdmin ? (
+        <button
+          type="button"
+          className="sidebar-settings-btn"
+          onClick={openSettings}
+          title="Settings"
+        >
+          <SettingsIcon size={15} />
+        </button>
+      ) : null}
+      </div>
+    </>
   )
 }

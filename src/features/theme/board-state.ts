@@ -196,12 +196,6 @@ export function clearBoardNotes(storageKey = 'tabula-sticky-notes:v1'): void {
   try {
     saveItems(storageKey, []);
     if (typeof localStorage !== 'undefined') {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('tabula-sticky-notes') || k === storageKey)) {
-          localStorage.setItem(k, '[]');
-        }
-      }
       localStorage.setItem(storageKey, '[]');
     }
   } catch {

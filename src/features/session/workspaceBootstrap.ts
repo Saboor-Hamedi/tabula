@@ -5,7 +5,8 @@ import { ingestExcel } from '../../core/duckdb/ingestExcel'
 import { buildDatasetDigest } from '../../core/profiling/buildDigest'
 import { buildLocalSuggestions } from '../../core/agent/suggestions'
 import { loadPersistedWorkspace, loadSessionFile } from '../../core/storage/persistence'
-import { registerSession } from '../../core/storage/sessions'
+import { purgeLegacyUnscopedStorage } from '../../core/storage/scope'
+import { clearSessionRegistry, registerSession } from '../../core/storage/sessions'
 import type { ChatMessage, DatasetDigest, Session, ToolTraceEntry } from '../../core/types'
 
 /** Restores fields missing from sessions saved by an earlier app version. */
@@ -58,9 +59,11 @@ export interface BootstrapResult {
  * stored file. Kept outside the React component so bootstrap logic can evolve
  * independently from UI state.
  */
-export async function bootstrapWorkspace(): Promise<BootstrapResult> {
+export async function bootstrapWorkspace(scope: string | null): Promise<BootstrapResult> {
+  purgeLegacyUnscopedStorage()
+  clearSessionRegistry()
   const handle = await initDuckDB()
-  const persisted = await loadPersistedWorkspace()
+  const persisted = await loadPersistedWorkspace(scope)
   const sessions: Session[] = []
   const messagesBySession: Record<string, ChatMessage[]> = {}
   const tracesBySession: Record<string, ToolTraceEntry[]> = {}
@@ -77,7 +80,7 @@ export async function bootstrapWorkspace(): Promise<BootstrapResult> {
     if (record.digest) digestBySession[session.id] = record.digest
     registerSession(session)
 
-    const file = await loadSessionFile(session.id)
+    const file = await loadSessionFile(session.id, scope)
     if (!file) continue
 
     try {

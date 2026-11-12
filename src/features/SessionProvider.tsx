@@ -36,11 +36,8 @@ import {
   transcriptFileName,
 } from "../core/export/transcript";
 import {
-  clearApiKey as persistClearApiKey,
-  getStoredApiKey,
   getStoredModel,
-  saveApiKey as persistApiKey,
-  saveModel as persistModel,
+  saveModel,
 } from "../core/storage/settings";
 import {
   clearSessionRegistry,
@@ -55,6 +52,7 @@ import {
   savePersistedSession,
   saveSessionFile,
 } from "../core/storage/persistence";
+import { getWorkspaceScope, stickyNotesStorageKey } from "../core/storage/scope";
 import {
   getPanelOpen,
   getSidebarOpen,
@@ -72,8 +70,12 @@ import {
   ACCEPTED_EXTENSIONS,
   MAX_UPLOAD_BYTES,
 } from "../core/constants";
-import { NEEDS_ACCESS_KEY } from "../core/config";
 import { recordMetric } from "../core/metrics";
+import {
+  canUseWorkspaceAnalysis,
+  openPricingModal,
+  refreshUsage,
+} from "../core/supabase/usage";
 import {
   bootstrapWorkspace,
   normalizeMessages,
@@ -117,7 +119,9 @@ import {
   type SessionActions,
   type SessionContextValue,
 } from "./session/sessionContext";
+import { useAuthUser } from "./auth/useProfile";
 import { addNoteToBoard, clearBoardNotes } from "./theme";
+import type { SpreadsheetSource } from "./spreadsheet/types";
 
 export {
   useSession,
@@ -155,9 +159,22 @@ function errorMessage(error: unknown): string {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const authUser = useAuthUser();
+  const workspaceScope = useMemo(
+    () => getWorkspaceScope(authUser?.id ?? null),
+    [authUser?.id],
+  );
+  const notesStorageKey = useMemo(
+    () => stickyNotesStorageKey(workspaceScope),
+    [workspaceScope],
+  );
+
   // Seed the first render from the synchronous mirror so a refresh never flashes
   // the upload screen before IndexedDB and DuckDB finish restoring.
-  const cached = useMemo<WorkspaceCache | null>(() => readWorkspaceCache(), []);
+  const cached = useMemo<WorkspaceCache | null>(
+    () => readWorkspaceCache(workspaceScope),
+    [workspaceScope],
+  );
   const cachedSessions = useMemo(
     () => (cached?.sessions ?? []).map(normalizeSession),
     [cached],
@@ -194,10 +211,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [sheetPicker, setSheetPicker] = useState<SheetPickerRequest | null>(
     null,
   );
-  const [apiKey, setApiKey] = useState<string | null>(() => getStoredApiKey());
+  const [spreadsheetSource, setSpreadsheetSource] =
+    useState<SpreadsheetSource | null>(null);
+  const openSpreadsheet = useCallback((source: SpreadsheetSource) => {
+    setSpreadsheetSource(source);
+  }, []);
+  const closeSpreadsheet = useCallback(() => {
+    setSpreadsheetSource(null);
+  }, []);
   const [model, setModelState] = useState<ModelId>(() => getStoredModel());
   const modelRef = useRef<ModelId>(model);
   modelRef.current = model;
+  const setModel = useCallback((next: ModelId) => {
+    saveModel(next);
+    modelRef.current = next;
+    setModelState(next);
+  }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [panelOpen, setPanelOpenState] = useState(() => getPanelOpen(true));
@@ -231,7 +260,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    if (!bootstrapRef.current) bootstrapRef.current = bootstrapWorkspace();
+    if (!bootstrapRef.current) bootstrapRef.current = bootstrapWorkspace(workspaceScope);
 
     bootstrapRef.current
       .then((result) => {
@@ -254,7 +283,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [workspaceScope]);
 
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) ?? null,
@@ -423,15 +452,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           message: `Loaded ${result.tables.length} table${result.tables.length === 1 ? "" : "s"}.`,
         });
 
-        await saveSessionFile(sessionId, file);
-        void savePersistedSession({
-          id: sessionId,
-          session,
-          messages: [],
-          traces: [],
-          digest: nextDigest ?? undefined,
-          updatedAt: Date.now(),
-        }).catch(() => undefined);
+        await saveSessionFile(sessionId, file, workspaceScope);
+        void savePersistedSession(
+          {
+            id: sessionId,
+            session,
+            messages: [],
+            traces: [],
+            digest: nextDigest ?? undefined,
+            updatedAt: Date.now(),
+          },
+          workspaceScope,
+        ).catch(() => undefined);
       } catch (error) {
         setUpload({
           phase: "error",
@@ -440,11 +472,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [refreshDigest, refreshSuggestions],
+    [refreshDigest, refreshSuggestions, workspaceScope],
   );
 
   const uploadFile = useCallback(
     async (file: File) => {
+      if (!canUseWorkspaceAnalysis()) {
+        setUpload({
+          phase: "error",
+          fileName: file.name,
+          message: "Your 7-day free trial has ended. Upgrade to Tabula Pro to upload datasets.",
+        });
+        openPricingModal("trial-expired");
+        return;
+      }
+
       const kind = getFileKind(file.name);
       if (!kind) {
         setUpload({
@@ -524,6 +566,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (file: File) => {
       const session = activeSession;
       if (!session) return;
+
+      if (!canUseWorkspaceAnalysis()) {
+        setUpload({
+          phase: "error",
+          fileName: file.name,
+          message: "Your 7-day free trial has ended. Upgrade to Tabula Pro to upload datasets.",
+        });
+        openPricingModal("trial-expired");
+        return;
+      }
 
       const kind = getFileKind(file.name);
       if (!kind) {
@@ -628,15 +680,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           message: `Replaced with ${result.tables.length} table${result.tables.length === 1 ? "" : "s"}.`,
         });
 
-        await saveSessionFile(session.id, file);
-        void savePersistedSession({
-          id: session.id,
-          session: updated,
-          messages: [],
-          traces: [],
-          digest: nextDigest ?? undefined,
-          updatedAt: Date.now(),
-        }).catch(() => undefined);
+        await saveSessionFile(session.id, file, workspaceScope);
+        void savePersistedSession(
+          {
+            id: session.id,
+            session: updated,
+            messages: [],
+            traces: [],
+            digest: nextDigest ?? undefined,
+            updatedAt: Date.now(),
+          },
+          workspaceScope,
+        ).catch(() => undefined);
       } catch (error) {
         setUpload({
           phase: "error",
@@ -645,7 +700,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [activeSession, refreshDigest, refreshSuggestions],
+    [activeSession, refreshDigest, refreshSuggestions, workspaceScope],
   );
 
   const selectSession = useCallback(
@@ -654,16 +709,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         clearPythonResult();
       }
       setActiveSessionId(sessionId);
-      void saveActiveSessionId(sessionId).catch(() => undefined);
+      void saveActiveSessionId(sessionId, workspaceScope).catch(() => undefined);
     },
-    [activeSessionId, clearPythonResult],
+    [activeSessionId, clearPythonResult, workspaceScope],
   );
 
   const deleteSession = useCallback(
     async (sessionId: string) => {
       if (sessionId === activeSessionId || sessions.length <= 1) {
         clearPythonResult();
-        clearBoardNotes();
+        clearBoardNotes(notesStorageKey);
         setNotesVersion((v) => v + 1);
       }
       if (streamingSessionRef.current === sessionId) {
@@ -677,7 +732,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       unregisterSession(sessionId);
       fileCacheRef.current.delete(sessionId);
-      void deletePersistedSession(sessionId).catch(() => undefined);
+      void deletePersistedSession(sessionId, workspaceScope).catch(() => undefined);
 
       setMessagesBySession((previous) => {
         const next = { ...previous };
@@ -718,8 +773,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setPanelOpenState(false);
         dbHandleRef.current = null;
         setDbReady(false);
-        clearWorkspaceCache();
-        void clearPersistedWorkspace().catch(() => undefined);
+        clearWorkspaceCache(workspaceScope);
+        void clearPersistedWorkspace(workspaceScope).catch(() => undefined);
         await closeDuckDB();
         return;
       }
@@ -729,9 +784,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSessions(remaining);
       setActiveSessionId(nextActiveId);
       if (nextActiveId)
-        void saveActiveSessionId(nextActiveId).catch(() => undefined);
+        void saveActiveSessionId(nextActiveId, workspaceScope).catch(() => undefined);
     },
-    [activeSessionId, sessions],
+    [activeSessionId, clearPythonResult, notesStorageKey, sessions, workspaceScope],
   );
 
   const sendMessage = useCallback(
@@ -739,13 +794,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const text = rawText.trim();
       if (text.length === 0) return;
 
-      const session = activeSession;
-      if (!session) return;
-
-      if (!apiKey && NEEDS_ACCESS_KEY) {
-        setSettingsOpen(true);
+      if (!canUseWorkspaceAnalysis()) {
+        openPricingModal("trial-expired");
         return;
       }
+
+      const session = activeSession;
+      if (!session) return;
 
       if (isStreaming || !dbHandleRef.current) return;
 
@@ -821,7 +876,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       try {
         const result = await runAgentTurn({
-          apiKey: apiKey ?? "server-proxy",
           model: currentModel,
           session,
           digest: digestBySession[sessionId] ?? null,
@@ -830,6 +884,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
           onDelta: scheduleDelta,
           onTrace: (entry) => upsertTrace(sessionId, entry),
+          onPythonResult: (pyResult) => {
+            setPythonResult(pyResult);
+            setPythonHistory((prev) => {
+              if (prev.length > 0 && prev[0]?.code?.trim() === pyResult.code?.trim()) {
+                return [pyResult, ...prev.slice(1)];
+              }
+              return [pyResult, ...prev.slice(0, 4)];
+            });
+            setPanelOpenState(true);
+            setPanelTabState('python');
+          },
         });
 
         // Drain the last buffered characters before replacing with the
@@ -896,11 +961,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStreamingSessionId(null);
         streamingSessionRef.current = null;
         abortRef.current = null;
+        void refreshUsage();
       }
     },
     [
       activeSession,
-      apiKey,
       digestBySession,
       isStreaming,
       messagesBySession,
@@ -920,23 +985,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const openReport = useCallback(() => setReportOpen(true), []);
   const closeReport = useCallback(() => setReportOpen(false), []);
 
-  const saveApiKey = useCallback((key: string) => {
-    const trimmed = key.trim();
-    persistApiKey(trimmed);
-    setApiKey(trimmed.length > 0 ? trimmed : null);
-  }, []);
-
-  const clearApiKey = useCallback(() => {
-    persistClearApiKey();
-    setApiKey(null);
-  }, []);
-
-  const setModel = useCallback((nextModel: ModelId) => {
-    modelRef.current = nextModel;
-    persistModel(nextModel);
-    setModelState(nextModel);
-  }, []);
-
   const openPanel = useCallback((tab: PanelTab = "notes") => {
     setPanelTabState(tab);
     setPanelOpenState(true);
@@ -946,12 +994,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const saveToNotes = useCallback(
     (text: string) => {
-      addNoteToBoard(text);
+      addNoteToBoard(text, 'butter', notesStorageKey);
       setPanelTabState("notes");
       setPanelOpenState(true);
       savePanelOpen(true);
     },
-    [],
+    [notesStorageKey],
   );
 
   const clearChat = useCallback(async () => {
@@ -968,17 +1016,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       [sessionId]: [],
     }));
     clearPythonResult();
-    clearBoardNotes();
+    clearBoardNotes(notesStorageKey);
     setNotesVersion((v) => v + 1);
-    void savePersistedSession({
-      id: sessionId,
-      session: activeSession,
-      messages: [],
-      traces: [],
-      digest: digestBySession[sessionId] ?? undefined,
-      updatedAt: Date.now(),
-    }).catch(() => undefined);
-  }, [activeSession, clearPythonResult, digestBySession]);
+    void savePersistedSession(
+      {
+        id: sessionId,
+        session: activeSession,
+        messages: [],
+        traces: [],
+        digest: digestBySession[sessionId] ?? undefined,
+        updatedAt: Date.now(),
+      },
+      workspaceScope,
+    ).catch(() => undefined);
+  }, [activeSession, clearPythonResult, digestBySession, notesStorageKey, workspaceScope]);
 
   const requestClearChat = useCallback(() => {
     setClearChatConfirmOpen(true);
@@ -1086,16 +1137,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           session.id === sessionId ? updated : session,
         ),
       );
-      void savePersistedSession({
-        id: sessionId,
-        session: updated,
-        messages: messagesBySession[sessionId] ?? [],
-        traces: tracesBySession[sessionId] ?? [],
-        digest: digestBySession[sessionId],
-        updatedAt: Date.now(),
-      });
+      void savePersistedSession(
+        {
+          id: sessionId,
+          session: updated,
+          messages: messagesBySession[sessionId] ?? [],
+          traces: tracesBySession[sessionId] ?? [],
+          digest: digestBySession[sessionId],
+          updatedAt: Date.now(),
+        },
+        workspaceScope,
+      );
     },
-    [digestBySession, messagesBySession, sessions, tracesBySession],
+    [digestBySession, messagesBySession, sessions, tracesBySession, workspaceScope],
   );
 
   /**
@@ -1114,11 +1168,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const stored = await loadSessionFile(session.id);
+    const stored = await loadSessionFile(session.id, workspaceScope);
     if (!stored) return;
     fileCacheRef.current.set(session.id, stored);
     downloadFile(stored);
-  }, [activeSession]);
+  }, [activeSession, workspaceScope]);
 
   const runPythonCode = useCallback(
     async (code: string, options?: { openPanel?: boolean }): Promise<PythonExecutionResult> => {
@@ -1139,7 +1193,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setPythonResult(result);
         setPythonHistory((prev) => {
           // If previous top run is the exact same code, replace it instead of accumulating Run 1, 2, 3...
-          if (prev.length > 0 && prev[0].code.trim() === code.trim()) {
+          if (prev.length > 0 && prev[0]?.code?.trim() === code.trim()) {
             return [result, ...prev.slice(1)];
           }
           return [result, ...prev.slice(0, 4)];
@@ -1157,7 +1211,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         };
         setPythonResult(failedResult);
         setPythonHistory((prev) => {
-          if (prev.length > 0 && prev[0].code.trim() === code.trim()) {
+          if (prev.length > 0 && prev[0]?.code?.trim() === code.trim()) {
             return [failedResult, ...prev.slice(1)];
           }
           return [failedResult, ...prev.slice(0, 4)];
@@ -1182,6 +1236,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useWorkspacePersistence({
     ready: persistReadyRef,
+    scope: workspaceScope,
     sessions,
     activeSessionId,
     messagesBySession,
@@ -1202,7 +1257,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isStreaming,
       streamingSessionId,
       upload,
-      apiKey,
       model,
       settingsOpen,
       reportOpen,
@@ -1215,10 +1269,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pythonStatus,
       clearChatConfirmOpen,
       notesVersion,
+      spreadsheetSource,
     }),
     [
       activeSession,
-      apiKey,
       clearChatConfirmOpen,
       dbError,
       dbReady,
@@ -1237,6 +1291,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       settingsOpen,
       sheetPicker,
       sidebarOpen,
+      spreadsheetSource,
       streamingSessionId,
       traces,
       upload,
@@ -1255,8 +1310,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       closeSettings,
       openReport,
       closeReport,
-      saveApiKey,
-      clearApiKey,
       setModel,
       openPanel,
       closePanel,
@@ -1279,13 +1332,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       cancelClearChat,
       confirmClearChat,
       clearChat,
+      openSpreadsheet,
+      closeSpreadsheet,
     }),
     [
       cancelClearChat,
       cancelSheetSelection,
-      clearApiKey,
       clearChat,
       clearPythonResult,
+      closeSpreadsheet,
       confirmClearChat,
       removePythonRun,
       closePanel,
@@ -1302,9 +1357,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openPanel,
       openReport,
       openSettings,
+      openSpreadsheet,
       requestClearChat,
       runPythonCode,
-      saveApiKey,
       saveToNotes,
       selectSession,
       sendMessage,

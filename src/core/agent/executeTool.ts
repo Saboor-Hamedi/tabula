@@ -4,6 +4,7 @@ import { runSQL } from '../duckdb/runSQL'
 import { profileTable } from '../profiling/profileTable'
 import { runPython } from '../python'
 import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
+import type { PythonExecutionResult } from '../python'
 import type { TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
 import {
   createTraceEntry,
@@ -20,6 +21,7 @@ export interface ToolContext {
   tableNames: string[]
   tables: TableSummary[]
   onTrace: (entry: ToolTraceEntry) => void
+  onPythonResult?: (result: PythonExecutionResult) => void
 }
 
 const CACHE_LIMIT = 40
@@ -143,11 +145,17 @@ async function runSql(
   const cached = queryCache.get(cacheKey)
   if (cached) return { ...cached, cached: true }
 
+  const limitMatch = /\blimit\s+(\d+)\b/i.exec(sql)
+  const explicitLimit = limitMatch ? parseInt(limitMatch[1], 10) : undefined
+  const effectiveMaxRows = explicitLimit && explicitLimit > 0
+    ? Math.min(Math.max(explicitLimit, MAX_RESULT_ROWS), 500)
+    : MAX_RESULT_ROWS
+
   const result = await runSQL({
     handle: context.handle,
     sql,
     schemaName: context.schemaName,
-    maxRows: MAX_RESULT_ROWS,
+    maxRows: effectiveMaxRows,
     readOnly: true,
   })
 
@@ -169,20 +177,32 @@ async function runPythonTool(
     return { error: 'The "code" argument is required and must be a non-empty string.' }
   }
 
-  const primaryTable = context.tableNames[0]
+  const primaryTable = Array.isArray(context.tableNames) ? context.tableNames[0] : undefined
   const result = await runPython(code, {
-    connection: context.handle.connection,
+    connection: context.handle?.connection ?? null,
     schemaName: context.schemaName,
     tableName: primaryTable,
   })
 
+  // Synchronize with the UI's Python Results tab so transformed df and plots appear immediately
+  if (context.onPythonResult && result) {
+    try {
+      context.onPythonResult(result)
+    } catch {
+      // Ignore UI callback errors
+    }
+  }
+
+  const plotCount = Array.isArray(result?.images) ? result.images.length : 0
   return {
-    stdout: result.stdout,
-    stderr: result.stderr,
-    hasPlots: result.images.length > 0,
-    plotCount: result.images.length,
-    elapsedMs: result.elapsedMs,
-    error: result.error,
+    stdout: result?.stdout ?? '',
+    stderr: result?.stderr ?? '',
+    hasPlots: plotCount > 0,
+    plotCount,
+    elapsedMs: result?.elapsedMs ?? 0,
+    error: result?.error ?? null,
+    dfInfo: result?.dfInfo,
+    dfPreview: result?.dfPreview,
   }
 }
 

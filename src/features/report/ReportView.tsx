@@ -3,7 +3,7 @@ import { buildReportHtml, downloadHtml } from '../../core/export/report'
 import { formatCount } from '../../core/utils/format'
 import { CloseIcon, DownloadIcon, PrintIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
-import { MessageRenderer } from '../chat/MessageRenderer'
+import { Renderer } from '../chat'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
 /** Full-width report view with print and standalone HTML export. */
@@ -76,7 +76,7 @@ export function ReportView() {
                   {message.role === 'user' ? (
                     <p>{message.content}</p>
                   ) : (
-                    <MessageRenderer content={message.content} />
+                    <Renderer content={message.content} />
                   )}
                 </section>
               ),

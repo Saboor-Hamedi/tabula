@@ -1,4 +1,6 @@
+import { getWorkspaceScope, stickyNotesStorageKey } from '../../core/storage/scope'
 import { formatCount } from '../../core/utils/format'
+import { useAuthUser } from '../auth/useProfile'
 import { ActivityIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { StickyBoard } from '../theme'
@@ -27,6 +29,8 @@ export function Inspector() {
   } = useSessionState()
   const { setPanelTab } = useSessionActions()
 
+  const user = useAuthUser()
+  const notesStorageKey = stickyNotesStorageKey(getWorkspaceScope(user?.id ?? null))
   const streamingHere = isStreaming && streamingSessionId === activeSession?.id
 
   return (
@@ -86,7 +90,7 @@ export function Inspector() {
         {panelTab === 'file' ? (
           <FilePanel />
         ) : panelTab === 'notes' ? (
-          <StickyBoard key={notesVersion} />
+          <StickyBoard key={`${notesStorageKey}:${notesVersion}`} storageKey={notesStorageKey} />
         ) : panelTab === 'python' ? (
           <PythonPanel />
         ) : traces.length === 0 ? (

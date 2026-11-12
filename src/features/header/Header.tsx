@@ -1,3 +1,8 @@
+import { useContext } from 'react'
+import { useRouter } from '../../core/router'
+import { ROUTES, userPath } from '../../core/router/paths'
+import { signOutAccount } from '../../core/supabase/signOut'
+import { useAuthUser, useProfile, useUserSlug } from '../auth/useProfile'
 import {
   MoonIcon,
   PanelRightIcon,
@@ -7,66 +12,101 @@ import {
 import { IconButton } from '../common/IconButton'
 import { useOnline } from '../common/useOnline'
 import { useTheme } from '../common/useTheme'
-import { useSessionActions, useSessionState } from '../SessionProvider'
+import {
+  SessionActionsContext,
+  SessionStateContext,
+} from '../session/sessionContext'
+import { Account } from './Account'
+import { Brand } from './Brand'
+import { Nav } from './Nav'
 
 /**
- * Header.
+ * The header.
  *
- * Left: App branding.
- * Right: Tour & pricing, clear chat history, theme toggle, and the inspector toggle.
+ * One header for the whole product: the workspace, the dashboard and the
+ * published insights all share it, so navigation never depends on where the
+ * visitor happens to be.
+ *
+ * Members only ever get the surfaces they are meant to use: Analyse and the
+ * Workspace. Insights belongs to administrators, and the published sections
+ * are public.
  */
 
-export function Header() {
-  const { activeSession, messages, panelOpen } = useSessionState()
-  const {
-    openPanel,
-    closePanel,
-    requestClearChat,
-  } = useSessionActions()
+export interface HeaderProps {
+  /**
+   * `workspace`: slim chat bar controls only (no brand, no nav, no account dropdown).
+   * `dashboard`: isolated dashboard header — app name only on left, account/theme on right.
+   * `page`: unified public header shared across Landing, Insights, and Articles.
+   */
+  variant?: 'workspace' | 'page' | 'dashboard'
+  onSignIn?: () => void
+  onSignUp?: () => void
+}
+
+export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
+  const { navigate } = useRouter()
+  const session = useContext(SessionStateContext)
+  const actions = useContext(SessionActionsContext)
+  const user = useAuthUser()
+  const profile = useProfile()
+  const userSlug = useUserSlug()
   const { theme, toggleTheme } = useTheme()
   const online = useOnline()
 
+  const isWorkspace = variant === 'workspace'
+  const isDashboard = variant === 'dashboard'
+  const canClearChat = isWorkspace && Boolean(session?.activeSession) && (session?.messages.length ?? 0) > 0
+
   return (
-    <header className="app-header">
+    <header className={`app-header ${isWorkspace ? 'is-workspace' : isDashboard ? 'is-dashboard' : 'is-page'}`}>
       <div className="app-header-left">
-        <div className="header-brand-title">
-          <span className="header-brand-name">Tabula</span>
-        </div>
+        {!isWorkspace ? (
+          <>
+            <Brand to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />
+            {!isDashboard ? <Nav isAuthenticated={Boolean(user)} /> : null}
+          </>
+        ) : null}
+
+        {!online ? <span className="offline-pill">Offline</span> : null}
       </div>
 
       <div className="app-header-right">
-        {!online ? <span className="offline-pill">Offline</span> : null}
-        <button
-          type="button"
-          className="header-tour-link"
-          onClick={() => {
-            window.location.hash = '#landing'
-          }}
-          title="Product Tour & Pricing Plans"
-        >
-          Tour & Pricing
-        </button>
-        {activeSession && messages.length > 0 ? (
-          <IconButton
-            label="Clear chat history"
-            onClick={requestClearChat}
-          >
+        {canClearChat && actions ? (
+          <IconButton label="Clear chat history" onClick={actions.requestClearChat}>
             <TrashIcon size={16} />
           </IconButton>
         ) : null}
+
         <IconButton
           label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          onClick={(e) => toggleTheme(e)}
+          onClick={(event) => toggleTheme(event)}
         >
           {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
         </IconButton>
-        <IconButton
-          label={panelOpen ? 'Hide inspector' : 'Show inspector'}
-          active={panelOpen}
-          onClick={() => (panelOpen ? closePanel() : openPanel('notes'))}
-        >
-          <PanelRightIcon size={17} />
-        </IconButton>
+
+        {isWorkspace && session && actions ? (
+          <IconButton
+            label={session.panelOpen ? 'Hide inspector' : 'Show inspector'}
+            active={session.panelOpen}
+            onClick={() =>
+              session.panelOpen ? actions.closePanel() : actions.openPanel('notes')
+            }
+          >
+            <PanelRightIcon size={17} />
+          </IconButton>
+        ) : null}
+
+        {!isWorkspace ? (
+          <Account
+            isAuthenticated={Boolean(user)}
+            email={user?.email ?? profile?.email ?? null}
+            showWorkspaceLink={!isDashboard}
+            onSignIn={onSignIn ?? (() => navigate(ROUTES.signIn))}
+            onSignUp={onSignUp ?? (() => navigate(ROUTES.signUp))}
+            onSignOut={() => void signOutAccount()}
+            onOpenWorkspace={() => navigate(userPath('/workspace', userSlug))}
+          />
+        ) : null}
       </div>
     </header>
   )

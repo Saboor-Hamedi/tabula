@@ -1,8 +1,8 @@
-import { STORAGE_KEYS } from '../constants'
 import type { ChatMessage, DatasetDigest, Session } from '../types'
+import { getWorkspaceScope, workspaceCacheKey } from './scope'
 
 /**
- * Tiny synchronous mirror of the workspace.
+ * Tiny synchronous mirror of the account-scoped workspace.
  *
  * IndexedDB holds the durable copy, but it is async. Reading this cache on the
  * very first render means a refresh paints the previous dataset and transcript
@@ -23,10 +23,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Reads the last synchronous workspace mirror. Invalid data is ignored. */
-export function readWorkspaceCache(): WorkspaceCache | null {
+/** Reads the last synchronous workspace mirror for the current account. Invalid data is ignored. */
+export function readWorkspaceCache(explicitScope?: string | null): WorkspaceCache | null {
+  const scope = explicitScope === undefined ? getWorkspaceScope() : explicitScope
+  if (!scope) return null
+
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.workspaceCache)
+    const raw = window.localStorage.getItem(workspaceCacheKey(scope))
     if (!raw) return null
 
     const parsed: unknown = JSON.parse(raw)
@@ -51,10 +54,16 @@ export function readWorkspaceCache(): WorkspaceCache | null {
 }
 
 /** Writes the lightweight mirror after the durable snapshot is scheduled. */
-export function saveWorkspaceCache(cache: Omit<WorkspaceCache, 'version'>): void {
+export function saveWorkspaceCache(
+  cache: Omit<WorkspaceCache, 'version'>,
+  explicitScope?: string | null,
+): void {
+  const scope = explicitScope === undefined ? getWorkspaceScope() : explicitScope
+  if (!scope) return
+
   try {
     window.localStorage.setItem(
-      STORAGE_KEYS.workspaceCache,
+      workspaceCacheKey(scope),
       JSON.stringify({ ...cache, version: CACHE_VERSION }),
     )
   } catch {
@@ -62,9 +71,12 @@ export function saveWorkspaceCache(cache: Omit<WorkspaceCache, 'version'>): void
   }
 }
 
-export function clearWorkspaceCache(): void {
+export function clearWorkspaceCache(explicitScope?: string | null): void {
+  const scope = explicitScope === undefined ? getWorkspaceScope() : explicitScope
+  if (!scope) return
+
   try {
-    window.localStorage.removeItem(STORAGE_KEYS.workspaceCache)
+    window.localStorage.removeItem(workspaceCacheKey(scope))
   } catch {
     // Ignore private-browsing failures.
   }

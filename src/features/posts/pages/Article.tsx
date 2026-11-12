@@ -1,0 +1,206 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useParams } from '../../../core/router'
+import { ROUTES, postsPath } from '../../../core/router/paths'
+import type { Post, PostImage } from '../../../core/supabase/types'
+import { isSupabaseConfigured } from '../../../core/supabase/client'
+import { formatCount } from '../../../core/utils/format'
+import { ArrowLeftIcon, CheckIcon, CopyIcon, EyeIcon } from '../../common/Icons'
+import { Header } from '../../header/Header'
+import { fetchPostBySlug, incrementPostView } from '../api'
+import { Content } from '../components/Content'
+
+/**
+ * A published insight, read the way an article should read.
+ *
+ * The page works without a session: PostgREST serves published posts to
+ * anonymous visitors, and the view counter is bumped through a SECURITY
+ * DEFINER function so no write access is ever handed to a visitor.
+ */
+
+function formatDate(value: string | null): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+export function Article() {
+  const { slug = '' } = useParams()
+  const [post, setPost] = useState<Post | null>(null)
+  const [images, setImages] = useState<PostImage[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    let active = true
+
+    const load = async () => {
+      if (!slug) {
+        setLoading(false)
+        setError('That post does not exist, or the link is incomplete.')
+        return
+      }
+
+      if (!isSupabaseConfigured) {
+        setLoading(false)
+        setError('Posts are not available in this build.')
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const detail = await fetchPostBySlug(slug)
+        if (!active) return
+        if (!detail) {
+          setError('That post does not exist, or it is no longer published.')
+          setPost(null)
+          setImages([])
+          return
+        }
+        setPost(detail.post)
+        setImages(detail.images)
+        void incrementPostView(detail.post.slug)
+      } catch (loadError) {
+        if (!active) return
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'The post could not be loaded.',
+        )
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [slug])
+
+  const handleCopyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
+  }, [])
+
+  return (
+    <div className="shell-frame">
+      <Header />
+
+      <article className="post-page">
+        <div className="post-article">
+          <div className="post-article-topbar">
+            <Link className="post-back" to={ROUTES.posts}>
+              <ArrowLeftIcon size={14} />
+              <span>All posts</span>
+            </Link>
+            {post ? (
+              <button
+                type="button"
+                className="btn btn-small"
+                onClick={() => void handleCopyLink()}
+              >
+                {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+                <span>{copied ? 'Link copied' : 'Copy link'}</span>
+              </button>
+            ) : null}
+          </div>
+
+          {loading ? (
+            <div className="post-article-skeleton">
+              <div className="post-skeleton-line is-title" />
+              <div className="post-skeleton-line" />
+              <div className="post-skeleton-line is-short" />
+              <div className="post-skeleton-block" />
+            </div>
+          ) : error || !post ? (
+            <div className="post-empty">
+              <p className="post-empty-title">Nothing to read here</p>
+              <p className="post-empty-text">{error ?? 'This post is unavailable.'}</p>
+              <Link className="btn" to={ROUTES.posts}>
+                Back to posts
+              </Link>
+            </div>
+          ) : (
+            <>
+              <header className="post-article-header">
+                {post.tags.length > 0 ? (
+                  <div className="post-card-tags">
+                    {post.tags.map((tag) => (
+                      <Link
+                        className="post-tag"
+                        to={postsPath(tag)}
+                        key={tag}
+                      >
+                        {tag}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+
+                <h1 className="post-article-title">{post.title}</h1>
+                {post.subtitle ? (
+                  <p className="post-article-subtitle">{post.subtitle}</p>
+                ) : null}
+                {post.excerpt ? <p className="post-article-excerpt">{post.excerpt}</p> : null}
+
+                <div className="post-article-meta">
+                  <div className="post-card-byline">
+                    {post.author_avatar_url ? (
+                      <img className="post-avatar" src={post.author_avatar_url} alt="" />
+                    ) : (
+                      <span className="post-avatar is-fallback" aria-hidden>
+                        {(post.author_name ?? 'T').slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="post-card-author">{post.author_name ?? 'Tabula'}</span>
+                    <span className="post-dot" aria-hidden>
+                      ·
+                    </span>
+                    <span className="post-card-date">{formatDate(post.published_at)}</span>
+                  </div>
+
+                  <div className="post-card-meta">
+                    <span className="post-chip">
+                      <EyeIcon size={12} />
+                      {formatCount(post.view_count)} views
+                    </span>
+                    <span className="post-chip">{post.reading_time_minutes} min read</span>
+                  </div>
+                </div>
+              </header>
+
+              {post.cover_image_url ? (
+                <figure className="post-article-cover">
+                  <img src={post.cover_image_url} alt="" />
+                  {post.cover_caption ? (
+                    <figcaption>{post.cover_caption}</figcaption>
+                  ) : null}
+                </figure>
+              ) : null}
+
+              <Content blocks={post.blocks} images={images} />
+
+              <footer className="post-article-footer">
+                <span>Made with Tabula — private data workbench.</span>
+                <Link to={ROUTES.posts}>Browse all posts</Link>
+              </footer>
+            </>
+          )}
+        </div>
+      </article>
+    </div>
+  )
+}

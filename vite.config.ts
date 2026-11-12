@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import { handleApiRequest } from './server/proxy.mjs'
 
 const CSP = [
   "default-src 'self'",
@@ -7,7 +8,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://api.deepseek.com https://*.deepseek.com https://cdn.jsdelivr.net blob: data:",
+  "connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net blob: data:",
   "worker-src 'self' blob: https://cdn.jsdelivr.net",
   "child-src 'self' blob:",
   "frame-src 'self' blob:",
@@ -30,14 +31,20 @@ function productionCsp(): Plugin {
   }
 }
 
-export default defineConfig({
-  plugins: [react(), productionCsp()],
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8787',
-        changeOrigin: false,
-      },
+/** Handles `/api/*` directly inside Vite dev so managed AI works without a second terminal. */
+function managedAiDevProxy(): Plugin {
+  return {
+    name: 'tabula-managed-ai-proxy',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (handleApiRequest(request, response)) return
+        next()
+      })
     },
-  },
+  }
+}
+
+export default defineConfig({
+  plugins: [react(), productionCsp(), managedAiDevProxy()],
 })

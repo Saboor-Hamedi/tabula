@@ -2,15 +2,20 @@ import { useEffect, useState } from 'react'
 import {
   CheckIcon,
   CloseIcon,
+  CodeIcon,
   CopyIcon,
   DownloadIcon,
   ExternalIcon,
   PlayIcon,
+  SheetIcon,
   TrashIcon,
 } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { exportToJupyterNotebook } from '../../core/python'
+import { buildCsv, downloadCsv } from '../../core/export/csv'
+import { CodeHighlight } from '../render/CodeHighlight'
+import { parseCsvToGrid } from '../spreadsheet/utils'
 
 const QUICK_STARTERS = [
   {
@@ -37,9 +42,11 @@ const QUICK_STARTERS = [
 
 export function PythonPanel() {
   const { pythonResult, pythonHistory = [], pythonStatus, activeSession } = useSessionState()
-  const { runPythonCode, clearPythonResult, removePythonRun } = useSessionActions()
+  const { runPythonCode, clearPythonResult, removePythonRun, openSpreadsheet } = useSessionActions()
   const [selectedRunIndex, setSelectedRunIndex] = useState(0)
   const [copiedStdout, setCopiedStdout] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
+  const [showCode, setShowCode] = useState(false)
   const [copiedImgIdx, setCopiedImgIdx] = useState<number | null>(null)
   const [gridCols, setGridCols] = useState<1 | 2>(1)
   const [lightboxImg, setLightboxImg] = useState<{ url: string; index: number } | null>(null)
@@ -99,6 +106,51 @@ export function PythonPanel() {
     })
   }
 
+  const handleDownloadDataFrame = () => {
+    if (!activeRun?.dfCsv && !activeRun?.dfPreview) return
+    const csvContent =
+      activeRun.dfCsv ||
+      (activeRun.dfPreview
+        ? buildCsv(activeRun.dfPreview.columns, activeRun.dfPreview.rows)
+        : '')
+    if (!csvContent) return
+    const baseName = activeSession?.fileName
+      ? activeSession.fileName.replace(/\.[^.]+$/, '')
+      : 'tabula-data'
+    downloadCsv(`${baseName}-transformed.csv`, csvContent)
+  }
+
+  const handleOpenInExcel = () => {
+    if (!activeRun?.dfCsv && !activeRun?.dfPreview) return
+    const baseName = activeSession?.fileName
+      ? activeSession.fileName.replace(/\.[^.]+$/, '')
+      : 'tabula-data'
+    if (activeRun.dfCsv) {
+      const parsed = parseCsvToGrid(activeRun.dfCsv)
+      if (parsed.headers.length > 0) {
+        openSpreadsheet({
+          kind: 'static',
+          title: `${baseName} (Transformed)`,
+          sheets: [{ name: 'Transformed Data', headers: parsed.headers, rows: parsed.rows }],
+        })
+        return
+      }
+    }
+    if (activeRun.dfPreview) {
+      openSpreadsheet({
+        kind: 'static',
+        title: `${baseName} (Preview)`,
+        sheets: [
+          {
+            name: 'Preview',
+            headers: activeRun.dfPreview.columns,
+            rows: activeRun.dfPreview.rows,
+          },
+        ],
+      })
+    }
+  }
+
   return (
     <div className="python-panel">
       {/* Top Banner / Status */}
@@ -124,15 +176,41 @@ export function PythonPanel() {
           {activeRun?.dfInfo ? (
             <span
               className="python-df-info-pill"
-              title={`DataFrame in memory: ${activeRun.dfInfo.shape[0]} rows, ${activeRun.dfInfo.shape[1]} columns (${activeRun.dfInfo.columns.join(', ')})`}
+              title={`Dataset in memory: ${activeRun.dfInfo.shape[0]} rows, ${activeRun.dfInfo.shape[1]} columns (${activeRun.dfInfo.columns.join(', ')})`}
             >
-              df: {activeRun.dfInfo.shape[0]} × {activeRun.dfInfo.shape[1]}
+              {activeRun.dfInfo.shape[0]} × {activeRun.dfInfo.shape[1]}
             </span>
           ) : null}
         </div>
 
         {pythonHistory.length > 0 || pythonResult ? (
           <div className="python-header-actions">
+            {/* Open Transformed Dataset in Excel View */}
+            {activeRun?.dfCsv || activeRun?.dfPreview ? (
+              <button
+                type="button"
+                className="code-tool-btn"
+                onClick={handleOpenInExcel}
+                title="Open transformed dataset in Excel-style view"
+              >
+                <SheetIcon size={11} />
+                <span>Open Excel</span>
+              </button>
+            ) : null}
+
+            {/* Download Transformed CSV if df in memory */}
+            {activeRun?.dfCsv || activeRun?.dfPreview ? (
+              <button
+                type="button"
+                className="code-tool-btn"
+                onClick={handleDownloadDataFrame}
+                title="Download transformed dataset as CSV"
+              >
+                <DownloadIcon size={11} />
+                <span>Dataset (.csv)</span>
+              </button>
+            ) : null}
+
             {/* Export Jupyter Notebook */}
             <button
               type="button"
@@ -175,10 +253,10 @@ export function PythonPanel() {
                 }}
               >
                 <span>Run {pythonHistory.length - idx}</span>
-                {run.images.length > 0 ? (
+                {Array.isArray(run?.images) && run.images.length > 0 ? (
                   <span className="python-pill-badge">{run.images.length}</span>
                 ) : null}
-                {run.error ? <span className="python-pill-error">!</span> : null}
+                {run?.error ? <span className="python-pill-error">!</span> : null}
                 <button
                   type="button"
                   className="python-pill-close-btn"
@@ -229,7 +307,7 @@ export function PythonPanel() {
         ) : (
           <div className="python-results-view">
             {/* Visual Plots */}
-            {activeRun && activeRun.images.length > 0 ? (
+            {activeRun && Array.isArray(activeRun.images) && activeRun.images.length > 0 ? (
               <div className="python-section python-plots-section">
                 <div className="python-section-title">
                   <span>Visual Plots ({activeRun.images.length})</span>
@@ -313,6 +391,109 @@ export function PythonPanel() {
               </div>
             ) : null}
 
+            {/* DataFrame Output Table & Download */}
+            {activeRun &&
+            activeRun.dfPreview &&
+            Array.isArray(activeRun.dfPreview.columns) &&
+            activeRun.dfPreview.columns.length > 0 ? (
+              <div className="python-section python-table-section">
+                <div className="python-section-title">
+                  <span>
+                    Dataset ({(activeRun.dfPreview.totalRows ?? 0).toLocaleString()} rows ×{' '}
+                    {activeRun.dfPreview.totalCols ?? activeRun.dfPreview.columns.length} cols)
+                  </span>
+                  <div className="python-plot-action-btns">
+                    <button
+                      type="button"
+                      className="tool-btn"
+                      onClick={handleOpenInExcel}
+                      title="Open full transformed dataset in Excel view (sort, filter, head/tail, .xlsx)"
+                    >
+                      <SheetIcon size={11} />
+                      <span>Open in Excel</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="tool-btn"
+                      onClick={handleDownloadDataFrame}
+                      title="Download full transformed dataset as CSV"
+                    >
+                      <DownloadIcon size={11} />
+                      <span>Download CSV</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="data-table-block">
+                  <div className="data-table-scroll" style={{ maxHeight: '300px' }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          {activeRun.dfPreview.columns.map((col, idx) => (
+                            <th key={idx} scope="col">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.isArray(activeRun.dfPreview.rows)
+                          ? activeRun.dfPreview.rows.map((row, rIdx) => (
+                              <tr key={rIdx}>
+                                {activeRun.dfPreview!.columns.map((_col, cIdx) => (
+                                  <td key={cIdx}>
+                                    {row[cIdx] !== undefined && row[cIdx] !== null && row[cIdx] !== ''
+                                      ? row[cIdx]
+                                      : '—'}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))
+                          : null}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="data-table-foot">
+                    <span>
+                      {(activeRun.dfPreview.totalRows ?? 0) >
+                      (Array.isArray(activeRun.dfPreview.rows) ? activeRun.dfPreview.rows.length : 0)
+                        ? `Showing first ${
+                            Array.isArray(activeRun.dfPreview.rows) ? activeRun.dfPreview.rows.length : 0
+                          } of ${(activeRun.dfPreview.totalRows ?? 0).toLocaleString()} rows`
+                        : `${
+                            Array.isArray(activeRun.dfPreview.rows) ? activeRun.dfPreview.rows.length : 0
+                          } row${
+                            (Array.isArray(activeRun.dfPreview.rows) ? activeRun.dfPreview.rows.length : 0) === 1
+                              ? ''
+                              : 's'
+                          }`}
+                    </span>
+                    <div className="data-table-foot-actions">
+                      <button
+                        type="button"
+                        className="tool-btn"
+                        onClick={handleOpenInExcel}
+                        title="Open transformed dataset in Excel view"
+                      >
+                        <SheetIcon size={13} />
+                        <span>Open in Excel</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="tool-btn"
+                        onClick={handleDownloadDataFrame}
+                        title="Download transformed dataset as CSV"
+                      >
+                        <DownloadIcon size={13} />
+                        <span>Download CSV</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {/* Terminal Stdout Output */}
             {activeRun && activeRun.stdout ? (
               <div className="python-section python-output-section">
@@ -338,6 +519,40 @@ export function PythonPanel() {
                   <span>Execution Error</span>
                 </div>
                 <pre className="python-terminal is-error">{activeRun.error}</pre>
+              </div>
+            ) : null}
+
+            {/* Executed Python Code */}
+            {activeRun && activeRun.code ? (
+              <div className="python-section python-code-section">
+                <div className="python-section-title">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <CodeIcon size={12} />
+                    <span>Executed Code</span>
+                  </span>
+                  <div className="python-plot-action-btns">
+                    <button
+                      type="button"
+                      className="tool-btn"
+                      onClick={() => setShowCode((v) => !v)}
+                    >
+                      <span>{showCode ? 'Hide' : 'Show'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="tool-btn"
+                      onClick={() => handleCopy(activeRun.code, setCopiedCode)}
+                    >
+                      {copiedCode ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+                      <span>{copiedCode ? 'Copied' : 'Copy code'}</span>
+                    </button>
+                  </div>
+                </div>
+                {showCode ? (
+                  <pre className="python-terminal python-code-preview">
+                    <CodeHighlight code={activeRun.code} language="python" />
+                  </pre>
+                ) : null}
               </div>
             ) : null}
           </div>

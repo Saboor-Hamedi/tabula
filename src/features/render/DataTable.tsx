@@ -1,9 +1,10 @@
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useContext, useMemo, useState } from 'react'
 import { MAX_PREVIEW_ROWS } from '../../core/constants'
 import { buildCsv, downloadCsv } from '../../core/export/csv'
-import { parseInlineMarkdown } from '../../core/parsing/inlineMarkdown'
+import { parseInlineMarkdown, stripInlineMarkdown } from '../../core/parsing/inlineMarkdown'
 import { formatCount } from '../../core/utils/format'
-import { CheckIcon, CopyIcon, DownloadIcon } from '../common/Icons'
+import { CheckIcon, CopyIcon, DownloadIcon, SheetIcon } from '../common/Icons'
+import { SessionActionsContext } from '../session/sessionContext'
 
 /**
  * Table rendered from a GFM block in an assistant message.
@@ -62,6 +63,7 @@ export const DataTable = memo(function DataTable({
   rows = [],
   alignments = [],
 }: DataTableProps) {
+  const sessionActions = useContext(SessionActionsContext)
   const [copied, setCopied] = useState(false)
   const safeHeaders = Array.isArray(headers) ? headers : []
   const safeRows = Array.isArray(rows) ? rows : []
@@ -146,6 +148,23 @@ export const DataTable = memo(function DataTable({
     downloadCsv('tabula-table.csv', buildCsv(safeHeaders, safeRows))
   }, [safeHeaders, safeRows])
 
+  const handleOpenSheet = useCallback(() => {
+    if (!sessionActions || safeHeaders.length === 0) return
+    sessionActions.openSpreadsheet({
+      kind: 'static',
+      title: 'Generated Result Table',
+      sheets: [
+        {
+          name: 'Results',
+          headers: safeHeaders.map((h) => stripInlineMarkdown(h)),
+          rows: safeRows.map((row) =>
+            safeHeaders.map((_h, idx) => stripInlineMarkdown(row[idx] ?? '')),
+          ),
+        },
+      ],
+    })
+  }, [sessionActions, safeHeaders, safeRows])
+
   if (safeHeaders.length === 0) return null
 
   return (
@@ -171,7 +190,7 @@ export const DataTable = memo(function DataTable({
           <tbody>
             {visibleRows.map((row, rowIndex) => (
               <tr key={rowIndex}>
-                {headers.map((header, cellIndex) => {
+                {safeHeaders.map((header, cellIndex) => {
                   const value = row[cellIndex] ?? ''
                   const align = columnAlignments[cellIndex] ?? 'left'
                   const isNum = align === 'right' || isNumericOrStatValue(value)
@@ -192,11 +211,22 @@ export const DataTable = memo(function DataTable({
 
       <div className="data-table-foot">
         <span>
-          {rows.length > MAX_PREVIEW_ROWS
-            ? `Showing ${formatCount(MAX_PREVIEW_ROWS)} of ${formatCount(rows.length)} rows`
-            : `${formatCount(rows.length)} row${rows.length === 1 ? '' : 's'}`}
+          {safeRows.length > MAX_PREVIEW_ROWS
+            ? `Showing ${formatCount(MAX_PREVIEW_ROWS)} of ${formatCount(safeRows.length)} rows`
+            : `${formatCount(safeRows.length)} row${safeRows.length === 1 ? '' : 's'}`}
         </span>
         <div className="data-table-foot-actions">
+          {sessionActions ? (
+            <button
+              type="button"
+              className="tool-btn"
+              onClick={handleOpenSheet}
+              title="Open table in Excel-style view (sort, filter, head/tail, .xlsx)"
+            >
+              <SheetIcon size={13} />
+              <span>Open in Excel</span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="tool-btn"

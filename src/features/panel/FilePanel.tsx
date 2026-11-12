@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { formatCount } from '../../core/utils/format'
-import { TableIcon } from '../common/Icons'
-import { useSessionState } from '../SessionProvider'
+import { ExternalIcon, SheetIcon, TableIcon } from '../common/Icons'
+import { useSessionActions, useSessionState } from '../SessionProvider'
 
 /**
  * Tables & schema inspector.
@@ -12,6 +12,18 @@ import { useSessionState } from '../SessionProvider'
 
 export function FilePanel() {
   const { activeSession, digest } = useSessionState()
+  const { openSpreadsheet } = useSessionActions()
+
+  const openSessionWorkbook = (initialTableName?: string) => {
+    if (!activeSession || (activeSession.tables?.length ?? 0) === 0) return
+    openSpreadsheet({
+      kind: 'session',
+      title: activeSession.fileName,
+      schemaName: activeSession.schemaName,
+      tables: activeSession.tables,
+      initialTableName: initialTableName ?? activeSession.primaryTable ?? activeSession.tables[0]?.name,
+    })
+  }
 
   const totalRows = useMemo(
     () =>
@@ -31,6 +43,29 @@ export function FilePanel() {
 
   return (
     <div className="file-panel">
+      <button
+        type="button"
+        className="file-card"
+        onClick={() => openSessionWorkbook()}
+        title="Open full Excel-style spreadsheet view (sort, filter, head/tail, stats)"
+      >
+        <span className="file-card-icon" aria-hidden>
+          <SheetIcon size={17} />
+        </span>
+        <span className="file-card-body">
+          <span className="file-card-name">{activeSession.fileName}</span>
+          <span className="file-card-meta">
+            <span>{activeSession.fileType.toUpperCase()}</span>
+            <span>·</span>
+            <span>{formatCount(totalRows)} rows</span>
+          </span>
+          <span className="file-card-hint">
+            <ExternalIcon size={12} />
+            <span>Open Excel view</span>
+          </span>
+        </span>
+      </button>
+
       <div className="file-facts">
         <div className="file-fact">
           <span className="file-fact-label">Tables</span>
@@ -49,6 +84,15 @@ export function FilePanel() {
               <TableIcon size={14} />
               <span className="file-table-name">{table.name}</span>
               <span className="file-table-rows">{formatCount(table.rowCount)}</span>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => openSessionWorkbook(table.name)}
+                title={`Open ${table.name} in Excel view`}
+              >
+                <ExternalIcon size={11} />
+                <span>Open</span>
+              </button>
             </header>
 
             <ul className="file-columns">

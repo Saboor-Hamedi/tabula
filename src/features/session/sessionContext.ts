@@ -11,6 +11,7 @@ import type {
 } from '../../core/types'
 import type { FigureChanges } from '../../core/parsing/editFigure'
 import type { PythonExecutionResult, PythonStatus } from '../../core/python'
+import type { SpreadsheetSource } from '../spreadsheet/types'
 
 export interface SheetPickerRequest {
   file: File
@@ -30,7 +31,6 @@ export interface SessionState {
   isStreaming: boolean
   streamingSessionId: string | null
   upload: UploadState
-  apiKey: string | null
   model: ModelId
   settingsOpen: boolean
   reportOpen: boolean
@@ -43,6 +43,7 @@ export interface SessionState {
   pythonStatus: PythonStatus
   clearChatConfirmOpen: boolean
   notesVersion: number
+  spreadsheetSource: SpreadsheetSource | null
 }
 
 export interface SessionActions {
@@ -55,8 +56,6 @@ export interface SessionActions {
   closeSettings: () => void
   openReport: () => void
   closeReport: () => void
-  saveApiKey: (key: string) => void
-  clearApiKey: () => void
   setModel: (model: ModelId) => void
   openPanel: (tab?: PanelTab) => void
   closePanel: (persist?: boolean) => void
@@ -84,6 +83,8 @@ export interface SessionActions {
   cancelClearChat: () => void
   confirmClearChat: () => Promise<void>
   clearChat: () => Promise<void>
+  openSpreadsheet: (source: SpreadsheetSource) => void
+  closeSpreadsheet: () => void
 }
 
 export type SessionContextValue = SessionState & SessionActions

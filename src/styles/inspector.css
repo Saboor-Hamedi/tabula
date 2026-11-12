@@ -12,13 +12,13 @@
   overflow: hidden;
 }
 
-/* Full-Height, Full-Width Inspector Header & Tabs (4 Tabs, Zero Gap) */
+/* Inspector Header & Tabs */
 .inspector-head {
   height: var(--header-height);
   flex: none;
   display: flex;
-  align-items: stretch;
-  padding: 0;
+  align-items: center;
+  padding: 5px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   box-sizing: border-box;
@@ -29,7 +29,7 @@
   align-items: stretch;
   width: 100%;
   height: 100%;
-  gap: 0;
+  gap: 5px;
   padding: 0;
   margin: 0;
   border: none;
@@ -42,17 +42,16 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 0;
+  padding: 5px;
   margin: 0;
-  border: 0;
-  border-radius: 0;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs, 4px);
   background: transparent;
   box-shadow: none;
   outline: none;
   color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 550;
   cursor: pointer;
   transition: all var(--transition);
   user-select: none;
@@ -61,14 +60,17 @@
 .inspector-tab:hover {
   color: var(--text);
   background: var(--surface-hover);
+  border-color: var(--border);
   box-shadow: none;
 }
 
 .inspector-tab.is-active {
   color: var(--text);
-  background: transparent;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-bottom: 2px solid var(--accent);
   box-shadow: none;
-  border-bottom: 2.5px solid var(--accent);
+  font-weight: 600;
 }
 
 .inspector-body {
@@ -77,14 +79,21 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  padding: 5px;
+  box-sizing: border-box;
 }
 
 .inspector-body.is-notes-tab {
   padding: 0;
 }
 
+.inspector-body.is-file-tab {
+  padding: 5px;
+}
+
 .inspector-body.is-python-tab {
-  padding: var(--space-3);
+  padding: 0;
+  overflow: hidden;
 }
 
 .panel-empty {
@@ -125,8 +134,8 @@
 .trace-list {
   display: flex;
   flex-direction: column;
-  padding: var(--space-3);
-  gap: var(--space-2);
+  padding: 5px;
+  gap: 5px;
 }
 
 .trace-list-meta {
@@ -135,7 +144,7 @@
   justify-content: space-between;
   font-size: 11px;
   color: var(--text-muted);
-  padding-bottom: var(--space-2);
+  padding-bottom: 5px;
   border-bottom: 1px solid var(--border);
 }
 

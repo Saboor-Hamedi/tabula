@@ -13,10 +13,9 @@ import {
  *
  * Two layers, in this order:
  *  1. `buildLocalSuggestions` — deterministic, zero-latency questions derived from
- *     the digest (real table names, real columns, real top values). Always works,
- *     even with no API key, and it is what the user sees the instant a file lands.
- *  2. `generateSuggestions` — asks the model for sharper, dataset-specific
- *     questions once a key is present, and falls back to layer 1 on any failure.
+ *     the digest (real table names, real columns, real top values).
+ *  2. `generateSuggestions` — asks the managed model for sharper, dataset-specific
+ *     questions, falling back to layer 1 on any failure.
  *
  * Nothing here is a hard-coded prompt list. Every question names a column or a
  * value that actually exists in the uploaded file.
@@ -25,7 +24,6 @@ import {
 export interface SuggestionInput {
   session: Session
   digest: DatasetDigest | null
-  apiKey: string | null
   model: ModelId
   /** The question the user just asked, when this runs after an answer. */
   question?: string
@@ -250,7 +248,6 @@ function parseSuggestions(text: string): string[] {
 export async function generateSuggestions({
   session,
   digest,
-  apiKey,
   model,
   question,
   answer,
@@ -258,11 +255,11 @@ export async function generateSuggestions({
 }: SuggestionInput): Promise<string[]> {
   const safeDigest = normalizeDigest(digest)
   const fallback = buildLocalSuggestions(session, safeDigest)
-  if (!apiKey || !safeDigest) return fallback
+  if (!safeDigest) return fallback
 
   try {
     const result = await generateText({
-      model: createDeepSeekModel(apiKey, model),
+      model: createDeepSeekModel(model),
       abortSignal: signal,
       temperature: 0.5,
       maxOutputTokens: 260,

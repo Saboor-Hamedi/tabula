@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../../core/supabase/client'
+import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
+import { formatCount } from '../../core/utils/format'
 import { CloseIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useAuth } from './useAuth'
@@ -11,6 +13,7 @@ interface AuthModalProps {
 
 export function AuthModal({ open, onClose }: AuthModalProps) {
   const { user, profile, tier, isPro, signOut } = useAuth()
+  const { usage } = useUsageStatus()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -104,19 +107,32 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
               {isPro ? (
                 <div className="auth-plan-pro">
                   <strong>You are on Tabula Pro</strong>
-                  <p>Enjoy managed DeepSeek AI models, unlimited file size, and clean executive exports.</p>
+                  <p>
+                    {usage
+                      ? `${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 5000000)} tokens used this month.`
+                      : 'Enjoy managed DeepSeek AI models, unlimited file size, and clean executive exports.'}
+                  </p>
                 </div>
               ) : (
                 <div className="auth-plan-free">
                   <div>
-                    <strong>Upgrade to Tabula Pro</strong>
-                    <p>Get managed AI without needing your own API key, unlimited analysis, and executive PDF reporting.</p>
+                    <strong>
+                      {usage?.trialExpired
+                        ? 'Your 7-day free trial has ended'
+                        : `Free Trial (${usage?.trialDaysRemaining ?? 7} days left)`}
+                    </strong>
+                    <p>
+                      {usage
+                        ? `${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens spent this month.`
+                        : 'Unlock Pro reasoning, unlimited datasets, and executive PDF reporting.'}
+                    </p>
                   </div>
                   <button
                     type="button"
                     className="btn btn-primary auth-upgrade-btn"
                     onClick={() => {
-                      alert('Stripe Checkout will be connected to your Stripe account!')
+                      onClose()
+                      openPricingModal(usage?.trialExpired ? 'trial-expired' : 'upgrade')
                     }}
                   >
                     Upgrade ($19/mo)

@@ -1,22 +1,19 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { extname, join, normalize, resolve } from 'node:path'
-import { Readable } from 'node:stream'
+import { extname, join, normalize, resolve, sep } from 'node:path'
+import { applySecurityHeaders, ensureServerEnv, handleApiRequest } from './proxy.mjs'
 
 /**
- * Minimal production server for Tabula.
+ * Production server for Tabula.
  *
- * Serves the built app and proxies model requests so the DeepSeek credential
- * stays on the server. The browser talks to `/api/deepseek/v1/*`; this process
- * forwards the request and streams the response back unchanged.
+ * Serves the built app with strict HTTP security headers and proxies managed
+ * AI and billing requests so model and billing credentials stay on the server.
  */
 
+ensureServerEnv(process.cwd())
+
 const PORT = Number(process.env.PORT ?? 8787)
-const API_KEY = process.env.DEEPSEEK_API_KEY ?? ''
-const UPSTREAM = 'https://api.deepseek.com'
 const DIST = resolve('dist')
-const MAX_BODY_BYTES = 2 * 1024 * 1024
-const RATE_LIMIT = Number(process.env.RATE_LIMIT_PER_MINUTE ?? 30)
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -31,92 +28,30 @@ const MIME = {
   '.csv': 'text/csv; charset=utf-8',
 }
 
-/** In-memory IP rate limiter. Good enough for a single Node instance. */
-const hits = new Map()
-
-function allowRequest(ip) {
-  const now = Date.now()
-  const windowStart = now - 60_000
-  const recent = (hits.get(ip) ?? []).filter((time) => time > windowStart)
-  if (recent.length >= RATE_LIMIT) {
-    hits.set(ip, recent)
-    return false
-  }
-  recent.push(now)
-  hits.set(ip, recent)
-  return true
-}
-
-function clientIp(request) {
-  const forwarded = request.headers['x-forwarded-for']
-  return typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : request.socket.remoteAddress
-}
-
-function sendJson(response, status, payload) {
-  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
-  response.end(JSON.stringify(payload))
-}
-
-async function proxyModel(request, response) {
-  if (!API_KEY) {
-    sendJson(response, 503, { error: 'Model service is not configured.' })
-    return
-  }
-
-  if (!allowRequest(clientIp(request))) {
-    sendJson(response, 429, { error: 'Too many requests. Try again in a minute.' })
-    return
-  }
-
-  const chunks = []
-  let size = 0
-  for await (const chunk of request) {
-    size += chunk.length
-    if (size > MAX_BODY_BYTES) {
-      sendJson(response, 413, { error: 'Request is too large.' })
-      return
-    }
-    chunks.push(chunk)
-  }
-
-  const targetPath = request.url.replace(/^\/api\/deepseek/, '') || '/v1'
-  const target = `${UPSTREAM}${targetPath}`
-
-  try {
-    const upstream = await fetch(target, {
-      method: request.method,
-      headers: {
-        authorization: `Bearer ${API_KEY}`,
-        'content-type': request.headers['content-type'] ?? 'application/json',
-        accept: request.headers.accept ?? 'text/event-stream',
-      },
-      body: Buffer.concat(chunks),
-    })
-
-    response.writeHead(upstream.status, {
-      'content-type': upstream.headers.get('content-type') ?? 'text/event-stream',
-      'cache-control': 'no-cache, no-transform',
-      connection: 'keep-alive',
-      'x-accel-buffering': 'no',
-    })
-
-    if (upstream.body) {
-      Readable.fromWeb(upstream.body).pipe(response)
-    } else {
-      response.end()
-    }
-  } catch {
-    sendJson(response, 502, { error: 'The model service is unavailable.' })
-  }
-}
-
 function serveStatic(request, response) {
-  const url = new URL(request.url, `http://${request.headers.host}`)
-  const requested = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '')
-  let filePath = join(DIST, requested)
+  applySecurityHeaders(request, response)
 
-  if (!filePath.startsWith(DIST)) {
-    response.writeHead(403)
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    response.writeHead(405, { 'content-type': 'text/plain; charset=utf-8' })
+    response.end('Method Not Allowed')
+    return
+  }
+
+  let pathname
+  try {
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    pathname = decodeURIComponent(url.pathname)
+  } catch {
+    response.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' })
+    response.end('Bad Request')
+    return
+  }
+
+  const requested = normalize(pathname).replace(/^([/\\])+/, '')
+  let filePath = resolve(join(DIST, requested))
+
+  if (filePath !== DIST && !filePath.startsWith(DIST + sep)) {
+    response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
     response.end('Forbidden')
     return
   }
@@ -128,21 +63,27 @@ function serveStatic(request, response) {
   const type = MIME[extname(filePath).toLowerCase()] ?? 'application/octet-stream'
   response.writeHead(200, {
     'content-type': type,
-    'cache-control': filePath.endsWith('index.html') || filePath.endsWith('sw.js') ? 'no-cache' : 'public, max-age=31536000, immutable',
+    'cache-control':
+      filePath.endsWith('index.html') || filePath.endsWith('sw.js')
+        ? 'no-cache'
+        : 'public, max-age=31536000, immutable',
   })
+
+  if (request.method === 'HEAD') {
+    response.end()
+    return
+  }
   createReadStream(filePath).pipe(response)
 }
 
-createServer((request, response) => {
-  if (request.url === '/api/health') {
-    sendJson(response, 200, { ok: true, modelConfigured: Boolean(API_KEY) })
-    return
-  }
-  if (request.url?.startsWith('/api/deepseek')) {
-    void proxyModel(request, response)
-    return
-  }
+const server = createServer((request, response) => {
+  if (handleApiRequest(request, response)) return
   serveStatic(request, response)
-}).listen(PORT, () => {
+})
+
+server.requestTimeout = 120_000
+server.headersTimeout = 15_000
+
+server.listen(PORT, () => {
   console.log(`Tabula server listening on http://localhost:${PORT}`)
 })

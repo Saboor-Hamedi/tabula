@@ -1,8 +1,9 @@
-import { memo, useRef, useState, type ReactNode } from 'react'
+import { memo, useContext, useRef, useState, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
-import { CheckIcon, CopyIcon, DownloadIcon } from '../common/Icons'
+import { CheckIcon, CopyIcon, DownloadIcon, SheetIcon } from '../common/Icons'
+import { SessionActionsContext } from '../session/sessionContext'
 import { CodeBlock } from './CodeBlock'
 
 /**
@@ -14,6 +15,7 @@ import { CodeBlock } from './CodeBlock'
  */
 
 function MarkdownTable({ children }: { children: ReactNode }) {
+  const sessionActions = useContext(SessionActionsContext)
   const ref = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
@@ -87,12 +89,35 @@ function MarkdownTable({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url)
   }
 
+  const handleOpenSheet = () => {
+    if (!sessionActions) return
+    const tableData = extractTableData()
+    if (tableData.length === 0) return
+    const [headers, ...rows] = tableData
+    sessionActions.openSpreadsheet({
+      kind: 'static',
+      title: 'Generated Table',
+      sheets: [{ name: 'Table', headers, rows }],
+    })
+  }
+
   return (
     <div className="md-table-container" ref={ref}>
       <div className="md-table-wrap">
         <table>{children}</table>
       </div>
       <div className="md-table-toolbar">
+        {sessionActions ? (
+          <button
+            type="button"
+            className="tool-btn"
+            onClick={handleOpenSheet}
+            title="Open table in Excel-style view (sort, filter, head/tail, .xlsx)"
+          >
+            <SheetIcon size={12} />
+            <span>Open in Excel</span>
+          </button>
+        ) : null}
         <button
           type="button"
           className="tool-btn"

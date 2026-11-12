@@ -1,11 +1,13 @@
 import { useRef, useState, type DragEvent } from 'react'
 import { ACCEPTED_EXTENSIONS } from '../../core/constants'
+import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
 import {
   ActivityIcon,
   AlertIcon,
   BarChartIcon,
   DatabaseIcon,
   FileIcon,
+  LockIcon,
   SearchIcon,
   TableIcon,
   UploadIcon,
@@ -16,13 +18,19 @@ import { UploadStatus } from './UploadStatus'
 export function UploadZone() {
   const { upload, dbError } = useSessionState()
   const { uploadFile } = useSessionActions()
+  const { usage } = useUsageStatus()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [sampleLoading, setSampleLoading] = useState(false)
 
   const busy = upload.phase === 'reading' || upload.phase === 'ingesting'
+  const trialExpired = Boolean(usage?.trialExpired)
 
   const loadSample = async () => {
+    if (trialExpired) {
+      openPricingModal('trial-expired')
+      return
+    }
     setSampleLoading(true)
     try {
       const response = await fetch('/orders.csv')
@@ -36,6 +44,10 @@ export function UploadZone() {
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return
+    if (trialExpired) {
+      openPricingModal('trial-expired')
+      return
+    }
     void uploadFile(files[0])
   }
 
@@ -43,6 +55,10 @@ export function UploadZone() {
     event.preventDefault()
     event.stopPropagation()
     setDragging(false)
+    if (trialExpired) {
+      openPricingModal('trial-expired')
+      return
+    }
     if (!busy) handleFiles(event.dataTransfer.files)
   }
 
@@ -74,22 +90,53 @@ export function UploadZone() {
 
         {/* 2. Drag and Drop Area with Small Sample Dataset Link */}
         <div className="workspace-upload-area">
+          {trialExpired ? (
+            <div className="trial-lock-banner" role="alert">
+              <div className="trial-lock-banner-copy">
+                <LockIcon size={16} />
+                <div>
+                  <strong>Your 7-day free trial has ended</strong>
+                  <span>
+                    Uploading new datasets and receiving Tabula AI responses requires a paid plan.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                onClick={() => openPricingModal('trial-expired')}
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+          ) : null}
+
           {/* Main Drop Area Card */}
           <div
-            className={`source-drop-card ${dragging ? 'is-dragging' : ''} ${busy ? 'is-busy' : ''}`}
+            className={`source-drop-card ${dragging ? 'is-dragging' : ''} ${busy ? 'is-busy' : ''} ${trialExpired ? 'is-locked' : ''}`}
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            onClick={() => !busy && inputRef.current?.click()}
+            onClick={() => {
+              if (trialExpired) {
+                openPricingModal('trial-expired')
+                return
+              }
+              if (!busy) inputRef.current?.click()
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(event) => {
-              if ((event.key === 'Enter' || event.key === ' ') && !busy) {
+              if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                inputRef.current?.click()
+                if (trialExpired) {
+                  openPricingModal('trial-expired')
+                } else if (!busy) {
+                  inputRef.current?.click()
+                }
               }
             }}
-            aria-label="Upload a spreadsheet"
+            aria-label={trialExpired ? 'Upgrade to upload a spreadsheet' : 'Upload a spreadsheet'}
           >
             <div className="source-drop-icon">
               <UploadIcon size={26} />

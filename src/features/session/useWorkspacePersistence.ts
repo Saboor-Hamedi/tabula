@@ -5,6 +5,7 @@ import type { ChatMessage, DatasetDigest, Session, ToolTraceEntry } from '../../
 
 interface WorkspacePersistenceInput {
   ready: MutableRefObject<boolean>
+  scope: string | null
   sessions: Session[]
   activeSessionId: string | null
   messagesBySession: Record<string, ChatMessage[]>
@@ -19,6 +20,7 @@ interface WorkspacePersistenceInput {
  */
 export function useWorkspacePersistence({
   ready,
+  scope,
   sessions,
   activeSessionId,
   messagesBySession,
@@ -27,23 +29,29 @@ export function useWorkspacePersistence({
   isStreaming,
 }: WorkspacePersistenceInput): void {
   useEffect(() => {
-    if (!ready.current || isStreaming) return
+    if (!ready.current || isStreaming || !scope) return
     const timer = window.setTimeout(() => {
-      saveWorkspaceCache({
-        sessions,
-        activeSessionId,
-        messagesBySession,
-        digestBySession,
-      })
+      saveWorkspaceCache(
+        {
+          sessions,
+          activeSessionId,
+          messagesBySession,
+          digestBySession,
+        },
+        scope,
+      )
       for (const session of sessions) {
-        void savePersistedSession({
-          id: session.id,
-          session,
-          messages: messagesBySession[session.id] ?? [],
-          traces: tracesBySession[session.id] ?? [],
-          digest: digestBySession[session.id],
-          updatedAt: Date.now(),
-        }).catch(() => undefined)
+        void savePersistedSession(
+          {
+            id: session.id,
+            session,
+            messages: messagesBySession[session.id] ?? [],
+            traces: tracesBySession[session.id] ?? [],
+            digest: digestBySession[session.id],
+            updatedAt: Date.now(),
+          },
+          scope,
+        ).catch(() => undefined)
       }
     }, 350)
     return () => window.clearTimeout(timer)
@@ -53,12 +61,13 @@ export function useWorkspacePersistence({
     isStreaming,
     messagesBySession,
     ready,
+    scope,
     sessions,
     tracesBySession,
   ])
 
   useEffect(() => {
-    if (!ready.current) return
-    void saveActiveSessionId(activeSessionId).catch(() => undefined)
-  }, [activeSessionId, ready])
+    if (!ready.current || !scope) return
+    void saveActiveSessionId(activeSessionId, scope).catch(() => undefined)
+  }, [activeSessionId, ready, scope])
 }

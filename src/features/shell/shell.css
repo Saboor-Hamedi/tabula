@@ -1,0 +1,20 @@
+/* ==========================================================================
+   Tabula — Shell
+   The frame every public surface sits in, and the container they measure
+   themselves against.
+   ========================================================================== */
+
+.shell-frame {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-container {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px;
+}

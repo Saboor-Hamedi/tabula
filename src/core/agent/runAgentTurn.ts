@@ -1,5 +1,6 @@
 import { stepCountIs, streamText, type ModelMessage } from 'ai'
 import type { ChatMessage, DatasetDigest, ModelId, Session, ToolTraceEntry } from '../types'
+import type { PythonExecutionResult } from '../python'
 import { MAX_AGENT_STEPS } from '../constants'
 import { createDeepSeekModel, buildProviderOptions } from '../deepseek/client'
 import { getDuckDBHandle } from '../duckdb/initDuckDB'
@@ -8,7 +9,6 @@ import { createAgentTools } from './tools'
 import type { ToolContext } from './executeTool'
 
 export interface AgentTurnInput {
-  apiKey: string
   model: ModelId
   session: Session
   /** Live dataset digest, injected into the system prompt each turn. */
@@ -18,6 +18,7 @@ export interface AgentTurnInput {
   signal: AbortSignal
   onDelta: (delta: string) => void
   onTrace: (entry: ToolTraceEntry) => void
+  onPythonResult?: (result: PythonExecutionResult) => void
 }
 
 export interface AgentTurnResult {
@@ -67,7 +68,6 @@ function toModelMessages(history: ChatMessage[], userText: string): ModelMessage
 }
 
 export async function runAgentTurn({
-  apiKey,
   model,
   session,
   digest,
@@ -76,14 +76,16 @@ export async function runAgentTurn({
   signal,
   onDelta,
   onTrace,
+  onPythonResult,
 }: AgentTurnInput): Promise<AgentTurnResult> {
   const toolContext: ToolContext = {
     handle: getDuckDBHandle(),
     sessionId: session.id,
     schemaName: session.schemaName,
-    tableNames: session.tables.map((table) => table.name),
-    tables: session.tables,
+    tableNames: Array.isArray(session?.tables) ? session.tables.map((table) => table.name) : [],
+    tables: Array.isArray(session?.tables) ? session.tables : [],
     onTrace,
+    onPythonResult,
   }
 
   const tools = createAgentTools(toolContext)
@@ -91,7 +93,7 @@ export async function runAgentTurn({
   let streamError: Error | null = null
 
   const result = streamText({
-    model: createDeepSeekModel(apiKey, model),
+    model: createDeepSeekModel(model),
     system: buildSystemPrompt({
       fileName: session.fileName,
       tables: session.tables,
@@ -109,10 +111,26 @@ export async function runAgentTurn({
   })
 
   let text = ''
-  for await (const delta of result.textStream) {
+  let needsStepSeparator = false
+  for await (const part of result.fullStream) {
     if (signal.aborted) break
-    text += delta
-    onDelta(delta)
+    if (part.type === 'start-step') {
+      if (text.trim().length > 0 && !text.endsWith('\n\n')) {
+        needsStepSeparator = true
+      }
+      continue
+    }
+    if (part.type === 'text-delta' && part.text) {
+      const prefix = needsStepSeparator
+        ? text.endsWith('\n')
+          ? '\n'
+          : '\n\n'
+        : ''
+      needsStepSeparator = false
+      const chunk = `${prefix}${part.text}`
+      text += chunk
+      onDelta(chunk)
+    }
   }
 
   // `result.text` is the authoritative final value; the stream can be cut short.
@@ -132,7 +150,29 @@ export async function runAgentTurn({
 
   const safeText = typeof text === 'string' ? text.trim() : ''
   const safeFinal = typeof finalText === 'string' ? finalText.trim() : ''
-  const answer = safeText.length > 0 ? text : safeFinal
+  let answer = safeText.length > 0 ? text : safeFinal
+
+  if (answer.trim().length === 0) {
+    // Attempt recovery from steps if multi-step tool call ran without final text delta
+    try {
+      const steps = await result.steps
+      const texts = steps
+        .map((s) => s.text?.trim())
+        .filter((t): t is string => Boolean(t && t.length > 0))
+      if (texts.length > 0) {
+        answer = texts.join('\n\n')
+      } else {
+        const toolCalls = steps.flatMap((s) => s.toolCalls ?? [])
+        if (toolCalls.length > 0) {
+          const toolsCalled = toolCalls.map((tc) => `\`${tc.toolName}\``).join(', ')
+          answer = `Completed execution with ${toolsCalled}. The transformed data is available in the table and on the Results inspector tab.`
+        }
+      }
+    } catch {
+      // Ignore step recovery error
+    }
+  }
+
   if (answer.trim().length === 0) {
     throw new Error('The model returned an empty response. Try asking again.')
   }

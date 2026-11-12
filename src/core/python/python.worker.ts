@@ -19,6 +19,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
+def _format_cell(val):
+    if val is None:
+        return ''
+    if isinstance(val, (list, tuple, dict, set, np.ndarray)):
+        return str(val)
+    try:
+        if pd.isna(val):
+            return ''
+    except Exception:
+        pass
+    return str(val)
+
 def __tabula_run__(user_code, csv_content=None):
     old_stdout = sys.stdout
     old_stderr = sys.stderr
@@ -28,12 +40,14 @@ def __tabula_run__(user_code, csv_content=None):
     output_images = []
     execution_error = None
     df_info = None
+    df_csv = None
+    df_preview = None
     
     try:
         if csv_content is not None and len(csv_content) > 0:
             # Preserve DataFrame across consecutive runs on same data, reload if CSV changed
             if 'df' not in globals() or globals().get('__tabula_last_csv__') != csv_content:
-                globals()['df'] = pd.read_csv(io.StringIO(csv_content))
+                globals()['df'] = pd.read_csv(io.StringIO(csv_content), skip_blank_lines=False)
                 globals()['__tabula_last_csv__'] = csv_content
             
         plt.close('all')
@@ -52,12 +66,25 @@ def __tabula_run__(user_code, csv_content=None):
             output_images.append(encoded)
             plt.close(fig)
             
-        # Collect updated DataFrame metadata if present
+        # Collect updated DataFrame metadata and preview if present
         if 'df' in globals() and isinstance(globals()['df'], pd.DataFrame):
+            _target_df = globals()['df']
             df_info = {
-                'shape': list(globals()['df'].shape),
-                'columns': [str(c) for c in globals()['df'].columns]
+                'shape': list(_target_df.shape),
+                'columns': [str(c) for c in _target_df.columns]
             }
+            try:
+                # Generate clean preview and CSV
+                preview_sub = _target_df.head(100)
+                df_preview = {
+                    'columns': [str(c) for c in _target_df.columns],
+                    'rows': [[_format_cell(val) for val in row] for row in preview_sub.values],
+                    'totalRows': int(_target_df.shape[0]),
+                    'totalCols': int(_target_df.shape[1])
+                }
+                df_csv = _target_df.to_csv(index=False)
+            except Exception:
+                pass
             
     except Exception:
         execution_error = traceback.format_exc()
@@ -70,7 +97,9 @@ def __tabula_run__(user_code, csv_content=None):
         'stderr': stderr_io.getvalue(),
         'images': output_images,
         'error': execution_error,
-        'dfInfo': df_info
+        'dfInfo': df_info,
+        'dfPreview': df_preview,
+        'dfCsv': df_csv
     }
 `
 
@@ -168,6 +197,20 @@ globals().pop('__tabula_last_csv__', None)
             ? {
                 shape: [Number(jsResult.dfInfo.shape[0]), Number(jsResult.dfInfo.shape[1])],
                 columns: Array.isArray(jsResult.dfInfo.columns) ? jsResult.dfInfo.columns : [],
+              }
+            : undefined,
+        dfCsv: typeof jsResult.dfCsv === 'string' ? jsResult.dfCsv : undefined,
+        dfPreview:
+          jsResult.dfPreview && Array.isArray(jsResult.dfPreview.columns)
+            ? {
+                columns: jsResult.dfPreview.columns.map(String),
+                rows: Array.isArray(jsResult.dfPreview.rows)
+                  ? jsResult.dfPreview.rows.map((r: unknown[]) =>
+                      Array.isArray(r) ? r.map(String) : [],
+                    )
+                  : [],
+                totalRows: Number(jsResult.dfPreview.totalRows ?? 0),
+                totalCols: Number(jsResult.dfPreview.totalCols ?? 0),
               }
             : undefined,
       }

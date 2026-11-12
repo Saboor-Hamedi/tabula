@@ -1,0 +1,296 @@
+-- ==============================================================================
+-- Tabula — Migration 001 companion: the queries the app actually runs
+-- ==============================================================================
+-- These are the PostgREST / RPC calls issued by `src/features/posts/api.ts`.
+-- They are written out here so the exact request the app makes is reviewable
+-- next to the schema it depends on.
+--
+--   * `anon`        — the Supabase anon key (visitors, not signed in)
+--   * `authenticated` — the signed-in user token (admins)
+--
+-- RLS does the authorisation for every one of them; the client never sends a
+-- role, an author id, or a publish date.
+-- ==============================================================================
+
+
+-- ------------------------------------------------------------------------------
+-- A. Public feed  — GET /rest/v1/posts?status=eq.published
+-- ------------------------------------------------------------------------------
+-- Used by the front page. The `status=eq.published` filter is belt and braces:
+-- the RLS policy "Published posts are public" already hides drafts.
+--
+--   select id, slug, title, subtitle, excerpt, cover_image_url, cover_caption,
+--          tags, featured, reading_time_minutes, view_count,
+--          author_name, author_avatar_url, dataset_name, model,
+--          published_at, created_at, updated_at
+--     from posts
+--    where status = 'published'
+--      and published_at <= now()
+--    order by published_at desc
+--    limit 24
+--    offset 0;
+--
+-- Range pagination (the `Content-Range` response header carries the total):
+--
+--   GET /rest/v1/posts
+--       ?select=*&status=eq.published&order=published_at.desc
+--       &limit=12&offset=0
+--     Range: 0-11
+--
+-- Full-text search over title + excerpt + content:
+--
+--   GET /rest/v1/posts
+--       ?select=*&status=eq.published
+--       &or=(title.ilike.*<term>*,excerpt.ilike.*<term>*)
+--       &order=published_at.desc
+--
+-- Tag filter:
+--
+--   GET /rest/v1/posts?select=*&status=eq.published&tags=cs.{"Revenue"}
+--
+-- Supabase client form:
+--
+--   supabase
+--     .from('posts')
+--     .select('id, slug, title, subtitle, excerpt, cover_image_url, cover_caption, tags, featured, reading_time_minutes, view_count, author_name, author_avatar_url, dataset_name, model, published_at, created_at, updated_at')
+--     .eq('status', 'published')
+--     .order('published_at', { ascending: false })
+--     .range(from, to)
+
+
+-- ------------------------------------------------------------------------------
+-- B. Single post  — GET /rest/v1/posts?slug=eq.<slug>
+-- ------------------------------------------------------------------------------
+--   select *, blocks, content
+--     from posts
+--    where slug = '<slug>'
+--    limit 1;
+--
+-- Supabase client form:
+--
+--   supabase
+--     .from('posts')
+--     .select('*')
+--     .eq('slug', slug)
+--     .maybeSingle()
+
+
+-- ------------------------------------------------------------------------------
+-- C. Gallery  — GET /rest/v1/post_images?post_id=eq.<id>
+-- ------------------------------------------------------------------------------
+--
+--   select id, url, alt_text, caption, width, height, position
+--     from post_images
+--    where post_id = '<post id>'
+--    order by position asc;
+--
+-- Supabase client form:
+--
+--   supabase
+--     .from('post_images')
+--     .select('id, url, alt_text, caption, width, height, position')
+--     .eq('post_id', postId)
+--     .order('position', { ascending: true })
+
+
+-- ------------------------------------------------------------------------------
+-- D. Publish (admin)  — POST /rest/v1/posts
+-- ------------------------------------------------------------------------------
+-- One click. The payload carries the answer and the render blocks; the author
+-- and the publish date are stamped by the `stamp_post_author` trigger.
+--
+--   insert into posts (
+--     slug, title, subtitle, excerpt, content, blocks,
+--     cover_image_url, cover_caption, source_message_id, source_session_id,
+--     dataset_name, model, status, tags, featured, reading_time_minutes
+--   ) values (
+--     '<slug>', '<title>', '<subtitle>', '<excerpt>', '<markdown>', '<json>',
+--     '<cover url>', '<cover caption>', '<message id>', '<session id>',
+--     '<dataset>', '<model>', 'published', array['<tag>'], false, 3
+--   )
+--   returning *;
+--
+-- Supabase client form:
+--
+--   const { data, error } = await supabase
+--     .from('posts')
+--     .insert({
+--       slug, title, subtitle, excerpt, content, blocks,
+--       cover_image_url: coverImageUrl, cover_caption: coverCaption,
+--       source_message_id: sourceMessageId, source_session_id: sourceSessionId,
+--       dataset_name: datasetName, model, status: 'published', tags,
+--       reading_time_minutes: readingTimeMinutes,
+--     })
+--     .select()
+--     .single()
+--
+-- The insert fails with a permission error for anybody who is not an admin
+-- (RLS policy "Admins can publish posts").
+
+
+-- ------------------------------------------------------------------------------
+-- E. Attach images (admin)  — POST /rest/v1/post_images
+-- ------------------------------------------------------------------------------
+--
+--   insert into post_images (post_id, url, storage_path, alt_text, caption, width, height, position)
+--   values
+--     ('<post id>', '<public url>', 'posts/<post id>/1.png', '<alt>', '<caption>', 1600, 900, 0),
+--     ('<post id>', '<public url>', 'posts/<post id>/2.png', '<alt>', '<caption>', 1600, 900, 1);
+--
+-- Supabase client form:
+--
+--   await supabase
+--     .from('post_images')
+--     .insert(images.map((image, index) => ({ ...image, post_id: postId, position: index })))
+
+
+-- ------------------------------------------------------------------------------
+-- F. Upload an image to the media bucket (admin)
+-- ------------------------------------------------------------------------------
+--   POST /storage/v1/object/post-media/<path>
+--   body: the raw file bytes
+--
+-- Supabase client form:
+--
+--   const { error } = await supabase.storage
+--     .from('post-media')
+--     .upload(`${postId}/${crypto.randomUUID()}.png`, file, {
+--       contentType: file.type,
+--       upsert: false,
+--     })
+--
+-- Then read the public URL:
+--
+--   const { data } = supabase.storage.from('post-media').getPublicUrl(path)
+--   // data.publicUrl
+
+
+-- ------------------------------------------------------------------------------
+-- G. View counter (public RPC)  — POST /rest/v1/rpc/increment_post_view
+-- ------------------------------------------------------------------------------
+--   select increment_post_view('<slug>');
+--
+-- Supabase client form:
+--
+--   const { error } = await supabase.rpc('increment_post_view', { post_slug: slug })
+
+
+-- ------------------------------------------------------------------------------
+-- H. Admin: list every post (including drafts)
+-- ------------------------------------------------------------------------------
+--
+--   select id, slug, title, status, tags, view_count, published_at, updated_at
+--     from posts
+--    order by created_at desc;
+--
+-- Supabase client form:
+--
+--   supabase
+--     .from('posts')
+--     .select('*')
+--     .order('created_at', { ascending: false })
+
+
+-- ------------------------------------------------------------------------------
+-- I. Admin: unpublish  — PATCH /rest/v1/posts?id=eq.<id>
+-- ------------------------------------------------------------------------------
+--
+--   update posts set status = 'archived' where id = '<id>';
+--
+-- Supabase client form:
+--
+--   supabase.from('posts').update({ status: 'archived' }).eq('id', postId)
+
+
+-- ------------------------------------------------------------------------------
+-- J. Admin: publish a draft
+-- ------------------------------------------------------------------------------
+--
+--   update posts set status = 'published' where id = '<id>';
+--   -- `published_at` is filled in by the trigger when it is still null.
+
+
+-- ------------------------------------------------------------------------------
+-- K. Admin: delete  — DELETE /rest/v1/posts?id=eq.<id>
+-- ------------------------------------------------------------------------------
+-- `post_images` rows cascade with the post.
+--
+--   delete from posts where id = '<id>';
+
+
+-- ------------------------------------------------------------------------------
+-- L. Promote an account to administrator (SQL editor only)
+-- ------------------------------------------------------------------------------
+--   update public.profiles set role = 'admin' where email = 'you@example.com';
+--
+-- Read back every role:
+--
+--   select id, email, display_name, role, created_at
+--     from public.profiles
+--    order by created_at;
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- M. Members (administrator)
+-- ------------------------------------------------------------------------------
+-- The dashboard reads the two tables and joins them in the browser, so it needs
+-- nothing but the two administrator read policies from admin.sql.
+--
+--   select id, email, display_name, avatar_url, tier, role,
+--          last_sign_in_at, created_at
+--     from profiles
+--    order by created_at desc;
+--
+--   select user_id, status, tier, current_period_start, current_period_end,
+--          cancel_at_period_end, created_at
+--     from subscriptions
+--    order by created_at desc;
+--
+-- Supabase client form:
+--
+--   const [profiles, subscriptions] = await Promise.all([
+--     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+--     supabase.from('subscriptions').select('*').order('created_at', { ascending: false }),
+--   ])
+
+-- ------------------------------------------------------------------------------
+-- N. Bring your own key (the owner only)
+-- ------------------------------------------------------------------------------
+--   select id, provider, key_value, label, created_at, updated_at
+--     from user_api_keys
+--    where user_id = auth.uid()
+--      and provider = 'deepseek';
+--
+--   insert into user_api_keys (user_id, provider, key_value, key_fingerprint)
+--   values (auth.uid(), 'deepseek', '<key>', '<sha256>')
+--   on conflict (user_id, provider)
+--   do update set key_value = excluded.key_value,
+--                 key_fingerprint = excluded.key_fingerprint,
+--                 updated_at = timezone('utc'::text, now());
+--
+--   delete from user_api_keys
+--    where user_id = auth.uid()
+--      and provider = 'deepseek';
+--
+-- Supabase client form:
+--
+--   const { data } = await supabase
+--     .from('user_api_keys')
+--     .select('*')
+--     .eq('user_id', userId)
+--     .eq('provider', 'deepseek')
+--     .maybeSingle()
+--
+--   await supabase
+--     .from('user_api_keys')
+--     .upsert(
+--       { user_id: userId, provider: 'deepseek', key_value: key, key_fingerprint: fingerprint },
+--       { onConflict: 'user_id,provider' },
+--     )
+--
+--   await supabase
+--     .from('user_api_keys')
+--     .delete()
+--     .eq('user_id', userId)
+--     .eq('provider', 'deepseek')
+-- ==============================================================================

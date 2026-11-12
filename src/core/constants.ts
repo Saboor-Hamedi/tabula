@@ -9,9 +9,8 @@
 export const APP_NAME = 'Tabula'
 export const APP_TAGLINE = 'Ask your spreadsheet anything'
 
-/** localStorage keys. Only UI preferences and the API key live here. */
+/** localStorage keys. Only UI preferences live here. */
 export const STORAGE_KEYS = {
-  apiKey: 'data-agent:deepseek-key',
   model: 'data-agent:model',
   sidebar: 'data-agent:ui:sidebar',
   panel: 'data-agent:ui:panel',
@@ -24,9 +23,9 @@ export const STORAGE_KEYS = {
 export const DEFAULT_MODEL = 'deepseek-v4-flash'
 
 /** How many rows a single SQL result may return before it is truncated. */
-export const MAX_RESULT_ROWS = 60
+export const MAX_RESULT_ROWS = 200
 /** Hard cap on rows rendered inside a chat table. */
-export const MAX_PREVIEW_ROWS = 60
+export const MAX_PREVIEW_ROWS = 200
 export const MAX_SAMPLE_ROWS = 6
 export const MAX_AGENT_STEPS = 6
 export const MAX_PROFILED_COLUMNS = 160

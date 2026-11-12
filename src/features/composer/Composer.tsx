@@ -1,8 +1,7 @@
-import { getModelOption } from '../../core/agent/modelOptions'
-import { NEEDS_ACCESS_KEY } from '../../core/config'
-import { CpuIcon, SheetIcon } from '../common/Icons'
+import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
+import { LockIcon, SheetIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
-import { ChatInput } from '../chat/ChatInput'
+import { Input } from '../chat'
 import { useComposerDraft } from './useComposerDraft'
 
 /**
@@ -17,67 +16,63 @@ import { useComposerDraft } from './useComposerDraft'
  */
 
 export function Composer() {
-  const { activeSession, apiKey, isStreaming, dbReady, model } = useSessionState()
-  const { sendMessage, stopStreaming, openSettings, setModel } = useSessionActions()
+  const { activeSession, isStreaming, dbReady } = useSessionState()
+  const { sendMessage, stopStreaming } = useSessionActions()
+  const { usage } = useUsageStatus()
   const [value, setValue] = useComposerDraft()
 
-  const needsKey = NEEDS_ACCESS_KEY && !apiKey
-  const disabled = !activeSession || needsKey || !dbReady
+  const trialExpired = Boolean(usage?.trialExpired)
+  const disabled = !activeSession || !dbReady || trialExpired
 
   const handleSubmit = () => {
+    if (trialExpired) {
+      openPricingModal('trial-expired')
+      return
+    }
     const text = value.trim()
     if (text.length === 0) return
     setValue('')
     void sendMessage(text)
   }
 
-  const toggleModel = () => {
-    setModel(model === 'deepseek-v4-pro' ? 'deepseek-v4-flash' : 'deepseek-v4-pro')
-  }
-
   return (
     <div className="composer">
       <div className="composer-inner">
+        {trialExpired ? (
+          <div className="composer-trial-bar" role="status">
+            <span className="composer-trial-bar-left">
+              <LockIcon size={13} />
+              <span>Your 7-day free trial has ended. Subscribe to continue asking Tabula.</span>
+            </span>
+            <button
+              type="button"
+              className="btn btn-primary btn-small"
+              onClick={() => openPricingModal('trial-expired')}
+            >
+              Upgrade
+            </button>
+          </div>
+        ) : null}
+
         {activeSession ? (
           <div className="composer-chips">
             <span className="chip" title={activeSession.fileName}>
               <SheetIcon size={12} />
               <span className="chip-text">{activeSession.fileName}</span>
             </span>
-            <button
-              type="button"
-              className="chip chip-model"
-              onClick={toggleModel}
-              title={`Active model: ${getModelOption(model).label}. Click to switch.`}
-            >
-              <CpuIcon size={12} />
-              <span className="chip-text">
-                {getModelOption(model).shortLabel}
-              </span>
-            </button>
           </div>
         ) : null}
 
-        <ChatInput
+        <Input
           value={value}
           onChange={setValue}
           onSubmit={handleSubmit}
           onStop={stopStreaming}
           disabled={disabled}
           streaming={isStreaming}
-          needsKey={needsKey}
-          onDisabledClick={needsKey ? openSettings : undefined}
-          disabledAction={
-            needsKey
-              ? {
-                  label: 'Set DeepSeek API Key',
-                  onClick: openSettings,
-                }
-              : undefined
-          }
           placeholder={
-            needsKey
-              ? 'Add your DeepSeek API key to start asking questions…'
+            trialExpired
+              ? 'Trial ended — upgrade to Tabula Pro to ask questions…'
               : !activeSession
                 ? 'Upload a file to begin…'
                 : !dbReady

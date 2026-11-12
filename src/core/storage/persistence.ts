@@ -1,6 +1,6 @@
 import type { ChatMessage, DatasetDigest, Session, ToolTraceEntry } from '../types'
+import { getWorkspaceScope, workspaceDbName } from './scope'
 
-const DB_NAME = 'tabula-workspace'
 const DB_VERSION = 1
 const SESSION_STORE = 'sessions'
 const FILE_STORE = 'files'
@@ -23,7 +23,8 @@ export interface PersistedWorkspace {
   activeSessionId: string | null
 }
 
-let databasePromise: Promise<IDBDatabase | null> | null = null
+const databasePromises = new Map<string, Promise<IDBDatabase | null>>()
+const openDatabases = new Map<string, IDBDatabase>()
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -40,17 +41,22 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   })
 }
 
-/** Opens (and upgrades) the small IndexedDB database used for workspace recovery. */
-function openDatabase(): Promise<IDBDatabase | null> {
-  if (databasePromise) return databasePromise
+/** Opens (and upgrades) the account-scoped IndexedDB database used for workspace recovery. */
+function openDatabase(explicitScope?: string | null): Promise<IDBDatabase | null> {
+  const scope = explicitScope === undefined ? getWorkspaceScope() : explicitScope
+  if (!scope) return Promise.resolve(null)
 
-  databasePromise = new Promise((resolve) => {
+  const dbName = workspaceDbName(scope)
+  const existing = databasePromises.get(dbName)
+  if (existing) return existing
+
+  const promise = new Promise<IDBDatabase | null>((resolve) => {
     if (typeof indexedDB === 'undefined') {
       resolve(null)
       return
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    const request = indexedDB.open(dbName, DB_VERSION)
 
     request.onupgradeneeded = () => {
       const database = request.result
@@ -65,17 +71,36 @@ function openDatabase(): Promise<IDBDatabase | null> {
       }
     }
 
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      openDatabases.set(dbName, request.result)
+      resolve(request.result)
+    }
     request.onerror = () => resolve(null)
     request.onblocked = () => resolve(null)
   })
 
-  return databasePromise
+  databasePromises.set(dbName, promise)
+  return promise
 }
 
-/** Loads every session snapshot and the previously selected session. */
-export async function loadPersistedWorkspace(): Promise<PersistedWorkspace> {
-  const database = await openDatabase()
+/** Closes cached IndexedDB connections (called on sign-out). */
+export function resetDatabaseConnections(): void {
+  for (const db of openDatabases.values()) {
+    try {
+      db.close()
+    } catch {
+      // Ignore close failures during sign-out cleanup.
+    }
+  }
+  openDatabases.clear()
+  databasePromises.clear()
+}
+
+/** Loads every session snapshot and the previously selected session for the active account. */
+export async function loadPersistedWorkspace(
+  scope?: string | null,
+): Promise<PersistedWorkspace> {
+  const database = await openDatabase(scope)
   if (!database) return { sessions: [], activeSessionId: null }
 
   try {
@@ -105,8 +130,11 @@ export async function loadPersistedWorkspace(): Promise<PersistedWorkspace> {
 }
 
 /** Persists a session snapshot after uploads, answers, or trace updates. */
-export async function savePersistedSession(record: PersistedSessionRecord): Promise<void> {
-  const database = await openDatabase()
+export async function savePersistedSession(
+  record: PersistedSessionRecord,
+  scope?: string | null,
+): Promise<void> {
+  const database = await openDatabase(scope)
   if (!database) return
 
   try {
@@ -119,8 +147,12 @@ export async function savePersistedSession(record: PersistedSessionRecord): Prom
 }
 
 /** Stores the original file so it can be reopened without asking for it again. */
-export async function saveSessionFile(sessionId: string, file: File): Promise<void> {
-  const database = await openDatabase()
+export async function saveSessionFile(
+  sessionId: string,
+  file: File,
+  scope?: string | null,
+): Promise<void> {
+  const database = await openDatabase(scope)
   if (!database) return
 
   try {
@@ -140,8 +172,11 @@ export async function saveSessionFile(sessionId: string, file: File): Promise<vo
 }
 
 /** Restores the original file as a browser File object. */
-export async function loadSessionFile(sessionId: string): Promise<File | null> {
-  const database = await openDatabase()
+export async function loadSessionFile(
+  sessionId: string,
+  scope?: string | null,
+): Promise<File | null> {
+  const database = await openDatabase(scope)
   if (!database) return null
 
   try {
@@ -161,8 +196,11 @@ export async function loadSessionFile(sessionId: string): Promise<File | null> {
 }
 
 /** Removes a session snapshot and its stored file in one transaction. */
-export async function deletePersistedSession(sessionId: string): Promise<void> {
-  const database = await openDatabase()
+export async function deletePersistedSession(
+  sessionId: string,
+  scope?: string | null,
+): Promise<void> {
+  const database = await openDatabase(scope)
   if (!database) return
 
   try {
@@ -176,8 +214,11 @@ export async function deletePersistedSession(sessionId: string): Promise<void> {
 }
 
 /** Remembers which session should reopen after a refresh. */
-export async function saveActiveSessionId(sessionId: string | null): Promise<void> {
-  const database = await openDatabase()
+export async function saveActiveSessionId(
+  sessionId: string | null,
+  scope?: string | null,
+): Promise<void> {
+  const database = await openDatabase(scope)
   if (!database) return
 
   try {
@@ -194,9 +235,9 @@ export async function saveActiveSessionId(sessionId: string | null): Promise<voi
   }
 }
 
-/** Clears every stored row. Used when the final session is deleted. */
-export async function clearPersistedWorkspace(): Promise<void> {
-  const database = await openDatabase()
+/** Clears every stored row for the active account. Used when the final session is deleted. */
+export async function clearPersistedWorkspace(scope?: string | null): Promise<void> {
+  const database = await openDatabase(scope)
   if (!database) return
 
   try {

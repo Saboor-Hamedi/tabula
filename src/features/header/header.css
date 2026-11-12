@@ -1,0 +1,374 @@
+/* ==========================================================================
+   Tabula — Header
+   One header for the whole product. The brand, the navigation and the
+   account control are the same everywhere; only the workspace adds the chat
+   controls on the right.
+   ========================================================================== */
+
+.app-header {
+  height: var(--header-height);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  position: relative;
+  /* Above the sidebar and the inspector, so the account menu is never
+     covered by them. */
+  z-index: 200;
+}
+
+.app-header.is-page,
+.app-header.is-dashboard {
+  position: sticky;
+  top: 0;
+  padding: 0 var(--space-5);
+}
+
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ---------- Brand ---------- */
+
+.header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  flex-shrink: 0;
+  border-radius: var(--radius-xs);
+}
+
+.header-brand-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-brand-name {
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+/* ---------- Navigation ---------- */
+
+.header-nav {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (min-width: 720px) {
+  .header-nav {
+    display: flex;
+  }
+}
+
+.header-nav-link {
+  position: relative;
+  padding: 5px 10px;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--transition), background var(--transition);
+}
+
+.header-nav-link:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.header-nav-link.is-active {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+/* ---------- Account ---------- */
+
+.header-account {
+  position: relative;
+}
+
+.header-btn {
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+
+.header-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.header-btn.is-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.header-btn.is-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.header-account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 8px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: all var(--transition);
+}
+
+.header-account-btn:hover,
+.header-account-btn.is-open {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.header-account-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.header-account-avatar.is-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.header-account-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-account-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.header-account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 300;
+  min-width: 210px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  animation: header-menu-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes header-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.header-account-menu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 9px 9px;
+}
+
+.header-account-menu-name {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-account-menu-email {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-account-menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+.header-account-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 550;
+  text-align: left;
+  transition: background var(--transition), color var(--transition);
+}
+
+.header-account-menu-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.header-account-menu-item.is-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.header-account-menu-item svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.header-account-menu-item:hover svg {
+  color: currentColor;
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    padding: 0 var(--space-3);
+  }
+
+  .header-account-name,
+  .header-account-badge {
+    display: none;
+  }
+
+  .header-account-btn {
+    padding: 0 4px;
+  }
+}
+
+/* ---------- The account identifier ---------- */
+
+.header-account-menu-id {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.header-account-menu-id-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.header-account-menu-id-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-account-menu-id-value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.header-account-menu-id-copy {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.header-account-menu-id-copy:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}

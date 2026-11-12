@@ -57,6 +57,65 @@ npm run dev
 
 Open `http://localhost:5173` to explore the interactive demo or upload your own spreadsheets.
 
+## Routes
+
+The fragment is the URL. Every surface is a route, and the router lives in
+`src/core/router/`.
+
+| Route | Surface |
+| --- | --- |
+| `#/landing` | The front page, with the hover menus |
+| `#/app` | **Analyse** — the signed-in home: identity, activity, and (for administrators) the member list and the published insights |
+| `#/workspace` | The chat workspace |
+| `#/insights` | The published insights index |
+| `#/insights/:slug` | One published insight |
+| `#/login` `#/signup` `#/verify` | The account screens |
+| `#/workspace?demo=1` | The workspace in demo mode, without an account |
+
+## Sign-in providers
+
+E-mail and password work out of the box. Google and GitHub are **off by
+default** on a Supabase project, so the sign-in screen only shows the buttons
+the project actually has enabled — a button that cannot work is never offered.
+
+To turn them on:
+
+**1. Redirect URLs** — Supabase Dashboard → Authentication → URL Configuration →
+Redirect URLs, add:
+
+```
+http://localhost:5173/**
+http://localhost:5173/#/app
+https://your-domain.com/**
+```
+
+The fragment is the router, so the app asks for `#/app` after the round trip.
+The authorisation code comes back on the query string, which leaves the hash
+free for the router.
+
+**2. Google**
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) →
+   Create Credentials → OAuth client ID → *Web application*.
+2. **Authorized JavaScript origins**: `https://<project-ref>.supabase.co`
+3. **Authorized redirect URIs**: `https://<project-ref>.supabase.co/auth/v1/callback`
+4. Copy the Client ID and Client Secret into Supabase → Authentication →
+   Providers → Google, tick *Enable Google*, paste both, and Save.
+
+**3. GitHub**
+
+1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.
+2. **Homepage URL**: `https://<project-ref>.supabase.co`
+3. **Authorization callback URL**: `https://<project-ref>.supabase.co/auth/v1/callback`
+4. Copy the Client ID and Client Secret into Supabase → Authentication →
+   Providers → GitHub, tick *Enable GitHub*, paste both, and Save.
+
+`<project-ref>` is the first part of your project URL, for example
+`iaxbixtmymalzhryhazz` in `https://iaxbixtmymalzhryhazz.supabase.co`.
+
+The app reads the public settings endpoint to learn which providers are live,
+so the buttons appear the moment you save — no rebuild.
+
 ## Scripts
 
 ```bash
@@ -69,12 +128,18 @@ npm run preview  # Serve production build locally
 ## Architecture
 
 - `src/core/` contains framework-free logic: persistence, parsing, analysis, agent tools, exports, diagnostics.
-- `src/features/` contains React surfaces: shell, sidebar, header, chat, composer, figures, inspector, settings.
+- `src/core/router/` contains the hash router: the provider, the route table, the hooks and the path matching.
+- `src/features/` contains React surfaces, one folder per product area.
 - `src/core/workers/` contains the spreadsheet conversion worker.
 - `src/core/parsing/` turns assistant output into text, tables, diagrams, and structured chart blocks.
 - `src/features/session/` contains workspace restore and persistence hooks.
+- `src/features/migration/` contains the database schema — one `.sql` file per feature (`accounts.sql`, `roles.sql`, `posts.sql`, `media.sql`, `admin.sql`, `api_keys.sql`) plus `queries.sql`, the requests the app makes. `tabula.sql` is the map of what to run and in what order.
+
+Each feature folder keeps its files in sub-folders by role — `pages/`,
+`components/`, `api/`, `lib/`, `styles/` — with single-purpose file names.
 
 Core code must not import from features.
+
 
 ## Privacy and deployment
 
