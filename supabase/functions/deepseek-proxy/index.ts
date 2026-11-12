@@ -35,13 +35,42 @@ function extractTotalTokens(usage: unknown): number {
     total_tokens?: unknown
     prompt_tokens?: unknown
     completion_tokens?: unknown
+    prompt_cache_hit_tokens?: unknown
+    prompt_cache_miss_tokens?: unknown
+    prompt_tokens_details?: { cached_tokens?: unknown }
   }
+
+  const completion =
+    typeof candidate.completion_tokens === 'number' && Number.isFinite(candidate.completion_tokens)
+      ? Math.max(0, candidate.completion_tokens)
+      : 0
+
+  const cacheHit =
+    typeof candidate.prompt_cache_hit_tokens === 'number' &&
+    Number.isFinite(candidate.prompt_cache_hit_tokens)
+      ? Math.max(0, candidate.prompt_cache_hit_tokens)
+      : typeof candidate.prompt_tokens_details?.cached_tokens === 'number' &&
+          Number.isFinite(candidate.prompt_tokens_details.cached_tokens)
+        ? Math.max(0, candidate.prompt_tokens_details.cached_tokens)
+        : 0
+
+  const cacheMiss =
+    typeof candidate.prompt_cache_miss_tokens === 'number' &&
+    Number.isFinite(candidate.prompt_cache_miss_tokens)
+      ? Math.max(0, candidate.prompt_cache_miss_tokens)
+      : typeof candidate.prompt_tokens === 'number' && Number.isFinite(candidate.prompt_tokens)
+        ? Math.max(0, candidate.prompt_tokens - cacheHit)
+        : 0
+
+  if (cacheHit > 0 || cacheMiss > 0 || completion > 0) {
+    // DeepSeek bills cache-hit input tokens at 10% of normal input cost.
+    return Math.max(0, Math.round(cacheHit * 0.1) + Math.round(cacheMiss) + Math.round(completion))
+  }
+
   if (typeof candidate.total_tokens === 'number' && Number.isFinite(candidate.total_tokens)) {
     return Math.max(0, Math.round(candidate.total_tokens))
   }
-  const prompt = typeof candidate.prompt_tokens === 'number' ? candidate.prompt_tokens : 0
-  const completion = typeof candidate.completion_tokens === 'number' ? candidate.completion_tokens : 0
-  return Math.max(0, Math.round(prompt + completion))
+  return 0
 }
 
 function parseSseUsageChunk(line: string): number {

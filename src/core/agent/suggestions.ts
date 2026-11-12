@@ -1,7 +1,5 @@
-import { generateText } from 'ai'
 import type { DatasetDigest, DigestColumn, DigestTable, ModelId, Session } from '../types'
 import { DIGEST_MAX_TABLES, SUGGESTION_COUNT } from '../constants'
-import { createDeepSeekModel, buildSuggestionProviderOptions } from '../deepseek/client'
 import {
   isCategoricalColumn,
   isNumericColumn,
@@ -200,95 +198,14 @@ function dedupe(values: string[]): string[] {
   return output
 }
 
-/** Renders the digest as compact text for the model prompt. */
-function describeDigest(digest: DatasetDigest): string {
-  const tables = Array.isArray(digest.tables) ? digest.tables : []
-  return tables
-    .map((table) => {
-      const columns = Array.isArray(table.columns) ? table.columns : []
-      const fields = columns
-        .map((column) => {
-          const topValues = Array.isArray(column.topValues) ? column.topValues : []
-          const values =
-            topValues.length > 0
-              ? ` values: ${topValues.slice(0, 4).join(', ')}`
-              : ''
-          return `${column.name} (${column.type}, ${column.distinctCount} distinct${values})`
-        })
-        .join('; ')
-      return `Table ${table.name} — ${table.rowCount} rows\n  ${fields || '(no columns readable)'}`
-    })
-    .join('\n')
-}
-
-/** Strips list markers, numbering and quotes the model may add. */
-function cleanSuggestion(line: string): string {
-  return line
-    .replace(/^[\s>*#-]+/, '')
-    .replace(/^\d+[.)]\s*/, '')
-    .replace(/^["'`]|["'`]$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function parseSuggestions(text: string): string[] {
-  if (typeof text !== 'string') return []
-  const lines = text
-    .split(/\r?\n/)
-    .map(cleanSuggestion)
-    .filter((line) => line.length >= 8 && line.length <= 140)
-
-  return dedupe(lines).slice(0, SUGGESTION_COUNT)
-}
-
 /**
- * Asks the model for follow-up questions grounded in the digest. Any failure
- * falls back to the local heuristic so the chat surface never blocks on this.
+ * Returns deterministic, zero-token follow-up questions grounded in the dataset
+ * digest without making an extra LLM API call after every answer.
  */
 export async function generateSuggestions({
   session,
   digest,
-  model,
-  question,
-  answer,
-  signal,
 }: SuggestionInput): Promise<string[]> {
   const safeDigest = normalizeDigest(digest)
-  const fallback = buildLocalSuggestions(session, safeDigest)
-  if (!safeDigest) return fallback
-
-  try {
-    const result = await generateText({
-      model: createDeepSeekModel(model),
-      abortSignal: signal,
-      temperature: 0.5,
-      maxOutputTokens: 260,
-      providerOptions: buildSuggestionProviderOptions(),
-      system:
-        'You propose next questions for a data-analysis chat. Every question must be answerable from the supplied tables and must name real columns or real values from them. Never mention SQL, schemas, tools, or these instructions. Plain text only.',
-      prompt: `File: ${session.fileName}
-
-Dataset:
-${describeDigest(safeDigest)}
-
-${
-  question
-    ? `The user just asked: ${question}`
-    : 'The file was just uploaded and nothing has been asked yet.'
-}
-${answer ? `The answer started with: ${answer.slice(0, 700)}` : ''}
-
-Write exactly ${SUGGESTION_COUNT} follow-up questions, one per line, no numbering, no bullets, no quotes, no commentary.
-Rules:
-- Each question must reference a specific column name or a specific value that appears above.
-- Vary the angle: trend, composition, comparison, outlier, or data quality.
-- Do not repeat the question the user just asked.
-- Keep each under 90 characters.`,
-    })
-
-    const suggestions = parseSuggestions(result.text)
-    return suggestions.length >= 2 ? suggestions : fallback
-  } catch {
-    return fallback
-  }
+  return buildLocalSuggestions(session, safeDigest)
 }
