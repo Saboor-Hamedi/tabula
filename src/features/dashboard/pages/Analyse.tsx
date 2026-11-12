@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from '../../../core/router'
+import { userPath } from '../../../core/router/paths'
 import { loadPersistedWorkspace } from '../../../core/storage/persistence'
 import { formatCount } from '../../../core/utils/format'
 import { isSupabaseConfigured } from '../../../core/supabase/client'
 import { openPricingModal, useUsageStatus } from '../../../core/supabase/usage'
-import { useAuthUser, useIsAdmin, useProfile } from '../../auth/useProfile'
+import { useAuthUser, useIsAdmin, useProfile, useUserSlug } from '../../auth/useProfile'
 import { useDisplayName } from '../../auth/display'
 import { Header } from '../../header/Header'
 import {
+  ArrowLeftIcon,
   BarChartIcon,
   DatabaseIcon,
   GlobeIcon,
@@ -42,9 +45,11 @@ function isMissingSchema(message: string): boolean {
 }
 
 export function Analyse() {
+  const { navigate } = useRouter()
   const user = useAuthUser()
   const profile = useProfile()
   const isAdmin = useIsAdmin()
+  const userSlug = useUserSlug()
   const displayName = useDisplayName()
 
   const [stats, setStats] = useState<WorkspaceStats | null>(null)
@@ -123,6 +128,13 @@ export function Analyse() {
   }, [members])
 
   const degraded = Boolean(user) && !profile
+  const quotaExhausted = Boolean(
+    usage &&
+      !usage.isAdmin &&
+      usage.monthlyLimit !== null &&
+      usage.remainingTokens !== null &&
+      usage.remainingTokens <= 0,
+  )
 
   return (
     <div className="shell-frame">
@@ -130,7 +142,17 @@ export function Analyse() {
 
       <main className="dash-page">
         <header className="dash-hero">
-          <span className="dash-eyebrow">Dashboard</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <span className="dash-eyebrow">Dashboard</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-small"
+              onClick={() => navigate(userPath('/workspace', userSlug))}
+            >
+              <ArrowLeftIcon size={13} />
+              <span>Back to Workspace</span>
+            </button>
+          </div>
           <h1 className="dash-title">
             {user ? `Welcome back, ${displayName.split(' ')[0]}` : 'Analyse your data'}
           </h1>
@@ -215,9 +237,11 @@ export function Analyse() {
                   value={
                     usage?.trialExpired
                       ? 'Trial ended'
-                      : usage?.status === 'trialing' && usage?.tier === 'free'
-                        ? `Trial (${usage.trialDaysRemaining ?? 0}d left)`
-                        : (profile?.tier ?? 'free')
+                      : quotaExhausted
+                        ? 'Tokens finished'
+                        : usage?.status === 'trialing' && usage?.tier === 'free'
+                          ? `Trial (${usage.trialDaysRemaining ?? 0}d left)`
+                          : (profile?.tier ?? 'free')
                   }
                   hint={
                     usage
@@ -231,22 +255,32 @@ export function Analyse() {
           </div>
         </div>
 
-        {!isAdmin && usage && (usage.trialExpired || usage.tier === 'free') ? (
+        {!isAdmin && usage && (usage.trialExpired || quotaExhausted || usage.tier === 'free') ? (
           <div className="dash-notice" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <LockIcon size={14} />
               <span>
                 {usage.trialExpired
                   ? 'Your 7-day free trial has ended. Upgrade with Stripe to resume uploading data and asking Tabula.'
-                  : `You have ${usage.trialDaysRemaining ?? 0} day${usage.trialDaysRemaining === 1 ? '' : 's'} left in your free trial (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used).`}
+                  : quotaExhausted
+                    ? `You have finished your trial tokens (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used). Upgrade to Tabula Pro to continue.`
+                    : `You have ${usage.trialDaysRemaining ?? 0} day${usage.trialDaysRemaining === 1 ? '' : 's'} left in your free trial (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used).`}
               </span>
             </span>
             <button
               type="button"
               className="btn btn-primary btn-small"
-              onClick={() => openPricingModal(usage.trialExpired ? 'trial-expired' : 'upgrade')}
+              onClick={() =>
+                openPricingModal(
+                  usage.trialExpired
+                    ? 'trial-expired'
+                    : quotaExhausted
+                      ? 'quota-exceeded'
+                      : 'upgrade',
+                )
+              }
             >
-              {usage.trialExpired ? 'Pay with Stripe' : 'Upgrade to Pro'}
+              {usage.trialExpired || quotaExhausted ? 'Pay with Stripe' : 'Upgrade to Pro'}
             </button>
           </div>
         ) : null}

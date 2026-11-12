@@ -3,6 +3,10 @@ import { EventEmitter } from 'node:events';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import {
+  BillingBlockError,
+  getBillingBlockReason,
+} from '../deepseek/client';
+import {
   getWorkspaceScope,
   stickyNotesStorageKey,
   workspaceCacheKey,
@@ -275,5 +279,26 @@ describe('Per-account workspace storage isolation', () => {
     expect(workspaceDbName(adminScope!)).not.toBe(workspaceDbName(memberScope!));
     expect(workspaceCacheKey(adminScope!)).not.toBe(workspaceCacheKey(memberScope!));
     expect(stickyNotesStorageKey(adminScope)).not.toBe(stickyNotesStorageKey(memberScope));
+  });
+});
+
+describe('Billing block error detection', () => {
+  it('recognizes direct BillingBlockError and wrapped AI SDK quota errors', () => {
+    expect(getBillingBlockReason(new BillingBlockError('quota-exceeded', 'Out of tokens'))).toBe(
+      'quota-exceeded',
+    );
+    expect(
+      getBillingBlockReason({
+        lastError: {
+          responseBody: JSON.stringify({ code: 'QUOTA_EXCEEDED' }),
+        },
+      }),
+    ).toBe('quota-exceeded');
+    expect(
+      getBillingBlockReason({
+        cause: new BillingBlockError('trial-expired', 'Trial ended'),
+      }),
+    ).toBe('trial-expired');
+    expect(getBillingBlockReason(new Error('Network timeout'))).toBeNull();
   });
 });

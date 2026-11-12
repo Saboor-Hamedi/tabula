@@ -2,27 +2,18 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getModelOption, MODEL_OPTIONS } from '../../core/agent/modelOptions'
 import { getTelemetryEnabled, saveTelemetryEnabled } from '../../core/storage/settings'
-import {
-  deletePlatformApiKey,
-  fetchPlatformKeyStatus,
-  savePlatformApiKey,
-  type PlatformKeyStatus,
-} from '../../core/supabase/platformKey'
 import { formatBytes } from '../../core/utils/format'
 import {
-  AlertIcon,
   CheckIcon,
   CloseIcon,
   CpuIcon,
   DatabaseIcon,
-  EyeIcon,
-  EyeOffIcon,
   GlobeIcon,
   KeyIcon,
   SettingsIcon,
 } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
-import { useAuthUser, useIsAdmin } from '../auth/useProfile'
+import { useIsAdmin } from '../auth/useProfile'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
 type SettingsTab = 'access' | 'models' | 'media' | 'storage'
@@ -134,157 +125,25 @@ function SettingsDialog() {
   return typeof document !== 'undefined' ? createPortal(content, document.body) : content
 }
 
-/** Single shared platform API key in Supabase (`user_api_keys`), managed by Admin via `/api/admin/key`. */
+/** DeepSeek API access is managed exclusively via Supabase Edge Function Secrets (`DEEPSEEK_API_KEY`). */
 function AccessPanel() {
-  const user = useAuthUser()
-  const [status, setStatus] = useState<PlatformKeyStatus | null>(null)
-  const [draftKey, setDraftKey] = useState('')
-  const [showKey, setShowKey] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let active = true
-
-    const load = async () => {
-      try {
-        const serverStatus = await fetchPlatformKeyStatus()
-        if (active) setStatus(serverStatus)
-      } catch (loadError) {
-        if (active) {
-          setStatus({ configured: false, masked: null })
-          if (loadError instanceof Error) setError(loadError.message)
-        }
-      }
-    }
-
-    void load()
-    return () => {
-      active = false
-    }
-  }, [user?.id])
-
-  const handleSave = async () => {
-    const trimmed = draftKey.trim()
-    if (!trimmed) {
-      setError('Enter a DeepSeek API key to save.')
-      return
-    }
-    if (!trimmed.startsWith('sk-') || trimmed.length < 20 || /\s/.test(trimmed)) {
-      setError('Enter a valid DeepSeek API key starting with "sk-".')
-      return
-    }
-    if (!user?.id) {
-      setError('Sign in as administrator to save the key.')
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    try {
-      const nextStatus = await savePlatformApiKey(trimmed)
-      setStatus(nextStatus)
-      setDraftKey('')
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : 'Could not save the API key.',
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleClear = async () => {
-    if (!user?.id) return
-    setSaving(true)
-    setError(null)
-    try {
-      const nextStatus = await deletePlatformApiKey()
-      setStatus(nextStatus)
-      setDraftKey('')
-    } catch (clearError) {
-      setError(
-        clearError instanceof Error ? clearError.message : 'Could not remove the API key.',
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <div className="settings-panel">
       <div className="settings-card">
         <div className="field">
           <div className="field-head">
-            <label htmlFor="admin-api-key" className="field-label">
+            <span className="field-label">
               <KeyIcon size={14} />
               Platform DeepSeek API key
-            </label>
-            {status === null ? (
-              <span className="field-status">Checking…</span>
-            ) : status.configured ? (
-              <span className="field-status is-ok">Active · {status.masked}</span>
-            ) : (
-              <span className="field-status is-warn">Not set</span>
-            )}
+            </span>
+            <span className="field-status is-ok">Managed via Supabase Secrets</span>
           </div>
 
           <p className="field-help">
-            Stored once in Supabase <code>user_api_keys</code> and used through the backend proxy
-            for all signed-in members.
+            <code>DEEPSEEK_API_KEY</code> is stored securely as a Supabase Edge Function Secret and
+            called exclusively through the <code>deepseek-proxy</code> Edge Function. It is never
+            stored in a database table or exposed to the browser.
           </p>
-
-          <div className={`field-input ${error ? 'has-error' : ''}`}>
-            <input
-              id="admin-api-key"
-              type={showKey ? 'text' : 'password'}
-              value={draftKey}
-              onChange={(event) => {
-                setDraftKey(event.target.value)
-                if (error) setError(null)
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void handleSave()
-              }}
-              placeholder={status?.configured ? 'Paste a new key to replace…' : 'sk-…'}
-              spellCheck={false}
-              autoComplete="off"
-              aria-invalid={error !== null}
-            />
-            <IconButton
-              label={showKey ? 'Hide key' : 'Show key'}
-              size="sm"
-              onClick={() => setShowKey((visible) => !visible)}
-            >
-              {showKey ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
-            </IconButton>
-          </div>
-
-          {error ? (
-            <div className="field-error" role="alert">
-              <AlertIcon size={13} />
-              <span>{error}</span>
-            </div>
-          ) : null}
-
-          <div className="settings-inline-actions">
-            <button
-              type="button"
-              className="btn btn-ghost btn-small"
-              onClick={() => void handleClear()}
-              disabled={saving || !status?.configured}
-            >
-              Remove key
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-small"
-              onClick={() => void handleSave()}
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : 'Save key'}
-            </button>
-          </div>
         </div>
       </div>
     </div>

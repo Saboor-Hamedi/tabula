@@ -36,7 +36,19 @@ export function normalizeSession(session: Session): Session {
 export function normalizeMessages(messages: ChatMessage[] | undefined): ChatMessage[] {
   if (!Array.isArray(messages)) return []
   return messages
-    .filter((message) => message !== null && typeof message === 'object' && !message.welcome)
+    .filter((message) => {
+      if (message === null || typeof message !== 'object' || message.welcome) return false
+      const raw = typeof message.content === 'string' ? message.content.trim() : ''
+      if (
+        message.error &&
+        (raw.length === 0 ||
+          raw.includes('AI_APICallError: Too Many Requests') ||
+          raw.includes('You have finished your trial tokens for this month.'))
+      ) {
+        return false
+      }
+      return true
+    })
     .map((message) => ({
       ...message,
       content: typeof message.content === 'string' ? message.content : '',

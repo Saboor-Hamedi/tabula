@@ -41,8 +41,10 @@ export function SidebarFooter() {
     }
   }, [menuOpen])
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'User'
+  const email = user?.email ?? profile?.email ?? ''
+  const displayName = profile?.display_name || email.split('@')[0] || 'User'
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U'
+  const avatarUrl = profile?.avatar_url ?? null
 
   return (
     <>
@@ -51,11 +53,18 @@ export function SidebarFooter() {
       {menuOpen && user ? (
         <div className="sidebar-account-menu" role="menu">
           <div className="account-menu-header">
-            <div className="account-menu-avatar">{initial}</div>
+            <div className="account-menu-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName} className="sidebar-account-avatar-img" />
+              ) : (
+                initial
+              )}
+            </div>
             <div className="account-menu-user-info">
               <span className="account-menu-name">{displayName}</span>
-              <span className="account-menu-email">{user.email}</span>
+              <span className="account-menu-email">{email}</span>
             </div>
+            {isAdmin ? <span className="sidebar-account-badge is-pro">Admin</span> : null}
           </div>
 
           <div className="account-menu-divider" />
@@ -92,12 +101,18 @@ export function SidebarFooter() {
             type="button"
             className={`sidebar-account-btn ${menuOpen ? 'is-active' : ''}`}
             onClick={() => setMenuOpen(!menuOpen)}
-            title={`Account: ${user.email}`}
+            title={`${displayName} (${user.email})`}
+            aria-label={`Account menu for ${displayName}`}
             aria-expanded={menuOpen}
           >
-            <span className="sidebar-account-avatar">{initial}</span>
-            <span className="sidebar-account-name">{displayName}</span>
-            {isAdmin ? <span className="sidebar-account-badge is-pro">Admin</span> : null}
+            <span className="sidebar-account-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName} className="sidebar-account-avatar-img" />
+              ) : (
+                initial
+              )}
+            </span>
+            <span className="sidebar-account-name">{email || displayName}</span>
           </button>
         </div>
       ) : (

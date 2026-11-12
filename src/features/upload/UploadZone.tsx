@@ -2,14 +2,10 @@ import { useRef, useState, type DragEvent } from 'react'
 import { ACCEPTED_EXTENSIONS } from '../../core/constants'
 import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
 import {
-  ActivityIcon,
   AlertIcon,
-  BarChartIcon,
   DatabaseIcon,
   FileIcon,
   LockIcon,
-  SearchIcon,
-  TableIcon,
   UploadIcon,
 } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
@@ -200,51 +196,6 @@ export function UploadZone() {
           </div>
         ) : null}
 
-        {/* 4. NotebookLM-Style Suggested Capabilities Guide */}
-        <div className="workspace-guide-section">
-          <span className="workspace-guide-label">What you can ask Tabula once sources are added:</span>
-          <div className="workspace-guide-grid">
-            <div className="guide-card">
-              <div className="guide-card-icon">
-                <ActivityIcon size={15} />
-              </div>
-              <div className="guide-card-text">
-                <strong>Trend & Growth Tracking</strong>
-                <span>Compare monthly revenue, churn cohorts, and regional volume.</span>
-              </div>
-            </div>
-
-            <div className="guide-card">
-              <div className="guide-card-icon">
-                <SearchIcon size={15} />
-              </div>
-              <div className="guide-card-text">
-                <strong>Anomaly & Outlier Detection</strong>
-                <span>Find suspicious spikes, missing entries, and unexpected margins.</span>
-              </div>
-            </div>
-
-            <div className="guide-card">
-              <div className="guide-card-icon">
-                <BarChartIcon size={15} />
-              </div>
-              <div className="guide-card-text">
-                <strong>Instant Visual Distributions</strong>
-                <span>Auto-generate comparative charts, histograms, and category rankings.</span>
-              </div>
-            </div>
-
-            <div className="guide-card">
-              <div className="guide-card-icon">
-                <TableIcon size={15} />
-              </div>
-              <div className="guide-card-text">
-                <strong>Executive Briefing Dossiers</strong>
-                <span>Generate structured summary reports with findings and export to PDF.</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )

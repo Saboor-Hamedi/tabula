@@ -12,7 +12,6 @@ import {
   ArrowRightIcon,
   CheckIcon,
   CloseIcon,
-  LockIcon,
   ShieldCheckIcon,
 } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
@@ -84,37 +83,23 @@ export function PricingModal() {
               {isExpired
                 ? 'Your 7-day free trial has ended'
                 : isQuotaExceeded
-                  ? 'Monthly token limit reached'
+                  ? isPro
+                    ? 'Monthly token limit reached'
+                    : 'You have finished your trial tokens'
                   : 'Upgrade to Tabula Pro'}
             </h2>
             <p className="modal-subtitle">
               {isExpired
                 ? 'You can still sign in and review previous work. Upgrade with Stripe to upload new data and receive Tabula AI responses.'
-                : 'Unlock full AI spreadsheet analysis, 5,000,000 monthly tokens, and executive exports.'}
+                : isQuotaExceeded && !isPro
+                  ? 'You have used all 250,000 free trial tokens. Upgrade to Tabula Pro with Stripe to unlock 5,000,000 monthly tokens.'
+                  : 'Unlock full AI spreadsheet analysis, 5,000,000 monthly tokens, and executive exports.'}
             </p>
           </div>
           <IconButton label="Close pricing" size="sm" onClick={closePricingModal}>
             <CloseIcon size={16} />
           </IconButton>
         </div>
-
-        {(isExpired || isQuotaExceeded) && (
-          <div className={`pricing-modal-banner ${isExpired ? 'is-expired' : ''}`} role="status">
-            <LockIcon size={16} />
-            <div>
-              <strong>
-                {isExpired
-                  ? 'Uploads & Tabula AI responses are paused'
-                  : 'Monthly allowance exhausted'}
-              </strong>
-              <div>
-                {isExpired
-                  ? 'Every new account includes 7 free days with no card required. Subscribe below to reactivate instant uploads and AI analysis.'
-                  : 'Upgrade to Pro for 20× more monthly tokens (5,000,000 tokens/month).'}
-              </div>
-            </div>
-          </div>
-        )}
 
         {usage ? (
           <div className="pricing-modal-usage-strip">

@@ -76,6 +76,8 @@ export interface ChatMessage {
   content: string
   createdAt: number
   error?: boolean
+  /** Set when a turn failed due to an expired trial or exhausted token quota. */
+  upgradeReason?: 'trial-expired' | 'quota-exceeded'
   model?: ModelId
   /** Marks the message the agent writes right after a file is ingested. */
   welcome?: boolean

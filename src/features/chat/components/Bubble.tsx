@@ -1,10 +1,12 @@
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import type { ChatMessage } from '../../../core/types'
+import { openPricingModal } from '../../../core/supabase/usage'
 import { formatCompact, formatTime } from '../../../core/utils/format'
-import { CheckIcon, CopyIcon, FileIcon } from '../../common/Icons'
+import { ArrowRightIcon, CheckIcon, CopyIcon, FileIcon } from '../../common/Icons'
 import { useIsAdmin } from '../../auth/useProfile'
 import { Composer, Publish } from '../../posts'
 import { useSessionActions } from '../../SessionProvider'
+import { copyRichAnswer } from '../lib/copyAnswer'
 import { Renderer } from './Renderer'
 import { Suggestions } from './Suggestions'
 
@@ -38,6 +40,7 @@ export const Bubble = memo(function Bubble({
   const [copied, setCopied] = useState(false)
   const [savedNote, setSavedNote] = useState(false)
   const [composing, setComposing] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const content = typeof message.content === 'string' ? message.content : ''
 
   const isUser = message.role === 'user'
@@ -45,7 +48,7 @@ export const Bubble = memo(function Bubble({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(content)
+      await copyRichAnswer(bodyRef.current, content)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -80,16 +83,31 @@ export const Bubble = memo(function Bubble({
           <span>{activity ?? 'Reading your data…'}</span>
         </div>
       ) : (
-        <Renderer
-          content={content}
-          streaming={streaming}
-          onEditFigure={(figureIndex, changes) =>
-            editFigure(message.id, figureIndex, changes)
-          }
-        />
+        <div ref={bodyRef}>
+          <Renderer
+            content={content}
+            streaming={streaming}
+            onEditFigure={(figureIndex, changes) =>
+              editFigure(message.id, figureIndex, changes)
+            }
+          />
+        </div>
       )}
 
       {streaming && !isThinking ? <span className="stream-caret" aria-hidden /> : null}
+
+      {!streaming && message.upgradeReason ? (
+        <div className="message-upgrade-cta">
+          <button
+            type="button"
+            className="btn btn-primary btn-small"
+            onClick={() => openPricingModal(message.upgradeReason!)}
+          >
+            <span>Upgrade to Tabula Pro</span>
+            <ArrowRightIcon size={13} />
+          </button>
+        </div>
+      ) : null}
 
       {!streaming && content.trim().length > 0 ? (
         <div className={`message-tools ${isAdmin ? 'is-admin' : ''}`}>

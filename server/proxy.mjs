@@ -174,47 +174,10 @@ function isValidDeepSeekKey(key) {
 }
 
 /**
- * Single source of truth for the platform DeepSeek API key:
- * `public.user_api_keys` in Supabase (admin-owned rows only, via `SUPABASE_SERVICE_ROLE_KEY`).
+ * Platform DeepSeek API key is managed via environment / Supabase Edge Function Secrets
+ * (`DEEPSEEK_API_KEY`) and is never read from a database table.
  */
-async function resolvePlatformApiKey(config, forceRefresh = false) {
-  if (!forceRefresh && cachedPlatformKey.value && Date.now() - cachedPlatformKey.fetchedAt < KEY_CACHE_TTL_MS) {
-    return cachedPlatformKey.value
-  }
-
-  if (config.supabaseUrl && config.supabaseServiceRoleKey) {
-    try {
-      const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/user_api_keys?provider=eq.deepseek&select=user_id,key_value&order=updated_at.desc&limit=5`,
-        { headers: supabaseAdminHeaders(config) },
-      )
-      if (res.ok) {
-        const rows = await res.json()
-        if (Array.isArray(rows) && rows.length > 0) {
-          for (const row of rows) {
-            if (!row?.user_id || !row?.key_value) continue
-            const roleRes = await fetch(
-              `${config.supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(row.user_id)}&select=role&limit=1`,
-              { headers: supabaseAdminHeaders(config) },
-            )
-            if (!roleRes.ok) continue
-            const profileRows = await roleRes.json()
-            if (profileRows?.[0]?.role !== 'admin') continue
-
-            const dbKey = decryptApiKey(row.key_value, config)
-            if (dbKey) {
-              cachedPlatformKey = { value: dbKey, fetchedAt: Date.now() }
-              return dbKey
-            }
-          }
-          cachedPlatformKey = { value: '', fetchedAt: Date.now() }
-        }
-      }
-    } catch {
-      // Fall through cleanly.
-    }
-  }
-
+async function resolvePlatformApiKey(config) {
   return config.envKey
 }
 
@@ -511,9 +474,7 @@ async function handleAdminKey(request, response, pathname, rootDir) {
   }
 
   if (pathname === '/api/admin/key/refresh' || request.method === 'GET') {
-    const forceRefresh = pathname === '/api/admin/key/refresh'
-    if (forceRefresh) invalidateKeyCache()
-    const activeKey = await resolvePlatformApiKey(config, forceRefresh)
+    const activeKey = await resolvePlatformApiKey(config)
     sendJson(
       response,
       200,
@@ -526,87 +487,12 @@ async function handleAdminKey(request, response, pathname, rootDir) {
     return
   }
 
-  if (request.method === 'PUT' || request.method === 'POST') {
-    const { tooLarge, buffer } = await readBodyBuffer(request, 16 * 1024)
-    if (tooLarge) {
-      sendJson(response, 413, { error: 'Payload too large.' }, request)
-      return
-    }
-    let body = null
-    try {
-      body = JSON.parse(buffer.toString('utf8'))
-    } catch {
-      sendJson(response, 400, { error: 'Invalid JSON payload.' }, request)
-      return
-    }
-
-    const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : ''
-    if (!isValidDeepSeekKey(apiKey)) {
-      sendJson(response, 400, { error: 'Enter a valid DeepSeek API key starting with "sk-".' }, request)
-      return
-    }
-
-    try {
-      await fetch(`${config.supabaseUrl}/rest/v1/user_api_keys?provider=eq.deepseek`, {
-        method: 'DELETE',
-        headers: {
-          ...supabaseAdminHeaders(config),
-          prefer: 'return=minimal',
-        },
-      })
-
-      const insertRes = await fetch(`${config.supabaseUrl}/rest/v1/user_api_keys`, {
-        method: 'POST',
-        headers: {
-          ...supabaseAdminHeaders(config),
-          'content-type': 'application/json',
-          prefer: 'return=minimal',
-        },
-        body: JSON.stringify({
-          user_id: auth.userId,
-          provider: 'deepseek',
-          key_value: encryptApiKey(apiKey, config),
-          key_fingerprint: sha256Hex(apiKey),
-          label: 'platform',
-        }),
-      })
-
-      if (!insertRes.ok) {
-        sendJson(response, 502, { error: 'Could not persist platform API key in database.' }, request)
-        return
-      }
-
-      invalidateKeyCache()
-      cachedPlatformKey = { value: apiKey, fetchedAt: Date.now() }
-      sendJson(response, 200, { configured: true, masked: maskKey(apiKey) }, request)
-    } catch {
-      sendJson(response, 502, { error: 'Failed to save platform API key.' }, request)
-    }
-    return
-  }
-
-  if (request.method === 'DELETE') {
-    try {
-      const delRes = await fetch(`${config.supabaseUrl}/rest/v1/user_api_keys?provider=eq.deepseek`, {
-        method: 'DELETE',
-        headers: {
-          ...supabaseAdminHeaders(config),
-          prefer: 'return=minimal',
-        },
-      })
-      if (!delRes.ok) {
-        sendJson(response, 502, { error: 'Could not remove platform API key from database.' }, request)
-        return
-      }
-      invalidateKeyCache()
-      sendJson(response, 200, { configured: false, masked: null }, request)
-    } catch {
-      sendJson(response, 502, { error: 'Failed to remove platform API key.' }, request)
-    }
-    return
-  }
-
-  sendJson(response, 405, { error: 'Method not allowed.' }, request)
+  sendJson(
+    response,
+    410,
+    { error: 'API keys are no longer stored in the database. Configure DEEPSEEK_API_KEY in Supabase Edge Function Secrets.' },
+    request,
+  )
 }
 
 async function handleUsageStatus(request, response, rootDir) {
@@ -1072,9 +958,9 @@ async function proxyDeepSeek(request, response, pathname, rootDir) {
     if (usage.totalTokens >= monthlyLimit) {
       sendJson(
         response,
-        429,
+        402,
         {
-          error: `Monthly token allowance reached for your ${auth.tier} plan (${usage.totalTokens.toLocaleString()} / ${monthlyLimit.toLocaleString()} tokens).`,
+          error: `You have finished your ${auth.tier === 'free' ? 'trial' : 'monthly'} tokens (${usage.totalTokens.toLocaleString()} / ${monthlyLimit.toLocaleString()} tokens).`,
           code: 'QUOTA_EXCEEDED',
         },
         request,

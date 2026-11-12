@@ -22,11 +22,23 @@ export function Composer() {
   const [value, setValue] = useComposerDraft()
 
   const trialExpired = Boolean(usage?.trialExpired)
-  const disabled = !activeSession || !dbReady || trialExpired
+  const quotaExhausted = Boolean(
+    usage &&
+      !usage.isAdmin &&
+      usage.monthlyLimit !== null &&
+      usage.remainingTokens !== null &&
+      usage.remainingTokens <= 0,
+  )
+  const blockedReason = trialExpired
+    ? 'trial-expired'
+    : quotaExhausted
+      ? 'quota-exceeded'
+      : null
+  const disabled = !activeSession || !dbReady || blockedReason !== null
 
   const handleSubmit = () => {
-    if (trialExpired) {
-      openPricingModal('trial-expired')
+    if (blockedReason) {
+      openPricingModal(blockedReason)
       return
     }
     const text = value.trim()
@@ -38,18 +50,22 @@ export function Composer() {
   return (
     <div className="composer">
       <div className="composer-inner">
-        {trialExpired ? (
+        {blockedReason ? (
           <div className="composer-trial-bar" role="status">
             <span className="composer-trial-bar-left">
               <LockIcon size={13} />
-              <span>Your 7-day free trial has ended. Subscribe to continue asking Tabula.</span>
+              <span>
+                {blockedReason === 'quota-exceeded'
+                  ? 'Trial tokens finished'
+                  : '7-day free trial ended'}
+              </span>
             </span>
             <button
               type="button"
               className="btn btn-primary btn-small"
-              onClick={() => openPricingModal('trial-expired')}
+              onClick={() => openPricingModal(blockedReason)}
             >
-              Upgrade
+              Upgrade to Tabula Pro
             </button>
           </div>
         ) : null}
@@ -71,13 +87,15 @@ export function Composer() {
           disabled={disabled}
           streaming={isStreaming}
           placeholder={
-            trialExpired
-              ? 'Trial ended — upgrade to Tabula Pro to ask questions…'
-              : !activeSession
-                ? 'Upload a file to begin…'
-                : !dbReady
-                  ? 'Initializing analysis engine…'
-                  : 'Ask questions, analyze trends, or request a summary…'
+            blockedReason === 'quota-exceeded'
+              ? 'Trial tokens finished — upgrade to Tabula Pro to continue…'
+              : blockedReason === 'trial-expired'
+                ? 'Trial ended — upgrade to Tabula Pro to ask questions…'
+                : !activeSession
+                  ? 'Upload a file to begin…'
+                  : !dbReady
+                    ? 'Initializing analysis engine…'
+                    : 'Ask questions, analyze trends, or request a summary…'
           }
         />
       </div>

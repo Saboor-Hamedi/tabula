@@ -7,7 +7,11 @@ import {
   type ReactNode,
 } from "react";
 import type { DuckDBHandle } from "../core/duckdb/initDuckDB";
-import { initDuckDB } from "../core/duckdb/initDuckDB";
+import {
+  hasDuckDBHandle,
+  initDuckDB,
+  resetDuckDBHandle,
+} from "../core/duckdb/initDuckDB";
 import { closeDuckDB } from "../core/duckdb/closeDuckDB";
 import { ingestCSV } from "../core/duckdb/ingestCSV";
 import { ingestExcel } from "../core/duckdb/ingestExcel";
@@ -71,8 +75,10 @@ import {
   MAX_UPLOAD_BYTES,
 } from "../core/constants";
 import { recordMetric } from "../core/metrics";
+import { getBillingBlockReason } from "../core/deepseek/client";
 import {
   canUseWorkspaceAnalysis,
+  isQuotaExhausted,
   openPricingModal,
   refreshUsage,
 } from "../core/supabase/usage";
@@ -208,6 +214,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     null,
   );
   const [upload, setUpload] = useState<UploadState>(IDLE_UPLOAD);
+
+  useEffect(() => {
+    if (upload.phase !== "done") return;
+    const timer = window.setTimeout(() => {
+      setUpload((current) =>
+        current.phase === "done" ? IDLE_UPLOAD : current,
+      );
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [upload.phase, upload.message, upload.fileName]);
   const [sheetPicker, setSheetPicker] = useState<SheetPickerRequest | null>(
     null,
   );
@@ -265,7 +281,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     bootstrapRef.current
       .then((result) => {
         if (!active) return;
-        dbHandleRef.current = result.handle;
+        dbHandleRef.current = hasDuckDBHandle() ? result.handle : null;
         setSessions(result.sessions);
         setMessagesBySession(result.messagesBySession);
         setTracesBySession(result.tracesBySession);
@@ -338,10 +354,60 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const ensureDuckDBHandle = useCallback(async (): Promise<DuckDBHandle> => {
+    if (dbHandleRef.current && hasDuckDBHandle()) {
+      return dbHandleRef.current;
+    }
+    const handle = await initDuckDB();
+    dbHandleRef.current = handle;
+    setDbReady(true);
+    setDbError(null);
+    return handle;
+  }, []);
+
+  const ingestWithWorkerRecovery = useCallback(
+    async (params: {
+      kind: FileKind;
+      file: File;
+      sessionId: string;
+      selectedSheets?: string[];
+    }) => {
+      const runIngest = (targetHandle: DuckDBHandle) =>
+        params.kind === "csv"
+          ? ingestCSV({
+              handle: targetHandle,
+              file: params.file,
+              sessionId: params.sessionId,
+            })
+          : ingestExcel({
+              handle: targetHandle,
+              file: params.file,
+              sessionId: params.sessionId,
+              selectedSheets: params.selectedSheets,
+            });
+
+      let handle = await ensureDuckDBHandle();
+      try {
+        const result = await runIngest(handle);
+        return { handle, result };
+      } catch (error) {
+        if (!/worker is not set/i.test(errorMessage(error))) {
+          throw error;
+        }
+        resetDuckDBHandle();
+        dbHandleRef.current = null;
+        handle = await ensureDuckDBHandle();
+        const result = await runIngest(handle);
+        return { handle, result };
+      }
+    },
+    [ensureDuckDBHandle],
+  );
+
   /** Builds a digest for a session and stores it for the agent and the UI. */
   const refreshDigest = useCallback(
     async (session: Session): Promise<DatasetDigest | null> => {
-      const handle = dbHandleRef.current;
+      const handle = await ensureDuckDBHandle().catch(() => null);
       if (!handle) return null;
 
       try {
@@ -352,7 +418,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [],
+    [ensureDuckDBHandle],
   );
 
   /**
@@ -391,14 +457,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const startedAt = performance.now();
 
       try {
-        let handle = dbHandleRef.current;
-        if (!handle) {
-          handle = await initDuckDB();
-          dbHandleRef.current = handle;
-          setDbReady(true);
-          setDbError(null);
-        }
-
         setUpload({
           phase: "ingesting",
           fileName: file.name,
@@ -406,10 +464,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
 
         const sessionId = createId();
-        const result =
-          kind === "csv"
-            ? await ingestCSV({ handle, file, sessionId })
-            : await ingestExcel({ handle, file, sessionId, selectedSheets });
+        const { result } = await ingestWithWorkerRecovery({
+          kind,
+          file,
+          sessionId,
+          selectedSheets,
+        });
 
         if (result.tables.length === 0) {
           throw new Error("No readable tables were found in this file.");
@@ -472,7 +532,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [refreshDigest, refreshSuggestions, workspaceScope],
+    [ingestWithWorkerRecovery, refreshDigest, refreshSuggestions, workspaceScope],
   );
 
   const uploadFile = useCallback(
@@ -604,14 +664,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const startedAt = performance.now();
 
       try {
-        let handle = dbHandleRef.current;
-        if (!handle) {
-          handle = await initDuckDB();
-          dbHandleRef.current = handle;
-          setDbReady(true);
-          setDbError(null);
-        }
-
         setUpload({
           phase: "ingesting",
           fileName: file.name,
@@ -621,10 +673,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // Ingest into a temporary schema first, so a failed replacement leaves
         // the existing dataset untouched.
         const temporaryId = createId();
-        const result =
-          kind === "csv"
-            ? await ingestCSV({ handle, file, sessionId: temporaryId })
-            : await ingestExcel({ handle, file, sessionId: temporaryId });
+        const { handle, result } = await ingestWithWorkerRecovery({
+          kind,
+          file,
+          sessionId: temporaryId,
+        });
 
         if (result.tables.length === 0) {
           throw new Error("No readable tables were found in this file.");
@@ -700,7 +753,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [activeSession, refreshDigest, refreshSuggestions, workspaceScope],
+    [activeSession, ingestWithWorkerRecovery, refreshDigest, refreshSuggestions, workspaceScope],
   );
 
   const selectSession = useCallback(
@@ -796,6 +849,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       if (!canUseWorkspaceAnalysis()) {
         openPricingModal("trial-expired");
+        return;
+      }
+
+      if (isQuotaExhausted()) {
+        openPricingModal("quota-exceeded");
         return;
       }
 
@@ -936,25 +994,54 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           });
         } else {
           const message = errorMessage(error);
-          setMessagesBySession((previous) => {
-            const list = previous[sessionId] ?? [];
-            return {
-              ...previous,
-              [sessionId]: list.map((item) =>
-                item.id === assistantId
-                  ? {
+          const inferredReason =
+            getBillingBlockReason(error) ??
+            (/too many requests/i.test(message) && isQuotaExhausted()
+              ? 'quota-exceeded'
+              : null);
+          if (inferredReason) {
+            openPricingModal(inferredReason);
+            setMessagesBySession((previous) => {
+              const list = previous[sessionId] ?? [];
+              return {
+                ...previous,
+                [sessionId]: list.flatMap((item) => {
+                  if (item.id !== assistantId) return [item];
+                  if (item.content.trim().length === 0) return [];
+                  return [
+                    {
                       ...item,
-                      error: true,
                       suggestionsPending: false,
-                      content:
-                        item.content.trim().length > 0
-                          ? `${item.content}\n\n> **Agent error:** ${message}`
-                          : `> **Agent error:** ${message}`,
-                    }
-                  : item,
-              ),
-            };
-          });
+                      upgradeReason: inferredReason,
+                    },
+                  ];
+                }),
+              };
+            });
+          } else {
+            const cleanMessage = /too many requests/i.test(message)
+              ? "Too many requests right now. Please wait a moment and try again."
+              : message;
+            setMessagesBySession((previous) => {
+              const list = previous[sessionId] ?? [];
+              return {
+                ...previous,
+                [sessionId]: list.map((item) =>
+                  item.id === assistantId
+                    ? {
+                        ...item,
+                        error: true,
+                        suggestionsPending: false,
+                        content:
+                          item.content.trim().length > 0
+                            ? `${item.content}\n\n> **Agent error:** ${cleanMessage}`
+                            : `> **Agent error:** ${cleanMessage}`,
+                      }
+                    : item,
+                ),
+              };
+            });
+          }
         }
       } finally {
         setIsStreaming(false);
