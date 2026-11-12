@@ -1021,11 +1021,18 @@ a.post-tag:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 6px 5px 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
+  padding: 6px 6px 6px 12px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 12px;
   box-shadow: var(--shadow-sm);
+}
+
+.insights-search .btn-primary {
+  color: #090d16;
+  font-weight: 600;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .insights-search svg {

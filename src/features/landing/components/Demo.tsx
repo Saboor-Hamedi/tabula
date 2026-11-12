@@ -67,7 +67,8 @@ export function Demo({
                 <span className="dot dot-gray" />
               </div>
               <div className="landing-window-title">
-                {activeScenario.fileType} • {activeScenario.rows}
+                <span className="landing-window-filename">{activeScenario.fileType}</span>
+                <span className="landing-window-rows">{activeScenario.rows}</span>
               </div>
               <div className="landing-window-speed">
                 <ZapIcon size={12} />

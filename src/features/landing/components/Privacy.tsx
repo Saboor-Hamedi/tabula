@@ -46,16 +46,32 @@ export function Privacy() {
               <h3 className="landing-arch-title">Total Local Privacy</h3>
               <ul className="landing-arch-list">
                 <li>
-                  <span className="arch-check">✓</span> <strong>0 bytes uploaded:</strong> Files open strictly inside your browser
+                  <span className="arch-check">✓</span>
+                  <div className="arch-item-copy">
+                    <strong className="arch-item-title">0 bytes uploaded</strong>
+                    <span className="arch-item-desc">Files open strictly inside your browser</span>
+                  </div>
                 </li>
                 <li>
-                  <span className="arch-check">✓</span> <strong>Never saved:</strong> When you close the tab, data vanishes from memory
+                  <span className="arch-check">✓</span>
+                  <div className="arch-item-copy">
+                    <strong className="arch-item-title">Never saved</strong>
+                    <span className="arch-item-desc">When you close the tab, data vanishes from memory</span>
+                  </div>
                 </li>
                 <li>
-                  <span className="arch-check">✓</span> <strong>Never stolen:</strong> No server has access to your rows or numbers
+                  <span className="arch-check">✓</span>
+                  <div className="arch-item-copy">
+                    <strong className="arch-item-title">Never stolen</strong>
+                    <span className="arch-item-desc">No server has access to your rows or numbers</span>
+                  </div>
                 </li>
                 <li>
-                  <span className="arch-check">✓</span> <strong>Full compliance:</strong> Safe for financial and medical records
+                  <span className="arch-check">✓</span>
+                  <div className="arch-item-copy">
+                    <strong className="arch-item-title">Full compliance</strong>
+                    <span className="arch-item-desc">Safe for financial and medical records</span>
+                  </div>
                 </li>
               </ul>
             </div>

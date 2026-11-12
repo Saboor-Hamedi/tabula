@@ -1,4 +1,4 @@
-import { ChevronDownIcon, ChevronUpIcon } from '../../common/Icons'
+import { ChevronDownIcon } from '../../common/Icons'
 import { FAQS } from '../data'
 
 /**
@@ -29,10 +29,11 @@ export function Faq({ openIndex, setOpenIndex }: FaqProps) {
                   <button
                     type="button"
                     className="faq-question-btn"
+                    aria-expanded={isOpen}
                     onClick={() => setOpenIndex(isOpen ? null : idx)}
                   >
                     <span>{faq.q}</span>
-                    {isOpen ? <ChevronUpIcon size={15} /> : <ChevronDownIcon size={15} />}
+                    <ChevronDownIcon size={15} className="faq-chevron" />
                   </button>
                   {isOpen && <div className="faq-answer-content">{faq.a}</div>}
                 </div>

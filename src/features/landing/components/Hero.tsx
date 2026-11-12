@@ -87,17 +87,14 @@ export function Hero({
               <span className="landing-metric-val">100%</span>
               <span className="landing-metric-label">Runs On Your Device</span>
             </div>
-            <div className="landing-metric-divider" />
             <div className="landing-metric-item">
               <span className="landing-metric-val">0 Bytes</span>
               <span className="landing-metric-label">Uploaded To Servers</span>
             </div>
-            <div className="landing-metric-divider" />
             <div className="landing-metric-item">
               <span className="landing-metric-val">Instant</span>
               <span className="landing-metric-label">No Waiting Or Queue</span>
             </div>
-            <div className="landing-metric-divider" />
             <div className="landing-metric-item">
               <span className="landing-metric-val">Safe</span>
               <span className="landing-metric-label">Confidential & Compliant</span>

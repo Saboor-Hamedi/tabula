@@ -1,7 +1,6 @@
 import { Link } from '../../../core/router'
 import { ROUTES } from '../../../core/router/paths'
-import { DatabaseIcon, MoonIcon, SunIcon } from '../../common/Icons'
-import { useTheme } from '../../common/useTheme'
+import { DatabaseIcon } from '../../common/Icons'
 
 /**
  * The footer.
@@ -20,8 +19,6 @@ const SECTION_LINKS: { label: string; section: string }[] = [
 const PROMISES = ['100% On-Device', 'Zero Cloud Storage', 'No Telemetry', 'Never Saved']
 
 export function Footer() {
-  const { theme, toggleTheme } = useTheme()
-
   const scrollTo = (section: string) => {
     const element = document.getElementById(section)
     element?.scrollIntoView({ behavior: 'smooth' })
@@ -72,17 +69,6 @@ export function Footer() {
         <div className="landing-footer-bottom">
           <div className="footer-copy">
             © {new Date().getFullYear()} Tabula. Your data stays with you.
-          </div>
-          <div className="footer-bottom-actions">
-            <button
-              type="button"
-              className="landing-theme-btn"
-              onClick={(event) => toggleTheme(event)}
-              title="Toggle Dark/Light Mode"
-            >
-              {theme === 'dark' ? <SunIcon size={13} /> : <MoonIcon size={13} />}
-              <span style={{ fontSize: '11px' }}>{theme === 'dark' ? 'Dark' : 'Light'}</span>
-            </button>
           </div>
         </div>
       </div>

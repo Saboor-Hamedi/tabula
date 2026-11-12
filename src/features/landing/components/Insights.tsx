@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link } from '../../../core/router'
 import { ROUTES } from '../../../core/router/paths'
+import { isSupabaseConfigured } from '../../../core/supabase/client'
 import { ArrowRightIcon, CloseIcon, SearchIcon } from '../../common/Icons'
-import { Feed } from '../../posts'
+import { Feed, listPublishedPostsPage } from '../../posts'
 
 /**
  * The public Posts section on the front page.
  *
  * Brings the searchable, paginated list of published posts right onto the
  * landing page so visitors can search and read analyses immediately.
+ * Hidden completely when no published posts exist yet.
  */
 
 export function Insights() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [hasPosts, setHasPosts] = useState<boolean | null>(
+    isSupabaseConfigured ? null : false,
+  )
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -21,6 +26,25 @@ export function Insights() {
     }, 220)
     return () => window.clearTimeout(timer)
   }, [search])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return
+    let active = true
+    void listPublishedPostsPage({ limit: 1, offset: 0 })
+      .then((result) => {
+        if (active) setHasPosts(result.total > 0)
+      })
+      .catch(() => {
+        if (active) setHasPosts(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  if (!hasPosts && !debouncedSearch) {
+    return null
+  }
 
   return (
     <section id="posts" className="landing-section landing-insights">

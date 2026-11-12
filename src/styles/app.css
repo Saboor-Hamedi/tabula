@@ -3085,10 +3085,16 @@ body.is-resizing * {
 
   .inspector {
     position: fixed;
-    inset: var(--header-height) 0 0 0;
+    top: var(--header-height);
+    right: 0;
+    bottom: 0;
+    left: auto;
+    width: min(var(--inspector-width, 320px), 100vw);
+    height: auto;
     z-index: 45;
-    border-left: 0;
+    border-left: 1px solid var(--border);
     border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-lg, -8px 0 24px rgba(0, 0, 0, 0.12));
     animation: sheet-in 180ms cubic-bezier(0.32, 0.72, 0, 1);
   }
 

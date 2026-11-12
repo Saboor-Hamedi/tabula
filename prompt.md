@@ -1,22 +1,27 @@
-We need to refactor how Tabula handles DeepSeek API calls and user token tracking to fix a security vulnerability where the DeepSeek API key is exposed in the database (`user_api_key` table).
+Act as a senior product designer specializing in subtle, high-craft dark-mode interfaces (Linear / Raycast aesthetic) and refine the mobile responsiveness, typography, contrast, and visual hierarchy of the **Tabula** landing page (`LandingPage` / `/landing` route).
 
-I have already stored `DEEPSEEK_API_KEY` as a Supabase Edge Function Secret. Please implement the following changes across the database, backend, and frontend:
+Please inspect the landing page components and apply the following exact UI/UX improvements without breaking existing functionality or desktop layouts:
 
-1. **Database Schema & Security (Supabase):**
-   - Deprecate/remove the `user_api_key` table so the DeepSeek API key is never stored in a user-accessible table.
-   - Create a `user_balances` table (or update the existing user profile table) with `user_id` (foreign key to `auth.users`) and `tokens_remaining` (integer, defaulting to `250000` for new users via a trigger on signup).
-   - Enable Row Level Security (RLS) on `user_balances` so authenticated users can only `SELECT` their own balance, and only the `service_role` (backend) can `UPDATE` `tokens_remaining`.
+1. **Primary CTA Button Contrast & Hero Polish**
+   - Change the text and icon color on all solid mint primary buttons (`Open Workspace →`, `Search`) from white to deep obsidian (`text-[#090D16] font-semibold`) so they achieve crisp AAA contrast against the `#2DD4BF` / teal background.
+   - Give the hero section slightly more top breathing room on mobile (`pt-14 pb-10`) and tighten the main headline (`leading-[1.12] tracking-tight`).
+   - Fix the 2×2 stats card (`100%`, `0 Bytes`, `Instant`, `Safe`) by replacing any uneven vertical divider lines with a clean symmetrical 2-column CSS grid using subtle hairline borders (`divide-x divide-y divide-white/[0.06]`) and centered alignment inside each quadrant.
 
-2. **Backend Proxy (Supabase Edge Function):**
-   - Create a new Supabase Edge Function named `deepseek-proxy` (or update our existing backend route).
-   - Verify the incoming user's Supabase JWT auth token to get their `user_id`.
-   - Query `user_balances` using the Supabase `service_role` client to check `tokens_remaining`. If `tokens_remaining <= 0`, return a `403` error stating they have run out of tokens.
-   - Retrieve `Deno.env.get('DEEPSEEK_API_KEY')` and forward the user's prompt/messages to the DeepSeek API (`https://api.deepseek.com/chat/completions`).
-   - Extract `usage.total_tokens` from DeepSeek's response, subtract that exact amount from the user's `tokens_remaining` in `user_balances` (clamping at `0` so it doesn't go negative), and return the assistant response along with the updated `tokens_remaining` to the frontend.
+2. **Interactive Demo Section (`How It Works`)**
+   - **Mobile Scenario Switcher:** On mobile viewports (`< 640px`), convert the 3 stacked scenario selector cards (`Customer Retention & Churn`, `Medical Research Trials`, `Quarterly Sales & Expenses`) into a horizontal scrollable row of compact pills (`flex overflow-x-auto snap-x gap-2.5 no-scrollbar`) so users can see the scenario tabs and the live preview window on the same screen without excessive scrolling. Keep the 3-column desktop layout intact (`sm:grid sm:grid-cols-3`).
+   - **Terminal Header Alignment:** Inside the simulated browser/terminal header, prevent `"Customer_Activity.xlsx • 1,248,500 rows"` from wrapping awkwardly next to the `"Processed in 0.04s"` pill. Display the filename on the top line (`text-xs font-medium text-slate-200 truncate`) and the row count directly underneath (`text-[11px] text-slate-400`), while keeping the green `"0.04s"` badge `whitespace-nowrap shrink-0`.
+   - **Flatten Nested Card Borders:** Eliminate heavy "box-inside-a-box" borders inside the demo output panel. Replace the outer borders on `YOUR QUESTION`, `Automated Local Calculation`, `INSTANT VISUAL BREAKDOWN`, and `EXECUTIVE SUMMARY` with subtle surface elevation (`bg-white/[0.025]`) and soft `1px` dividers (`border-white/[0.06]`).
 
-3. **Frontend Refactor:**
-   - Remove all frontend queries to the old `user_api_key` table and remove any client-side calls directly to `api.deepseek.com`.
-   - Update the chat/agent service to send requests to our new `deepseek-proxy` Supabase Edge Function, passing the user's active session `Authorization: Bearer <token>` header.
-   - Update the UI dashboard to display the user's live `tokens_remaining` from `user_balances` after each query.
+3. **Published Posts Section**
+   - Unify the search bar by placing the **Search** button cleanly inside the right side of the rounded input container (`flex items-center p-1.5 rounded-xl bg-white/[0.03] border border-white/[0.08]`) rather than floating outside it.
+   - If no posts exist in the database yet (`posts.length === 0`), hide this entire section on the public landing page instead of rendering a `"No posts published yet"` empty state box, so first-time visitors don't see an empty placeholder.
 
-Please inspect our current codebase structure first, confirm the exact files you will modify, and then write the SQL migration, the Edge Function code, and the updated frontend API calls.
+4. **Privacy Comparison Cards (`Your Data Stays With You`)**
+   - In the **Total Local Privacy** card, replace the misaligned 2-column label/description layout with a clean stacked layout matching the **How Traditional Software Works** card above it: green checkmark + bold white title on the first line (e.g., `0 bytes uploaded`), and muted gray explanation (`text-slate-400 text-sm`) indented cleanly underneath.
+   - Give **The Tabula Guarantee** card a subtle top radial emerald glow (`bg-gradient-to-b from-emerald-500/[0.08] to-transparent border-emerald-500/25`) so it visually stands out as the clear winner over the muted red comparison card.
+
+5. **FAQ Accordion & Footer Cleanup**
+   - Replace the 6 heavy bordered FAQ boxes with a cleaner, lighter full-width hairline accordion (`divide-y divide-white/[0.08]`) with generous vertical padding (`py-5`) and smooth chevron rotation.
+   - In the footer, remove the accidental underline on the `Tabula` brand link (`no-underline`) and remove the redundant `Dark` theme toggle button at the very bottom (since the theme toggle already lives in the top navbar).
+
+Show me a summary of the files updated and verify there are no TypeScript or Tailwind class issues.
