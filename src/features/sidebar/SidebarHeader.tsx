@@ -28,7 +28,7 @@ export function SidebarHeader({ onClose, closable = false }: SidebarHeaderProps)
         <span className="brand-mark" aria-hidden>
           <DatabaseIcon size={16} />
         </span>
-        <span className="brand-name">Tabula</span>
+        <span className="brand-name">Lumina Tabula</span>
       </div>
 
       <div className="sidebar-header-actions">

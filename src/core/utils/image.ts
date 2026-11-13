@@ -33,11 +33,35 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
   const viewBox = svg.viewBox?.baseVal
   const width = Math.max(1, Math.round(viewBox?.width || bounds.width || 960))
   const height = Math.max(1, Math.round(viewBox?.height || bounds.height || 540))
+  const renderScale = Math.min(4, Math.max(scale, Math.ceil(1400 / width)))
+  const pixelWidth = Math.max(1, Math.round(width * renderScale))
+  const pixelHeight = Math.max(1, Math.round(height * renderScale))
+  const svgUnitRatio = bounds.width > 0 ? width / bounds.width : 1
+
+  // Capture live computed font sizes (converted to SVG viewBox units) and colors
+  // before cloning so shape labels never render oversized or inherit thick strokes.
+  const liveFoStyles = Array.from(svg.querySelectorAll('foreignObject')).map((fo) => {
+    const leaf = fo.querySelector('p, span, div') ?? fo.firstElementChild ?? fo
+    const cs = window.getComputedStyle(leaf)
+    const parsed = parseFloat(cs.fontSize)
+    const unitSize = Number.isFinite(parsed) && parsed > 0 ? parsed * svgUnitRatio : 12
+    const foH = parseFloat(fo.getAttribute('height') || '0')
+    const maxForBox = foH > 0 ? Math.max(9, foH * 0.65) : 13
+    return {
+      fontSize: Math.min(Math.max(unitSize, 9), maxForBox, 13),
+      color: cs.color || '',
+    }
+  })
 
   const clone = svg.cloneNode(true) as SVGSVGElement
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  clone.setAttribute('width', String(width))
-  clone.setAttribute('height', String(height))
+  if (!clone.getAttribute('viewBox')) {
+    clone.setAttribute('viewBox', `0 0 ${width} ${height}`)
+  }
+  // Rasterize the SVG vector directly at target pixel dimensions so the browser
+  // never upscales a 1x bitmap onto a 2x canvas (which causes blurry text).
+  clone.setAttribute('width', String(pixelWidth))
+  clone.setAttribute('height', String(pixelHeight))
   clone.style.maxWidth = 'none'
   // Exported figures must be transparent for Word/Google Docs. Mermaid can put
   // a theme background on the root SVG or an xychart background rect, so both
@@ -62,6 +86,7 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
   const exportStyle = document.createElementNS('http://www.w3.org/2000/svg', 'style')
   exportStyle.textContent =
     'svg{background:transparent!important;background-color:transparent!important}' +
+    'text,tspan{font-family:Inter,system-ui,-apple-system,sans-serif}' +
     'rect.background{display:none!important}' +
     `.chart-title text,.bottom-axis text,.left-axis text,.pieTitleText,.legend text,.elbow-chart-text,.series-chart-text{fill:${textColor}!important}` +
     `.chart-title text,.pieTitleText{font-weight:700!important}`
@@ -82,7 +107,7 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
 
   // Convert HTML foreignObject elements into standard SVG <text> nodes.
   // ForeignObjects in SVGs cause browser security sandboxes to reject <img> loading.
-  clone.querySelectorAll('foreignObject').forEach((fo) => {
+  clone.querySelectorAll('foreignObject').forEach((fo, foIndex) => {
     const textContent = fo.textContent?.trim() || ''
     if (!textContent) {
       fo.remove()
@@ -93,8 +118,9 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
     const w = parseFloat(fo.getAttribute('width') || '0')
     const h = parseFloat(fo.getAttribute('height') || '0')
 
-    const fontSize = 12
-    const maxChars = Math.max(6, Math.floor((w - 8) / (fontSize * 0.52)))
+    const liveStyle = liveFoStyles[foIndex]
+    const fontSize = liveStyle?.fontSize ?? 12
+    const maxChars = Math.max(6, Math.floor((w - 8) / (fontSize * 0.55)))
     const words = textContent.split(/\s+/)
     const lines: string[] = []
     let line = ''
@@ -115,10 +141,12 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
 
     const textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text')
     textNode.setAttribute('text-anchor', 'middle')
-    textNode.setAttribute('fill', textColor)
+    textNode.setAttribute('fill', liveStyle?.color || textColor)
+    textNode.setAttribute('stroke', 'none')
+    textNode.setAttribute('stroke-width', '0')
     textNode.setAttribute('font-family', 'Inter, system-ui, -apple-system, sans-serif')
     textNode.setAttribute('font-size', `${fontSize}px`)
-    textNode.setAttribute('font-weight', '550')
+    textNode.setAttribute('font-weight', '400')
     lines.forEach((lineText, index) => {
       const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
       tspan.setAttribute('x', String(x + w / 2))
@@ -142,20 +170,20 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
     })
 
     const canvas = document.createElement('canvas')
-    canvas.width = Math.round(width * scale)
-    canvas.height = Math.round(height * scale)
+    canvas.width = pixelWidth
+    canvas.height = pixelHeight
     const context = canvas.getContext('2d')
     if (!context) throw new Error('Canvas is unavailable in this browser.')
 
     // Leave the canvas untouched: its default pixels are fully transparent, so
     // the PNG pastes cleanly into Word instead of carrying a dark background.
     context.clearRect(0, 0, canvas.width, canvas.height)
-    context.scale(scale, scale)
-    context.drawImage(image, 0, 0, width, height)
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    context.scale(renderScale, renderScale)
 
-    // Subtle "Made with Tabula" watermark badge on exported chart PNGs (Prompt 5.1)
+    // Subtle "Made with Lumina Tabula" watermark badge on exported chart PNGs (Prompt 5.1)
     context.save()
-    const watermarkText = 'Made with Tabula'
+    const watermarkText = 'Made with Lumina Tabula'
     context.font = '500 11px Inter, system-ui, -apple-system, sans-serif'
     const metrics = context.measureText(watermarkText)
     const padX = 8

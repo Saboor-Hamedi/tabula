@@ -517,8 +517,8 @@ async function buildExecutiveReportHtml(
     entries.push(`
       <section class="tabula-entry">
         <div class="tabula-entry-head">
-          <strong class="tabula-entry-title">Tabula Analytical Findings #${inquiry}</strong>
-          <span class="tabula-entry-meta">Tabula Intelligence</span>
+          <strong class="tabula-entry-title">Lumina Tabula Analytical Findings #${inquiry}</strong>
+          <span class="tabula-entry-meta">Lumina Tabula Intelligence</span>
         </div>
         <div class="tabula-entry-body">${body}</div>
       </section>
@@ -541,7 +541,7 @@ async function buildExecutiveReportHtml(
     <div class="tabula-report">
       <header class="tabula-header">
         <div class="tabula-brand-row">
-          <span class="tabula-brand">Tabula Sovereign Intelligence</span>
+          <span class="tabula-brand">Lumina Tabula Sovereign Intelligence</span>
         </div>
         <h1 class="tabula-title">${escapeHtml(title)}</h1>
         <table class="tabula-meta">
@@ -1074,7 +1074,7 @@ Security:        100% In-Memory Sandbox · Zero Server Uploads
   }
 
   content += `================================================================================
-End of Report · Tabula Sovereign Analytics
+End of Report · Lumina Tabula Sovereign Analytics
 ================================================================================\n`
 
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })

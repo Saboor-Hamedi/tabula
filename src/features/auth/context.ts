@@ -25,6 +25,9 @@ export interface AuthState {
   refreshSession: () => Promise<Session | null>
   resendVerificationEmail: (email?: string) => Promise<{ error: Error | null }>
   resetPasswordForEmail: (email: string) => Promise<{ error: Error | null }>
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>
+  passwordRecovery: boolean
+  clearPasswordRecovery: () => void
   signInWithOAuth: (provider: 'google' | 'github') => Promise<{ error: Error | null }>
   signInWithOtp: (email: string) => Promise<{ error: Error | null }>
   refreshProfile: () => Promise<UserProfile | null>

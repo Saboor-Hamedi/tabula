@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   readMermaidTextColor,
   readMermaidTitle,
@@ -8,8 +8,10 @@ import { hasOpenFence } from '../../core/parsing/parseMessage'
 import {
   copyFigureImage,
   downloadFigureImage,
+  svgToPngBlob,
   type ImageExportMode,
 } from '../../core/utils/image'
+import { FigureLightbox } from '../common/FigureLightbox'
 import {
   CheckIcon,
   CodeIcon,
@@ -40,9 +42,38 @@ export function MermaidBlock({
   const [editing, setEditing] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
   const [imageStatus, setImageStatus] = useState<ImageExportMode | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const diagramContainerRef = useRef<HTMLDivElement>(null)
 
   const name = figureName(code)
+
+  useEffect(() => {
+    return () => {
+      if (lightboxSrc) URL.revokeObjectURL(lightboxSrc)
+    }
+  }, [lightboxSrc])
+
+  const handleOpenLightbox = useCallback(async () => {
+    const svg = diagramContainerRef.current?.querySelector('svg')
+    if (!(svg instanceof SVGSVGElement)) return
+    try {
+      const blob = await svgToPngBlob(svg, 2)
+      const url = URL.createObjectURL(blob)
+      setLightboxSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return url
+      })
+    } catch (err) {
+      console.warn('Could not open diagram preview:', err)
+    }
+  }, [])
+
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+  }, [])
 
   const handleCopyCode = async () => {
     try {
@@ -93,29 +124,6 @@ export function MermaidBlock({
   return (
     <div className="mermaid-wrapper" ref={ref}>
       <div className="mermaid-wrapper-header">
-        <div className="mermaid-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'diagram'}
-            className={`mermaid-tab ${tab === 'diagram' ? 'is-active' : ''}`}
-            onClick={() => setTab('diagram')}
-          >
-            <ImageIcon size={13} />
-            <span>Diagram</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'code'}
-            className={`mermaid-tab ${tab === 'code' ? 'is-active' : ''}`}
-            onClick={() => setTab('code')}
-          >
-            <CodeIcon size={13} />
-            <span>Code</span>
-          </button>
-        </div>
-
         <div className="mermaid-header-actions">
           {tab === 'diagram' ? (
             <>
@@ -161,6 +169,29 @@ export function MermaidBlock({
             </button>
           )}
         </div>
+
+        <div className="mermaid-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'diagram'}
+            className={`mermaid-tab ${tab === 'diagram' ? 'is-active' : ''}`}
+            onClick={() => setTab('diagram')}
+          >
+            <ImageIcon size={13} />
+            <span>Diagram</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'code'}
+            className={`mermaid-tab ${tab === 'code' ? 'is-active' : ''}`}
+            onClick={() => setTab('code')}
+          >
+            <CodeIcon size={13} />
+            <span>Code</span>
+          </button>
+        </div>
       </div>
 
       <div className="mermaid-wrapper-body">
@@ -169,6 +200,7 @@ export function MermaidBlock({
             code={code}
             inView={inView}
             containerRef={diagramContainerRef}
+            onClick={handleOpenLightbox}
           />
         ) : (
           <div className="mermaid-code-view">
@@ -194,6 +226,13 @@ export function MermaidBlock({
           onClose={() => setEditing(false)}
         />
       ) : null}
+
+      <FigureLightbox
+        src={lightboxSrc}
+        title={readMermaidTitle(code) || 'Diagram'}
+        hideHeader
+        onClose={handleCloseLightbox}
+      />
     </div>
   )
 }

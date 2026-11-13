@@ -1,4 +1,4 @@
-/* Tabula service worker: app shell + heavy analysis assets after first use. */
+/* Lumina Tabula service worker: app shell + heavy analysis assets after first use. */
 const CACHE = 'tabula-v2'
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg']
 

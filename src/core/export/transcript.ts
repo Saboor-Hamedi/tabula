@@ -4,7 +4,7 @@ import { stripInlineMarkdown } from '../parsing/inlineMarkdown'
 /** A plain-text conversation export that stays readable outside the app. */
 export function buildTranscript(session: Session, messages: ChatMessage[]): string {
   const lines: string[] = [
-    `Tabula conversation — ${session.fileName}`,
+    `Lumina Tabula conversation — ${session.fileName}`,
     `Exported ${new Date().toLocaleString()}`,
     '',
   ]
@@ -16,7 +16,7 @@ export function buildTranscript(session: Session, messages: ChatMessage[]): stri
       .replace(/\n{3,}/g, '\n\n')
       .trim()
     if (!text) continue
-    lines.push(message.role === 'user' ? 'You:' : 'Tabula:', text, '')
+    lines.push(message.role === 'user' ? 'You:' : 'Lumina Tabula:', text, '')
   }
 
   return lines.join('\n')

@@ -1681,22 +1681,23 @@ body.is-resizing * {
   margin: 0 0 var(--space-3);
   display: flex;
   flex-direction: column;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }
 
 .md-table-wrap {
   margin: 0 0 var(--space-2);
   overflow-x: auto;
+  width: 100%;
   max-width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .md-table-wrap table {
-  width: max-content;
+  width: 100%;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -1757,18 +1758,19 @@ body.is-resizing * {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  width: fit-content;
+  box-shadow: none;
+  width: 100%;
   max-width: 100%;
 }
 
 .data-table-scroll {
   overflow-x: auto;
+  width: 100%;
   max-width: 100%;
 }
 
 .data-table {
-  width: max-content;
+  width: 100%;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -2479,7 +2481,16 @@ body.is-resizing * {
 
 /* ---------- File panel ---------- */
 
-.inspector-body.is-file-tab,
+.inspector-body.is-file-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 5px;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
 .file-panel {
   display: flex;
   flex-direction: column;
@@ -4428,7 +4439,7 @@ body.is-resizing * {
 /* ---------- Python Panel ---------- */
 .inspector-body.is-python-tab,
 .inspector-body.is-notes-tab {
-  padding: 0;
+  padding: 5px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -6829,4 +6840,381 @@ body.is-resizing * {
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: all;
+}
+
+/* ==========================================================================
+   Lumina Tabula — Floating 3-Pane Editorial Workspace (5px radius)
+   ========================================================================== */
+
+.app-shell.is-workspace-shell {
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #F1F0EC;
+}
+
+[data-theme='dark'] .app-shell.is-workspace-shell {
+  background: #131315;
+}
+
+.app-shell.is-workspace-shell .app-header.is-workspace {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 12px;
+  background: transparent;
+  border-bottom: none;
+  flex-shrink: 0;
+}
+
+.workspace-brand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.brand-mark.is-workspace-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+}
+
+.workspace-header-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-local-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.workspace-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: #FFFFFF;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+[data-theme='dark'] .workspace-action-btn {
+  background: #1B1B1E;
+  border-color: #29292E;
+}
+
+.workspace-action-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.workspace-action-btn.is-primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.workspace-action-btn.is-primary:hover {
+  opacity: 0.9;
+}
+
+.workspace-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.workspace-tier-badge.is-pro {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* Floating 3-Pane Grid */
+.app-shell.is-workspace-shell .app-grid {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px 10px;
+  gap: 0;
+}
+
+.app-shell.is-workspace-shell .sidebar,
+.app-shell.is-workspace-shell .app-main,
+.app-shell.is-workspace-shell .inspector {
+  background: #FFFFFF;
+  border: 1px solid #E2E1DC;
+  border-radius: 5px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+[data-theme='dark'] .app-shell.is-workspace-shell .sidebar,
+[data-theme='dark'] .app-shell.is-workspace-shell .app-main,
+[data-theme='dark'] .app-shell.is-workspace-shell .inspector {
+  background: #1B1B1E;
+  border-color: #29292E;
+}
+
+.app-shell.is-workspace-shell .resize-handle {
+  width: 8px;
+}
+
+.app-shell.is-workspace-shell .resize-handle::after {
+  background: transparent;
+}
+
+.app-shell.is-workspace-shell .resize-handle:hover::after {
+  background: var(--accent);
+}
+
+/* Left Sidebar: 2-Col Actions & Live Filter */
+.sidebar-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sidebar-action-row .sidebar-add-source-btn,
+.sidebar-action-row .sidebar-add-note-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 8px;
+  margin: 0;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.sidebar-action-row .sidebar-add-source-btn:hover,
+.sidebar-action-row .sidebar-add-note-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.sidebar-filter-wrap {
+  margin-bottom: 8px;
+}
+
+.sidebar-filter-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
+.sidebar-filter-input:focus {
+  border-color: var(--accent);
+}
+
+/* Editorial Memo Flow for User Questions */
+.message-user.is-memo-heading {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-memo-heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* Quick Studio 2-Col Grid */
+.studio-notes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.quick-studio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quick-studio-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.quick-studio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.quick-studio-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.quick-studio-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.quick-studio-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile & Tablet 3-Segment Bottom Bar (< 1024px) */
+.workspace-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .workspace-header-toggle-desktop,
+  .workspace-local-badge,
+  .workspace-action-label {
+    display: none;
+  }
+
+  .app-shell.is-workspace-shell .app-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 0 8px 8px;
+  }
+
+  .app-shell.is-workspace-shell .sidebar,
+  .app-shell.is-workspace-shell .inspector {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    box-shadow: none;
+  }
+
+  .workspace-mobile-nav {
+    display: block;
+    padding: 0 8px calc(8px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+  }
+
+  .workspace-mobile-nav-track {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    border-radius: 5px;
+    background: #FFFFFF;
+    border: 1px solid #E2E1DC;
+  }
+
+  [data-theme='dark'] .workspace-mobile-nav-track {
+    background: #1B1B1E;
+    border-color: #29292E;
+  }
+
+  .workspace-mobile-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 36px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .workspace-mobile-tab.is-active {
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+    color: var(--text);
+  }
+}
+
+/* Horizontally Swipeable Follow-up Prompts on Narrow Phones */
+@media (max-width: 639px) {
+  .welcome-starters,
+  .suggestions {
+    display: flex !important;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 8px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .welcome-starters > *,
+  .suggestions > * {
+    flex: 0 0 82%;
+    scroll-snap-align: start;
+  }
 }

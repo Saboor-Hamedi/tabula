@@ -59,6 +59,7 @@
 .post-card {
   display: flex;
   flex-direction: column;
+  height: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -66,13 +67,11 @@
   color: inherit;
   text-decoration: none;
   transition:
-    transform var(--transition),
     box-shadow var(--transition),
     border-color var(--transition);
 }
 
 .post-card:hover {
-  transform: translateY(-2px);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
 }
@@ -93,6 +92,64 @@
   overflow: hidden;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
+}
+
+.post-card-cover.is-mermaid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  pointer-events: none;
+  background: var(--surface);
+}
+
+.post-card-cover.is-mermaid .mermaid-diagram {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.post-card-cover.is-mermaid svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
+.post-card-cover.is-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-2) 90%, var(--accent-soft)),
+    color-mix(in srgb, var(--surface) 95%, var(--accent-soft))
+  );
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.post-card-placeholder-art {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text-muted);
+}
+
+.post-card-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
 }
 
 .post-card-cover img {
@@ -146,6 +203,12 @@ a.post-tag:hover {
   line-height: 1.28;
   letter-spacing: -0.015em;
   color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .post-card.is-featured .post-card-title {
@@ -158,6 +221,12 @@ a.post-tag:hover {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .post-card-excerpt {
@@ -179,7 +248,7 @@ a.post-tag:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .post-card-byline {
@@ -187,6 +256,7 @@ a.post-tag:hover {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1 1 auto;
   font-size: var(--text-xs);
   color: var(--text-muted);
 }
@@ -197,11 +267,19 @@ a.post-tag:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  min-width: 0;
+  max-width: 90px;
+  flex-shrink: 1;
 }
 
 .post-dot {
   color: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.post-card-date {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .post-avatar {
@@ -227,6 +305,7 @@ a.post-tag:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .post-chip {
@@ -331,6 +410,12 @@ a.post-tag:hover {
   padding-bottom: 20px;
   margin-bottom: 28px;
   border-bottom: 1px solid var(--border);
+}
+
+.post-article-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .post-back {
@@ -528,7 +613,7 @@ a.post-tag:hover {
   border-radius: var(--radius-lg);
   background: var(--surface);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .post-body {
@@ -537,13 +622,7 @@ a.post-tag:hover {
 
 .post-body .mermaid-wrapper-header::before,
 .post-body .figure-tools::before {
-  content: 'Figure ' counter(post-figure);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-right: auto;
+  content: none;
 }
 
 .post-body .mermaid-wrapper-header {
@@ -558,17 +637,33 @@ a.post-tag:hover {
 
 .post-body .data-table-block {
   margin: 26px 0;
+  width: 100%;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
+}
+
+.post-body .data-table-block .data-table-scroll,
+.post-body .data-table-block .data-table {
+  width: 100%;
+  min-width: 100%;
 }
 
 .post-body .md-table-container {
   margin: 26px 0;
+  width: 100%;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+}
+
+.post-body .md-table-container .md-table-wrap,
+.post-body .md-table-container .md-table-wrap table {
+  width: 100%;
+  min-width: 100%;
 }
 
 /* ---------- Gallery ---------- */
@@ -1021,17 +1116,18 @@ a.post-tag:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 6px 12px;
+  padding: 5px 5px 5px 16px;
   background: color-mix(in srgb, var(--text) 3%, transparent);
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-full);
   box-shadow: var(--shadow-sm);
 }
 
 .insights-search .btn-primary {
   color: #090d16;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: var(--radius-full);
+  padding-inline: 16px;
   flex-shrink: 0;
 }
 

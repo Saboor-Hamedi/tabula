@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Tabula — Migration 001 companion: the queries the app actually runs
+-- Lumina Tabula — Migration 001 companion: the queries the app actually runs
 -- ==============================================================================
 -- These are the PostgREST / RPC calls issued by `src/features/posts/api.ts`.
 -- They are written out here so the exact request the app makes is reviewable

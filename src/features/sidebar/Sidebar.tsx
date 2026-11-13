@@ -28,18 +28,16 @@ import { SidebarHeader } from './SidebarHeader'
 export interface SidebarProps {
   onClose: () => void
   closable?: boolean
-  isCollapsed?: boolean
-  onExpand?: () => void
+  onSelectSessionComplete?: () => void
 }
 
 export function Sidebar({
   onClose,
   closable = false,
-  isCollapsed = false,
-  onExpand,
+  onSelectSessionComplete,
 }: SidebarProps) {
-  const { sessions, activeSession, upload, messages, pythonResult } = useSessionState()
-  const { selectSession, uploadFile } = useSessionActions()
+  const { sessions, activeSession, upload, uploadQueue, messages, pythonResult } = useSessionState()
+  const { selectSession, uploadFiles } = useSessionActions()
   const { usage } = useUsageStatus()
   const trialExpired = Boolean(usage?.trialExpired)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -145,26 +143,6 @@ export function Sidebar({
     [sessions],
   )
 
-  if (isCollapsed) {
-    return (
-      <aside className="sidebar is-collapsed" aria-label="Sources rail">
-        <div className="sidebar-rail-header">
-          <button
-            type="button"
-            className="brand-rail-btn"
-            onClick={onExpand}
-            title="Expand sources sidebar"
-            aria-label="Expand sources sidebar"
-          >
-            <span className="brand-mark" aria-hidden>
-              <FileIcon size={16} />
-            </span>
-          </button>
-        </div>
-      </aside>
-    )
-  }
-
   return (
     <aside className="sidebar" aria-label="Sources">
       <SidebarHeader onClose={onClose} closable={closable} />
@@ -258,7 +236,6 @@ export function Sidebar({
           </span>
         </div>
 
-        {/* "Add Source" Button */}
         <button
           type="button"
           className="sidebar-add-source-btn"
@@ -272,24 +249,25 @@ export function Sidebar({
           title={
             trialExpired
               ? 'Trial ended — upgrade to add new datasets'
-              : 'Add a new spreadsheet or CSV source'
+              : 'Add spreadsheet or CSV sources'
           }
         >
           <PlusIcon size={14} />
-          <span>{trialExpired ? 'Upgrade to Add Source' : 'Add Source'}</span>
+          <span>{trialExpired ? 'Upgrade to Add' : 'Add Source'}</span>
         </button>
 
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           accept={ACCEPTED_EXTENSIONS.join(',')}
           className="visually-hidden"
           onChange={(event) => {
-            const files = event.target.files
-            if (files && files.length > 0) {
-              void uploadFile(files[0])
-            }
+            const files = event.target.files ? Array.from(event.target.files) : []
             event.target.value = ''
+            if (files.length === 0) return
+            void uploadFiles(files)
+            onSelectSessionComplete?.()
           }}
         />
 
@@ -306,13 +284,16 @@ export function Sidebar({
                 key={session.id}
                 session={session}
                 active={session.id === activeSession?.id}
-                onSelect={selectSession}
+                onSelect={(id) => {
+                  selectSession(id)
+                  onSelectSessionComplete?.()
+                }}
               />
             ))
           )}
         </div>
 
-        <UploadStatus state={upload} />
+        <UploadStatus state={upload} queue={uploadQueue} />
       </div>
 
       <SidebarFooter />

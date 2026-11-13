@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Tabula — Migration: Replace user_api_key(s) with user_balances & Edge Proxy
+-- Lumina Tabula — Migration: Replace user_api_key(s) with user_balances & Edge Proxy
 -- ------------------------------------------------------------------------------
 -- Safe & idempotent SQL migration for Supabase Dashboard -> SQL Editor.
 --

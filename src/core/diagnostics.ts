@@ -59,7 +59,7 @@ export function reportDiagnostic(
   events.push(event)
   writeEvents(events)
 
-  console.error(`[Tabula:${source}]`, normalized, context)
+  console.error(`[Lumina Tabula:${source}]`, normalized, context)
 
   if (TELEMETRY_ENDPOINT && getTelemetryEnabled()) {
     void fetch(TELEMETRY_ENDPOINT, {

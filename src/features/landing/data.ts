@@ -84,8 +84,8 @@ export interface FaqItem {
 
 export const FAQS: FaqItem[] = [
   {
-    q: 'How does Tabula analyze my files without uploading them?',
-    a: 'Tabula performs all calculations directly inside your web browser. When you open a file, your computer does all the work locally. Your files are never transmitted across the internet, never saved to any database, and never stored on any server.',
+    q: 'How does Lumina Tabula analyze my files without uploading them?',
+    a: 'Lumina Tabula performs all calculations directly inside your web browser. When you open a file, your computer does all the work locally. Your files are never transmitted across the internet, never saved to any database, and never stored on any server.',
   },
   {
     q: 'Can anyone see, save, or steal my confidential business data?',
@@ -93,11 +93,11 @@ export const FAQS: FaqItem[] = [
   },
   {
     q: 'What types of files can I analyze?',
-    a: 'You can open Excel spreadsheets (.xlsx), CSV files, TSV files, and large data files with millions of rows. Simply drag and drop your file into Tabula and begin immediately.',
+    a: 'You can open Excel spreadsheets (.xlsx), CSV files, TSV files, and large data files with millions of rows. Simply drag and drop your file into Lumina Tabula and begin immediately.',
   },
   {
     q: 'Do I need to install software or know complicated formulas?',
-    a: 'No. Tabula works immediately in your standard web browser (Chrome, Safari, Edge, Firefox). You do not need to install plugins or write complex formulas. Just type questions in plain English.',
+    a: 'No. Lumina Tabula works immediately in your standard web browser (Chrome, Safari, Edge, Firefox). You do not need to install plugins or write complex formulas. Just type questions in plain English.',
   },
   {
     q: 'Can I work offline without an internet connection?',

@@ -1,27 +1,33 @@
-Act as a senior product designer specializing in subtle, high-craft dark-mode interfaces (Linear / Raycast aesthetic) and refine the mobile responsiveness, typography, contrast, and visual hierarchy of the **Tabula** landing page (`LandingPage` / `/landing` route).
+Act as a senior product designer specializing in quiet, high-craft, editorial interfaces (NotebookLM / Linear aesthetic) and refactor the **Tabula Workspace** (`/:username/workspace` or `Workspace` component) to match the refined floating 3-pane layout while preserving all existing DuckDB-WASM, Supabase Auth, token tracking, and AI chat functionality.
 
-Please inspect the landing page components and apply the following exact UI/UX improvements without breaking existing functionality or desktop layouts:
+Please inspect the workspace component and apply these exact design and responsive layout rules:
 
-1. **Primary CTA Button Contrast & Hero Polish**
-   - Change the text and icon color on all solid mint primary buttons (`Open Workspace →`, `Search`) from white to deep obsidian (`text-[#090D16] font-semibold`) so they achieve crisp AAA contrast against the `#2DD4BF` / teal background.
-   - Give the hero section slightly more top breathing room on mobile (`pt-14 pb-10`) and tighten the main headline (`leading-[1.12] tracking-tight`).
-   - Fix the 2×2 stats card (`100%`, `0 Bytes`, `Instant`, `Safe`) by replacing any uneven vertical divider lines with a clean symmetrical 2-column CSS grid using subtle hairline borders (`divide-x divide-y divide-white/[0.06]`) and centered alignment inside each quadrant.
+1. **Floating 3-Pane Shell with `5px` Border Radius**
+   - Wrap the entire workspace in a `h-[100dvh] w-full overflow-hidden flex flex-col` outer shell (`bg-[#F1F0EC]` in light mode, `bg-[#131315]` in dark mode) so mobile browser bars on iPhone, Xiaomi, and Android never clip the bottom composer.
+   - Render the **Left Sources Sidebar**, **Center Chat Canvas**, and **Right Studio Panel** as floating cards separated by `gap-2 lg:gap-2.5` with **`rounded-[5px]`** on all four corners and `1px` hairline borders (`border-[#E2E1DC] dark:border-[#29292E]`, surface `bg-[#FFFFFF] dark:bg-[#1B1B1E]`).
+   - Support collapsible desktop side rails (`lg:w-11`) for both the left and right panels.
 
-2. **Interactive Demo Section (`How It Works`)**
-   - **Mobile Scenario Switcher:** On mobile viewports (`< 640px`), convert the 3 stacked scenario selector cards (`Customer Retention & Churn`, `Medical Research Trials`, `Quarterly Sales & Expenses`) into a horizontal scrollable row of compact pills (`flex overflow-x-auto snap-x gap-2.5 no-scrollbar`) so users can see the scenario tabs and the live preview window on the same screen without excessive scrolling. Keep the 3-column desktop layout intact (`sm:grid sm:grid-cols-3`).
-   - **Terminal Header Alignment:** Inside the simulated browser/terminal header, prevent `"Customer_Activity.xlsx • 1,248,500 rows"` from wrapping awkwardly next to the `"Processed in 0.04s"` pill. Display the filename on the top line (`text-xs font-medium text-slate-200 truncate`) and the row count directly underneath (`text-[11px] text-slate-400`), while keeping the green `"0.04s"` badge `whitespace-nowrap shrink-0`.
-   - **Flatten Nested Card Borders:** Eliminate heavy "box-inside-a-box" borders inside the demo output panel. Replace the outer borders on `YOUR QUESTION`, `Automated Local Calculation`, `INSTANT VISUAL BREAKDOWN`, and `EXECUTIVE SUMMARY` with subtle surface elevation (`bg-white/[0.025]`) and soft `1px` dividers (`border-white/[0.06]`).
+2. **Unified Top App Bar**
+   - Keep a single slim top header (`h-12 px-2.5 sm:px-3.5`) containing:
+     - **Left:** Tabula brand mark (`rounded-[5px]`), active workspace/file title, and a subtle `Local Workspace` badge.
+     - **Right:** `New analysis` button (`rounded-[5px]`), `Export` button, Light/Dark theme toggle, `TRIAL` (or subscription tier) badge, and user avatar.
 
-3. **Published Posts Section**
-   - Unify the search bar by placing the **Search** button cleanly inside the right side of the rounded input container (`flex items-center p-1.5 rounded-xl bg-white/[0.03] border border-white/[0.08]`) rather than floating outside it.
-   - If no posts exist in the database yet (`posts.length === 0`), hide this entire section on the public landing page instead of rendering a `"No posts published yet"` empty state box, so first-time visitors don't see an empty placeholder.
+3. **Left Sidebar: Selectable Sources + Compact Trial Meter**
+   - Add a `+ Sources` and `+ Note` 2-column action row (`rounded-[5px]`), a live file filter input, and a `Select all sources` toggle with individual file checkboxes so users can control which loaded spreadsheets are included in the active query context.
+   - Pin a clean, minimal trial/token progress footer at the bottom of the left card (`tabular-nums`, `2px` progress bar, and an `Upgrade` link) without heavy gradients or clutter.
 
-4. **Privacy Comparison Cards (`Your Data Stays With You`)**
-   - In the **Total Local Privacy** card, replace the misaligned 2-column label/description layout with a clean stacked layout matching the **How Traditional Software Works** card above it: green checkmark + bold white title on the first line (e.g., `0 bytes uploaded`), and muted gray explanation (`text-slate-400 text-sm`) indented cleanly underneath.
-   - Give **The Tabula Guarantee** card a subtle top radial emerald glow (`bg-gradient-to-b from-emerald-500/[0.08] to-transparent border-emerald-500/25`) so it visually stands out as the clear winner over the muted red comparison card.
+4. **Center Research Memo Canvas & Untouched Composer**
+   - **Editorial Memo Flow:** Render user questions as clean headings (`text-[15.5px] sm:text-[16.5px] font-semibold`) above a `max-w-[660px]` centered column rather than chat bubbles.
+   - **Connected Progress Stepper & Diagnostic Strip:** Display a clean step-by-step progress/diagnostic strip (`grid-cols-1 sm:grid-cols-3 gap-2`) with subtle `rounded-[5px]` surface cards (`bg-[#FAF9F6] dark:bg-[#222226]`) and restrained left-border highlights for key insights.
+   - **Margin Actions:** Include subtle `Copy` and `Save to Studio` actions below each AI response (visible on touchscreens, hover-revealed on desktop).
+   - **Adaptive Follow-Up Prompts:** Display the 4 suggested follow-up prompts as a horizontally swipeable strip on narrow phones (`flex overflow-x-auto snap-x sm:grid sm:grid-cols-2`) so the chat area stays spacious when the mobile keyboard opens.
+   - **DO NOT change the bottom textarea design:** Keep the exact rounded composer box (`rounded-2xl bg-[#F4F4F5] dark:bg-[#242428]`) with `"Ask questions, analyze trends, or request a summary..."`, `"Enter to send · Shift+Enter for a new line"` on the bottom left, and the `w-8 h-8 rounded-lg` `↑` send button on the bottom right—with **no file chips or extra badges inside the textarea**.
 
-5. **FAQ Accordion & Footer Cleanup**
-   - Replace the 6 heavy bordered FAQ boxes with a cleaner, lighter full-width hairline accordion (`divide-y divide-white/[0.08]`) with generous vertical padding (`py-5`) and smooth chevron rotation.
-   - In the footer, remove the accidental underline on the `Tabula` brand link (`no-underline`) and remove the redundant `Dark` theme toggle button at the very bottom (since the theme toggle already lives in the top navbar).
+5. **Right Studio Panel (`Data` | `Notes` | `Results` | `Activity`)**
+   - Use a flush 4-tab switcher (`Data`, `Notes`, `Results`, `Activity`) with a clean active underline/pill indicator.
+   - Include a 2-column **Quick Studio** grid (`Executive Summary`, `Data Table`, `Trend Breakdown`, `Cohort Comparison`, `Outlier Audit`, `Study Guide`) that generates pinned cards into a **Saved Outputs** list below it, alongside full views for the live DuckDB data table preview, manual Studio notes, pinned result tables, and local execution audit logs (`0 bytes uploaded`).
 
-Show me a summary of the files updated and verify there are no TypeScript or Tailwind class issues.
+6. **Mobile & Tablet Navigation (`< 1024px`)**
+   - On viewports below `lg` (`< 1024px` — iPhone, Xiaomi, Android, iPad portrait), display one active panel at a time (`Sources`, `Chat`, or `Studio`) controlled by a clean `rounded-[5px]` 3-segment bottom navigation bar (`lg:hidden`) so nothing ever squashes horizontally.
+
+Show a brief summary of the files modified and verify there are no TypeScript errors or layout overflow issues on mobile viewports.

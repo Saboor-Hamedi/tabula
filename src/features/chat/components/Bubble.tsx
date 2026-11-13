@@ -64,8 +64,8 @@ export const Bubble = memo(function Bubble({
 
   if (isUser) {
     return (
-      <article className="message message-user">
-        <div className="user-bubble">{content}</div>
+      <article className="message message-user is-memo-heading">
+        <h2 className="user-memo-heading">{content}</h2>
         <time className="message-time">{formatTime(message.createdAt)}</time>
       </article>
     )
@@ -103,7 +103,7 @@ export const Bubble = memo(function Bubble({
             className="btn btn-primary btn-small"
             onClick={() => openPricingModal(message.upgradeReason!)}
           >
-            <span>Upgrade to Tabula Pro</span>
+            <span>Upgrade to Lumina Tabula Pro</span>
             <ArrowRightIcon size={13} />
           </button>
         </div>

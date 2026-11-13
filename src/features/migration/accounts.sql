@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Tabula — Accounts
+-- Lumina Tabula — Accounts
 -- ------------------------------------------------------------------------------
 -- The tables behind an account: the profile, the subscription and the usage
 -- ledger. Everything a person signs up with lives here.

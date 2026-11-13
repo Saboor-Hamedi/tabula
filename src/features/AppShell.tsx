@@ -10,6 +10,7 @@ import {
   SIDEBAR_WIDTH,
 } from '../core/storage/uiPrefs'
 import { Panel } from './chat'
+import { DatabaseIcon, SendIcon, SparklesIcon } from './common/Icons'
 import { useKeyboardShortcuts } from './common/useKeyboardShortcuts'
 import { useServiceWorkerUpdate } from './common/useServiceWorkerUpdate'
 import { ConfirmModal } from './common/ConfirmModal'
@@ -84,6 +85,7 @@ export function AppShell() {
   } = useSessionActions()
   const sidebarOverlay = useMediaQuery(SIDEBAR_OVERLAY_QUERY)
   const panelOverlay = useMediaQuery(PANEL_OVERLAY_QUERY)
+  const [mobilePane, setMobilePane] = useState<'sources' | 'chat' | 'studio'>('chat')
 
   // Refresh entitlement immediately after returning from Stripe Checkout
   useEffect(() => {
@@ -116,9 +118,8 @@ export function AppShell() {
     if (panelOverlay) closePanel(false)
   }, [closePanel, panelOverlay])
 
-  const sidebarInGrid = sidebarOpen && !sidebarOverlay
+  const sidebarInGrid = sidebarOpen && !panelOverlay
   const panelInGrid = panelOpen && !panelOverlay
-  const sidebarAsOverlay = sidebarOpen && sidebarOverlay
 
   const updateSidebarWidth = (width: number) => {
     setSidebarWidth(width)
@@ -135,58 +136,102 @@ export function AppShell() {
     '--inspector-width': `${panelWidth}px`,
   } as CSSProperties
 
+  const gridClasses = [
+    'app-grid',
+    sidebarInGrid ? 'has-sidebar' : '',
+    panelInGrid ? 'has-panel' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className="app-shell" style={layoutStyle}>
-      <div
-        className={`app-grid ${sidebarInGrid ? 'has-sidebar' : ''} ${
-          panelInGrid ? 'has-panel' : ''
-        }`}
-      >
-        {sidebarInGrid ? (
-          <>
-            <Sidebar onClose={() => setSidebarOpen(false)} />
-            <ResizeHandle
-              side="left"
-              label="Resize datasets sidebar"
-              width={sidebarWidth}
-              min={SIDEBAR_WIDTH.min}
-              max={SIDEBAR_WIDTH.max}
-              onResize={updateSidebarWidth}
-            />
-          </>
-        ) : null}
+    <div className="app-shell is-workspace-shell" style={layoutStyle}>
+      <Header variant="workspace" />
 
-        <div className="app-main">
-          <Header variant="workspace" />
-          <main className="app-content">
-            {activeSession ? <Panel /> : <UploadZone />}
-          </main>
-        </div>
-
-        {panelInGrid ? (
-          <ResizeHandle
-            side="right"
-            label="Resize inspector"
-            width={panelWidth}
-            min={PANEL_WIDTH.min}
-            max={PANEL_WIDTH.max}
-            onResize={updatePanelWidth}
+      <div className={gridClasses}>
+        {!panelOverlay ? (
+          sidebarInGrid ? (
+            <>
+              <Sidebar onClose={() => setSidebarOpen(false)} />
+              <ResizeHandle
+                side="left"
+                label="Resize datasets sidebar"
+                width={sidebarWidth}
+                min={SIDEBAR_WIDTH.min}
+                max={SIDEBAR_WIDTH.max}
+                onResize={updateSidebarWidth}
+              />
+            </>
+          ) : null
+        ) : mobilePane === 'sources' ? (
+          <Sidebar
+            onClose={() => setMobilePane('chat')}
+            onSelectSessionComplete={() => setMobilePane('chat')}
           />
         ) : null}
-        {panelOpen ? <Inspector /> : null}
+
+        {!panelOverlay || mobilePane === 'chat' ? (
+          <div className="app-main">
+            <main className="app-content">
+              {activeSession ? <Panel /> : <UploadZone />}
+            </main>
+          </div>
+        ) : null}
+
+        {!panelOverlay ? (
+          panelInGrid ? (
+            <>
+              <ResizeHandle
+                side="right"
+                label="Resize studio panel"
+                width={panelWidth}
+                min={PANEL_WIDTH.min}
+                max={PANEL_WIDTH.max}
+                onResize={updatePanelWidth}
+              />
+              <Inspector />
+            </>
+          ) : null
+        ) : mobilePane === 'studio' ? (
+          <Inspector onSwitchToChat={() => setMobilePane('chat')} />
+        ) : null}
       </div>
 
-      {sidebarAsOverlay ? (
-        <>
-          <div
-            className="scrim"
-            role="presentation"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div className="sidebar-drawer">
-            <Sidebar onClose={() => setSidebarOpen(false)} closable />
+      {panelOverlay ? (
+        <nav className="workspace-mobile-nav" aria-label="Workspace panels">
+          <div className="workspace-mobile-nav-track" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobilePane === 'sources'}
+              className={`workspace-mobile-tab ${mobilePane === 'sources' ? 'is-active' : ''}`}
+              onClick={() => setMobilePane('sources')}
+            >
+              <DatabaseIcon size={15} />
+              <span>Sources</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobilePane === 'chat'}
+              className={`workspace-mobile-tab ${mobilePane === 'chat' ? 'is-active' : ''}`}
+              onClick={() => setMobilePane('chat')}
+            >
+              <SendIcon size={15} />
+              <span>Chat</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobilePane === 'studio'}
+              className={`workspace-mobile-tab ${mobilePane === 'studio' ? 'is-active' : ''}`}
+              onClick={() => setMobilePane('studio')}
+            >
+              <SparklesIcon size={15} />
+              <span>Studio</span>
+            </button>
           </div>
-        </>
+        </nav>
       ) : null}
 
       {settingsOpen ? (

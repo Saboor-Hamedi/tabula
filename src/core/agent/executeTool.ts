@@ -6,6 +6,7 @@ import { runPython } from '../python'
 import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
 import type { PythonExecutionResult } from '../python'
 import type { TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
+import { compactPythonToolResult, stripCodeFences } from '../../tabula/utils/agentHelpers'
 import {
   createTraceEntry,
   createTraceId,
@@ -135,10 +136,11 @@ async function runSql(
   args: Record<string, unknown>,
   context: ToolContext,
 ): Promise<ToolResultPayload> {
-  const sql = readString(args, 'sql')
-  if (!sql) {
+  const rawSql = readString(args, 'sql')
+  if (!rawSql) {
     return { error: 'The "sql" argument is required and must be a non-empty string.' }
   }
+  const sql = stripCodeFences(rawSql)
 
   const purpose = readString(args, 'purpose')
   const cacheKey = `${context.schemaName}:${normalizeSql(sql)}`
@@ -172,10 +174,11 @@ async function runPythonTool(
   args: Record<string, unknown>,
   context: ToolContext,
 ): Promise<ToolResultPayload> {
-  const code = readString(args, 'code')
-  if (!code) {
+  const rawCode = readString(args, 'code')
+  if (!rawCode) {
     return { error: 'The "code" argument is required and must be a non-empty string.' }
   }
+  const code = stripCodeFences(rawCode)
 
   const primaryTable = Array.isArray(context.tableNames) ? context.tableNames[0] : undefined
   const result = await runPython(code, {
@@ -193,17 +196,7 @@ async function runPythonTool(
     }
   }
 
-  const plotCount = Array.isArray(result?.images) ? result.images.length : 0
-  return {
-    stdout: result?.stdout ?? '',
-    stderr: result?.stderr ?? '',
-    hasPlots: plotCount > 0,
-    plotCount,
-    elapsedMs: result?.elapsedMs ?? 0,
-    error: result?.error ?? null,
-    dfInfo: result?.dfInfo,
-    dfPreview: result?.dfPreview,
-  }
+  return compactPythonToolResult(result)
 }
 
 export async function executeTool(

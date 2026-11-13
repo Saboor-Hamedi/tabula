@@ -6,7 +6,7 @@
  * suggestions) must never appear in this file — it is computed at runtime.
  */
 
-export const APP_NAME = 'Tabula'
+export const APP_NAME = 'Lumina Tabula'
 export const APP_TAGLINE = 'Ask your spreadsheet anything'
 
 /** localStorage keys. Only UI preferences live here. */

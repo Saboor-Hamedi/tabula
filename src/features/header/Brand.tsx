@@ -17,11 +17,11 @@ export interface BrandProps {
 
 export function Brand({ to = ROUTES.dashboard, compact = false }: BrandProps) {
   return (
-    <Link className="header-brand" to={to} aria-label="Tabula home">
+    <Link className="header-brand" to={to} aria-label="Lumina Tabula home">
       <span className="header-brand-badge">
         <DatabaseIcon size={15} />
       </span>
-      {compact ? null : <span className="header-brand-name">Tabula</span>}
+      {compact ? null : <span className="header-brand-name">Lumina Tabula</span>}
     </Link>
   )
 }

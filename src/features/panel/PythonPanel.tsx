@@ -11,6 +11,7 @@ import {
   TrashIcon,
 } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
+import { FigureLightbox } from '../common/FigureLightbox'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { exportToJupyterNotebook } from '../../core/python'
 import { buildCsv, downloadCsv } from '../../core/export/csv'
@@ -560,51 +561,17 @@ export function PythonPanel() {
       </div>
 
       {/* Lightbox Fullscreen Modal */}
-      {lightboxImg ? (
-        <div
-          className="figure-lightbox-overlay"
-          onClick={() => setLightboxImg(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="figure-lightbox-dialog"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="figure-lightbox-bar">
-              <span className="figure-lightbox-title">
-                Figure {lightboxImg.index + 1}
-              </span>
-              <div className="figure-lightbox-actions">
-                <button
-                  type="button"
-                  className="tool-btn"
-                  onClick={() => handleDownloadImage(lightboxImg.url, lightboxImg.index)}
-                  title="Download PNG"
-                >
-                  <DownloadIcon size={13} />
-                  <span>Download</span>
-                </button>
-                <button
-                  type="button"
-                  className="tool-btn"
-                  onClick={() => setLightboxImg(null)}
-                  title="Close (Esc)"
-                >
-                  <CloseIcon size={14} />
-                </button>
-              </div>
-            </div>
-            <div className="figure-lightbox-view">
-              <img
-                src={lightboxImg.url}
-                alt={`Figure ${lightboxImg.index + 1}`}
-                className="figure-lightbox-img"
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <FigureLightbox
+        src={lightboxImg?.url ?? null}
+        title={lightboxImg ? `Figure ${lightboxImg.index + 1}` : ''}
+        alt={lightboxImg ? `Figure ${lightboxImg.index + 1}` : undefined}
+        onDownload={
+          lightboxImg
+            ? () => handleDownloadImage(lightboxImg.url, lightboxImg.index)
+            : undefined
+        }
+        onClose={() => setLightboxImg(null)}
+      />
     </div>
   )
 }

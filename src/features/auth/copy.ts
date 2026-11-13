@@ -5,7 +5,7 @@
  */
 export const AUTH_COPY = {
   signIn: {
-    title: 'Sign in to Tabula',
+    title: 'Sign in to Lumina Tabula',
     subtitle: 'Enter your credentials to reach your workspace.',
     submit: 'Sign in',
   },
@@ -26,6 +26,6 @@ export const AUTH_COPY = {
   offline: {
     title: 'Running without an account',
     subtitle:
-      'No project is configured, so Tabula runs entirely on this device. Nothing is uploaded and nothing is shared.',
+      'No project is configured, so Lumina Tabula runs entirely on this device. Nothing is uploaded and nothing is shared.',
   },
 } as const

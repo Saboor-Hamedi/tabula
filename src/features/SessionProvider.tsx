@@ -97,6 +97,7 @@ import type {
   PanelTab,
   Session,
   ToolTraceEntry,
+  UploadQueueItem,
   UploadState,
 } from "../core/types";
 
@@ -214,6 +215,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     null,
   );
   const [upload, setUpload] = useState<UploadState>(IDLE_UPLOAD);
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+
+  const updateUploadProgress = useCallback(
+    (queueId: string | undefined, next: UploadState) => {
+      setUpload(next);
+      if (!queueId) return;
+      setUploadQueue((prev) =>
+        prev.map((item) =>
+          item.id === queueId
+            ? { ...item, phase: next.phase, message: next.message }
+            : item,
+        ),
+      );
+      if (next.phase === "done") {
+        window.setTimeout(() => {
+          setUploadQueue((prev) => prev.filter((item) => item.id !== queueId));
+        }, 2500);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (upload.phase !== "done") return;
@@ -448,8 +470,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const startUpload = useCallback(
-    async (file: File, kind: FileKind, selectedSheets?: string[]) => {
-      setUpload({
+    async (
+      file: File,
+      kind: FileKind,
+      selectedSheets?: string[],
+      queueId?: string,
+    ) => {
+      updateUploadProgress(queueId, {
         phase: "reading",
         fileName: file.name,
         message: "Reading file…",
@@ -457,7 +484,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const startedAt = performance.now();
 
       try {
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "ingesting",
           fileName: file.name,
           message: "Preparing your tables…",
@@ -491,7 +518,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         registerSession(session);
 
         // Digest first: the welcome message and every suggestion depend on it.
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "ingesting",
           fileName: file.name,
           message: "Reading columns…",
@@ -506,7 +533,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }));
         setTracesBySession((previous) => ({ ...previous, [sessionId]: [] }));
         recordMetric("lastUploadMs", performance.now() - startedAt);
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "done",
           fileName: file.name,
           message: `Loaded ${result.tables.length} table${result.tables.length === 1 ? "" : "s"}.`,
@@ -525,23 +552,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           workspaceScope,
         ).catch(() => undefined);
       } catch (error) {
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "error",
           fileName: file.name,
           message: errorMessage(error),
         });
       }
     },
-    [ingestWithWorkerRecovery, refreshDigest, refreshSuggestions, workspaceScope],
+    [ingestWithWorkerRecovery, refreshDigest, updateUploadProgress, workspaceScope],
   );
 
-  const uploadFile = useCallback(
-    async (file: File) => {
+  const processQueuedFile = useCallback(
+    async (file: File, queueId?: string) => {
       if (!canUseWorkspaceAnalysis()) {
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "error",
           fileName: file.name,
-          message: "Your 7-day free trial has ended. Upgrade to Tabula Pro to upload datasets.",
+          message:
+            "Your 7-day free trial has ended. Upgrade to Lumina Tabula Pro to upload datasets.",
         });
         openPricingModal("trial-expired");
         return;
@@ -549,7 +577,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       const kind = getFileKind(file.name);
       if (!kind) {
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "error",
           fileName: file.name,
           message: `Unsupported file type. Upload ${ACCEPTED_EXTENSIONS.join(" or ")}.`,
@@ -558,7 +586,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       if (file.size > MAX_UPLOAD_BYTES) {
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "error",
           fileName: file.name,
           message: "File is too large for in-browser analysis (limit: 80 MB).",
@@ -567,7 +595,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       if (kind === "xlsx") {
-        setUpload({
+        updateUploadProgress(queueId, {
           phase: "reading",
           fileName: file.name,
           message: "Checking sheets…",
@@ -578,11 +606,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           );
           if (sheets.length > 25) {
             setSheetPicker({ file, fileName: file.name, sheets });
-            setUpload(IDLE_UPLOAD);
+            updateUploadProgress(queueId, IDLE_UPLOAD);
+            if (queueId) {
+              setUploadQueue((prev) => prev.filter((item) => item.id !== queueId));
+            }
             return;
           }
         } catch (error) {
-          setUpload({
+          updateUploadProgress(queueId, {
             phase: "error",
             fileName: file.name,
             message: errorMessage(error),
@@ -591,9 +622,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await startUpload(file, kind);
+      await startUpload(file, kind, undefined, queueId);
     },
-    [startUpload],
+    [startUpload, updateUploadProgress],
+  );
+
+  const uploadFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      const entries = files.map((file) => ({
+        id: createId(),
+        file,
+      }));
+      setUploadQueue((prev) => [
+        ...prev.filter((item) => item.phase !== "error" && item.phase !== "done"),
+        ...entries.map(({ id, file }) => ({
+          id,
+          fileName: file.name,
+          phase: "queued" as const,
+          message: "Loading…",
+        })),
+      ]);
+      await Promise.allSettled(
+        entries.map(({ id, file }) => processQueuedFile(file, id)),
+      );
+    },
+    [processQueuedFile],
+  );
+
+  const uploadFile = useCallback(
+    async (file: File) => {
+      await uploadFiles([file]);
+    },
+    [uploadFiles],
   );
 
   const confirmSheetSelection = useCallback(
@@ -631,7 +692,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUpload({
           phase: "error",
           fileName: file.name,
-          message: "Your 7-day free trial has ended. Upgrade to Tabula Pro to upload datasets.",
+          message: "Your 7-day free trial has ended. Upgrade to Lumina Tabula Pro to upload datasets.",
         });
         openPricingModal("trial-expired");
         return;
@@ -1344,6 +1405,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isStreaming,
       streamingSessionId,
       upload,
+      uploadQueue,
       model,
       settingsOpen,
       reportOpen,
@@ -1382,6 +1444,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       streamingSessionId,
       traces,
       upload,
+      uploadQueue,
     ],
   );
 
@@ -1389,6 +1452,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const actions = useMemo<SessionActions>(
     () => ({
       uploadFile,
+      uploadFiles,
       selectSession,
       deleteSession,
       sendMessage,
@@ -1456,6 +1520,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       stopStreaming,
       toggleSidebar,
       uploadFile,
+      uploadFiles,
     ],
   );
 

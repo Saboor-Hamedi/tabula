@@ -76,7 +76,7 @@ export function summarizeToolError(error: unknown): string {
 export function buildTraceExport(session: Session, traces: ToolTraceEntry[]): string {
   return safeStringify(
     {
-      app: 'Tabula',
+      app: 'Lumina Tabula',
       exportedAt: new Date().toISOString(),
       session: {
         fileName: session.fileName,

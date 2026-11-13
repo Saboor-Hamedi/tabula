@@ -7,6 +7,7 @@ import type {
   Session,
   SheetInfo,
   ToolTraceEntry,
+  UploadQueueItem,
   UploadState,
 } from '../../core/types'
 import type { FigureChanges } from '../../core/parsing/editFigure'
@@ -31,6 +32,7 @@ export interface SessionState {
   isStreaming: boolean
   streamingSessionId: string | null
   upload: UploadState
+  uploadQueue: UploadQueueItem[]
   model: ModelId
   settingsOpen: boolean
   reportOpen: boolean
@@ -48,6 +50,7 @@ export interface SessionState {
 
 export interface SessionActions {
   uploadFile: (file: File) => Promise<void>
+  uploadFiles: (files: File[]) => Promise<void>
   selectSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => Promise<void>
   sendMessage: (text: string) => Promise<void>

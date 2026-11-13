@@ -8,17 +8,11 @@ import { TraceEntry } from '../trace/TraceEntry'
 import { FilePanel } from './FilePanel'
 import { PythonPanel } from './PythonPanel'
 
-/**
- * Right-hand inspector.
- *
- * Workspace panel featuring 4 full-width, full-height tabs:
- * - Data (tables & schema columns inspection)
- * - Notes (interactive studio notes)
- * - Results (Python runtime results & plots)
- * - Activity (transparent agent trace)
- */
+export interface InspectorProps {
+  onSwitchToChat?: () => void
+}
 
-export function Inspector() {
+export function Inspector({ onSwitchToChat: _onSwitchToChat }: InspectorProps = {}) {
   const {
     panelTab,
     traces,

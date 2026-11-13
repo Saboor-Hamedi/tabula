@@ -20,7 +20,7 @@ const POST_IMAGES = 'post_images'
 const MEDIA_BUCKET = 'post-media'
 
 const SUMMARY_COLUMNS =
-  'id, slug, title, subtitle, excerpt, cover_image_url, cover_caption, tags, featured, reading_time_minutes, view_count, author_name, author_avatar_url, dataset_name, model, published_at, created_at, updated_at'
+  'id, slug, title, subtitle, excerpt, content, cover_image_url, cover_caption, tags, featured, reading_time_minutes, view_count, author_name, author_avatar_url, dataset_name, model, published_at, created_at, updated_at, blocks, post_images(url, alt_text, position)'
 
 export interface PublishInput extends PostDraft {
   /** The chat message this post was written from. */

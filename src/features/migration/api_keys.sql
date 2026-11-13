@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Tabula — Platform API Key (Admin-only, backend-managed)
+-- Lumina Tabula — Platform API Key (Admin-only, backend-managed)
 -- ------------------------------------------------------------------------------
 -- Stores the single shared platform DeepSeek API key.
 --

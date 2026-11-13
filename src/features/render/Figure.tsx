@@ -55,9 +55,9 @@ export function Figure({ name, children, onEdit }: FigureProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="figure-watermark"
-          title="Made with Tabula · Private Data Workbench"
+          title="Made with Lumina Tabula · Private Data Workbench"
         >
-          Made with Tabula
+          Made with Lumina Tabula
         </a>
         <div className="figure-actions">
           <button type="button" className="tool-btn" onClick={handleCopy}>

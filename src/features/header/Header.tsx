@@ -62,13 +62,15 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
     <header className={`app-header ${isWorkspace ? 'is-workspace' : isDashboard ? 'is-dashboard' : 'is-page'}`}>
       <div className="app-header-left">
         {isWorkspace && session && actions ? (
-          <IconButton
-            label={session.sidebarOpen ? 'Hide sources' : 'Show sources'}
-            active={session.sidebarOpen}
-            onClick={() => actions.toggleSidebar()}
-          >
-            <SidebarIcon size={17} />
-          </IconButton>
+          <span className="workspace-header-toggle-desktop">
+            <IconButton
+              label={session.sidebarOpen ? 'Collapse sources' : 'Expand sources'}
+              active={session.sidebarOpen}
+              onClick={() => actions.toggleSidebar()}
+            >
+              <SidebarIcon size={16} />
+            </IconButton>
+          </span>
         ) : null}
 
         {!isWorkspace ? (
@@ -96,15 +98,17 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
         </IconButton>
 
         {isWorkspace && session && actions ? (
-          <IconButton
-            label={session.panelOpen ? 'Hide inspector' : 'Show inspector'}
-            active={session.panelOpen}
-            onClick={() =>
-              session.panelOpen ? actions.closePanel() : actions.openPanel('notes')
-            }
-          >
-            <PanelRightIcon size={17} />
-          </IconButton>
+          <span className="workspace-header-toggle-desktop">
+            <IconButton
+              label={session.panelOpen ? 'Collapse studio' : 'Expand studio'}
+              active={session.panelOpen}
+              onClick={() =>
+                session.panelOpen ? actions.closePanel() : actions.openPanel('notes')
+              }
+            >
+              <PanelRightIcon size={16} />
+            </IconButton>
+          </span>
         ) : null}
 
         {!isWorkspace ? (

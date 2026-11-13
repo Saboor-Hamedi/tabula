@@ -86,13 +86,13 @@ export function PricingModal() {
                   ? isPro
                     ? 'Monthly token limit reached'
                     : 'You have finished your trial tokens'
-                  : 'Upgrade to Tabula Pro'}
+                  : 'Upgrade to Lumina Tabula Pro'}
             </h2>
             <p className="modal-subtitle">
               {isExpired
-                ? 'You can still sign in and review previous work. Upgrade with Stripe to upload new data and receive Tabula AI responses.'
+                ? 'You can still sign in and review previous work. Upgrade with Stripe to upload new data and receive Lumina Tabula AI responses.'
                 : isQuotaExceeded && !isPro
-                  ? 'You have used all 250,000 free trial tokens. Upgrade to Tabula Pro with Stripe to unlock 5,000,000 monthly tokens.'
+                  ? 'You have used all 250,000 free trial tokens. Upgrade to Lumina Tabula Pro with Stripe to unlock 5,000,000 monthly tokens.'
                   : 'Unlock full AI spreadsheet analysis, 5,000,000 monthly tokens, and executive exports.'}
             </p>
           </div>
@@ -165,7 +165,7 @@ export function PricingModal() {
             <div className="pricing-plan-pill">Recommended</div>
             <div>
               <h3 className="pricing-plan-title">Pro Analyst</h3>
-              <p className="pricing-plan-desc">Unlimited spreadsheet uploads & full Tabula AI access.</p>
+              <p className="pricing-plan-desc">Unlimited spreadsheet uploads & full Lumina Tabula AI access.</p>
               <div className="pricing-plan-price">
                 <span className="pricing-plan-amount">$19</span>
                 <span className="pricing-plan-period">/ month</span>

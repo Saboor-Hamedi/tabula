@@ -254,7 +254,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: var(--space-3) var(--space-2) var(--space-2);
+  padding: 5px;
   overflow-y: auto;
 }
 
@@ -648,4 +648,14 @@
 
 .account-menu-item.is-danger:hover {
   background: rgba(220, 38, 38, 0.1);
+}
+
+.upload-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-account-menu .quota-card {
+  margin: 4px 2px;
 }

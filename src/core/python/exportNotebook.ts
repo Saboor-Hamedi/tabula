@@ -17,10 +17,10 @@ export function exportToJupyterNotebook({ fileName = 'analysis', runs }: ExportN
     cell_type: 'markdown',
     metadata: {},
     source: [
-      `# Tabula Data Science Analysis\n`,
+      `# Lumina Tabula Data Science Analysis\n`,
       `**Dataset:** \`${fileName}\`  \n`,
       `**Generated:** ${new Date().toLocaleString()}  \n`,
-      `*Automated browser analytics powered by Tabula.*`,
+      `*Automated browser analytics powered by Lumina Tabula.*`,
     ],
   })
 

@@ -35,7 +35,7 @@ export function Demo({
             <span className="landing-subhead">How It Works</span>
             <h2 className="landing-section-title">Ask In Plain English, Get Instant Insights</h2>
             <p className="landing-section-desc">
-              Select an example scenario below to see how Tabula analyzes spreadsheets right in your browser.
+              Select an example scenario below to see how Lumina Tabula analyzes spreadsheets right in your browser.
             </p>
           </div>
 

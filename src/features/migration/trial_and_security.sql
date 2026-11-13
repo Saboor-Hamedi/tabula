@@ -1,8 +1,8 @@
 -- ==============================================================================
--- Tabula — Upgrade Migration: 7-Day Free Trial, Usage RPC & Admin-Only API Key
+-- Lumina Tabula — Upgrade Migration: 7-Day Free Trial, Usage RPC & Admin-Only API Key
 -- ------------------------------------------------------------------------------
 -- Safe & idempotent script to run in Supabase Dashboard -> SQL Editor on an
--- existing Tabula database.
+-- existing Lumina Tabula database.
 -- ==============================================================================
 
 -- 1. Add trial_ends_at to subscriptions

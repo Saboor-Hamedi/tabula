@@ -20,6 +20,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(() => isSupabaseConfigured)
+  const [passwordRecovery, setPasswordRecovery] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return (
+      window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('type=recovery')
+    )
+  })
 
   const fetchProfile = useCallback(async (userId: string) => {
     if (!supabase) return null
@@ -62,7 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true)
+      }
       setSession(session)
       setUser(session?.user ?? null)
       setAuthState({ user: session?.user ?? null })
@@ -140,9 +150,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetPasswordForEmail = useCallback(async (targetEmail: string) => {
     if (!supabase) return { error: new Error('Supabase is not configured.') }
     const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-      redirectTo: `${window.location.origin}/login`,
+      redirectTo: `${window.location.origin}/login?type=recovery`,
     })
     return { error: error ? new Error(error.message) : null }
+  }, [])
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (!error) {
+      setPasswordRecovery(false)
+    }
+    return { error: error ? new Error(error.message) : null }
+  }, [])
+
+  const clearPasswordRecovery = useCallback(() => {
+    setPasswordRecovery(false)
   }, [])
 
   const signInWithOAuth = useCallback(async (provider: 'google' | 'github') => {
@@ -197,6 +220,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshSession,
       resendVerificationEmail,
       resetPasswordForEmail,
+      updatePassword,
+      passwordRecovery,
+      clearPasswordRecovery,
       signInWithOAuth,
       signInWithOtp,
       refreshProfile,
@@ -215,6 +241,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshSession,
       resendVerificationEmail,
       resetPasswordForEmail,
+      updatePassword,
+      passwordRecovery,
+      clearPasswordRecovery,
       signInWithOAuth,
       signInWithOtp,
       refreshProfile,

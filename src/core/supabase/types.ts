@@ -46,7 +46,7 @@ export interface PostImage {
 }
 
 /**
- * A published Tabula answer.
+ * A published Lumina Tabula answer.
  *
  * `blocks` carries the parsed render blocks so the public page can draw the
  * exact same markdown, Mermaid diagrams, charts and tables the admin saw.
@@ -79,7 +79,10 @@ export interface Post {
 }
 
 /** The subset of a post the public feed needs. */
-export type PostSummary = Omit<Post, 'content' | 'blocks'>
+export type PostSummary = Omit<Post, 'blocks'> & {
+  blocks?: PostBlock[]
+  post_images?: Pick<PostImage, 'url' | 'alt_text' | 'position'>[]
+}
 
 /**
  * Render blocks stored on a post.

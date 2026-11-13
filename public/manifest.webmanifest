@@ -1,6 +1,6 @@
 {
-  "name": "Tabula — Chat with your data",
-  "short_name": "Tabula",
+  "name": "Lumina Tabula — Chat with your data",
+  "short_name": "Lumina Tabula",
   "description": "Private, in-browser analysis for CSV and Excel workbooks.",
   "start_url": "/",
   "display": "standalone",

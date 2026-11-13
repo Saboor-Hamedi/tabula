@@ -17,7 +17,7 @@ export function ReportView() {
   const title = activeSession.primaryTable
     ? `${activeSession.primaryTable} Analysis Report`
     : 'Dataset Analysis Report'
-  const subtitle = `Tabula analysis · ${new Date().toLocaleString()} · ${formatCount(messages.length)} messages`
+  const subtitle = `Lumina Tabula analysis · ${new Date().toLocaleString()} · ${formatCount(messages.length)} messages`
   const fileName = `tabula-analysis-report-${new Date().toISOString().slice(0, 10)}.html`
 
   const getHtml = () =>
@@ -71,7 +71,7 @@ export function ReportView() {
               !message.content.trim() ? null : (
                 <section key={message.id} className="report-entry">
                   <div className={message.role === 'user' ? 'report-user' : 'report-assistant'}>
-                    {message.role === 'user' ? 'You' : 'Tabula'}
+                    {message.role === 'user' ? 'You' : 'Lumina Tabula'}
                   </div>
                   {message.role === 'user' ? (
                     <p>{message.content}</p>

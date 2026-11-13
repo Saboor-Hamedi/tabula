@@ -159,7 +159,7 @@ export function Analyse() {
           <p className="dash-subtitle">
             {isAdmin
               ? 'Manage members, subscriptions, and all published posts in one place.'
-              : 'Your datasets and your activity on Tabula.'}
+              : 'Your datasets and your activity on Lumina Tabula.'}
           </p>
         </header>
 
@@ -261,9 +261,9 @@ export function Analyse() {
               <LockIcon size={14} />
               <span>
                 {usage.trialExpired
-                  ? 'Your 7-day free trial has ended. Upgrade with Stripe to resume uploading data and asking Tabula.'
+                  ? 'Your 7-day free trial has ended. Upgrade with Stripe to resume uploading data and asking Lumina Tabula.'
                   : quotaExhausted
-                    ? `You have finished your trial tokens (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used). Upgrade to Tabula Pro to continue.`
+                    ? `You have finished your trial tokens (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used). Upgrade to Lumina Tabula Pro to continue.`
                     : `You have ${usage.trialDaysRemaining ?? 0} day${usage.trialDaysRemaining === 1 ? '' : 's'} left in your free trial (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used).`}
               </span>
             </span>

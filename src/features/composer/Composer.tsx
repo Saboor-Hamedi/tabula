@@ -65,7 +65,7 @@ export function Composer() {
               className="btn btn-primary btn-small"
               onClick={() => openPricingModal(blockedReason)}
             >
-              Upgrade to Tabula Pro
+              Upgrade to Lumina Tabula Pro
             </button>
           </div>
         ) : null}
@@ -88,9 +88,9 @@ export function Composer() {
           streaming={isStreaming}
           placeholder={
             blockedReason === 'quota-exceeded'
-              ? 'Trial tokens finished — upgrade to Tabula Pro to continue…'
+              ? 'Trial tokens finished — upgrade to Lumina Tabula Pro to continue…'
               : blockedReason === 'trial-expired'
-                ? 'Trial ended — upgrade to Tabula Pro to ask questions…'
+                ? 'Trial ended — upgrade to Lumina Tabula Pro to ask questions…'
                 : !activeSession
                   ? 'Upload a file to begin…'
                   : !dbReady

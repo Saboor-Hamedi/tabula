@@ -12,8 +12,8 @@ import { useSessionActions, useSessionState } from '../SessionProvider'
 import { UploadStatus } from './UploadStatus'
 
 export function UploadZone() {
-  const { upload, dbError } = useSessionState()
-  const { uploadFile } = useSessionActions()
+  const { upload, uploadQueue, dbError } = useSessionState()
+  const { uploadFile, uploadFiles } = useSessionActions()
   const { usage } = useUsageStatus()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -38,13 +38,13 @@ export function UploadZone() {
     }
   }
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     if (trialExpired) {
       openPricingModal('trial-expired')
       return
     }
-    void uploadFile(files[0])
+    await uploadFiles(Array.from(files))
   }
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -93,7 +93,7 @@ export function UploadZone() {
                 <div>
                   <strong>Your 7-day free trial has ended</strong>
                   <span>
-                    Uploading new datasets and receiving Tabula AI responses requires a paid plan.
+                    Uploading new datasets and receiving Lumina Tabula AI responses requires a paid plan.
                   </span>
                 </div>
               </div>
@@ -157,10 +157,11 @@ export function UploadZone() {
             <input
               ref={inputRef}
               type="file"
+              multiple
               accept={ACCEPTED_EXTENSIONS.join(',')}
               className="visually-hidden"
               onChange={(event) => {
-                handleFiles(event.target.files)
+                void handleFiles(event.target.files)
                 event.target.value = ''
               }}
             />
@@ -183,7 +184,7 @@ export function UploadZone() {
         </div>
 
         {/* Upload Status Bar (if reading/ingesting) */}
-        <UploadStatus state={upload} />
+        <UploadStatus state={upload} queue={uploadQueue} />
 
         {/* Database Error Banner (if any) */}
         {dbError ? (

@@ -45,7 +45,7 @@ export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProp
           <span className="landing-subhead">Posts</span>
           <h1 className="insights-title">Published Posts</h1>
           <p className="insights-subtitle">
-            Published analyses from the Tabula workspace — every table, chart, and diagram
+            Published analyses from the Lumina Tabula workspace — every table, chart, and diagram
             preserved as it was produced.
           </p>
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { PostSummary } from '../../../core/supabase/types'
 import { isSupabaseConfigured } from '../../../core/supabase/client'
 import { Pagination } from '../../common/Pagination'
@@ -78,15 +78,6 @@ export function Feed({
     }
   }, [limit, offsetPage(paginate, page), tag, search, paginate])
 
-  const featured = useMemo(
-    () => (page === 1 && !search ? (posts.find((post) => post.featured) ?? posts[0]) : undefined),
-    [posts, page, search],
-  )
-  const rest = useMemo(
-    () => (featured ? posts.filter((post) => post.id !== featured.id) : posts),
-    [featured, posts],
-  )
-
   if (loading) {
     return (
       <div className={variant === 'grid' ? 'post-grid' : 'post-row'} aria-busy="true">
@@ -137,8 +128,7 @@ export function Feed({
         </div>
       ) : (
         <div className="post-grid">
-          {featured ? <Card post={featured} featured /> : null}
-          {rest.map((post) => (
+          {posts.map((post) => (
             <Card key={post.id} post={post} />
           ))}
         </div>

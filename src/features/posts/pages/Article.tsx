@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from '../../../core/router'
+import { Link, useParams, useRouter } from '../../../core/router'
 import { ROUTES, postsPath } from '../../../core/router/paths'
 import type { Post, PostImage } from '../../../core/supabase/types'
 import { isSupabaseConfigured } from '../../../core/supabase/client'
 import { formatCount } from '../../../core/utils/format'
+import { useIsAdmin } from '../../auth/useProfile'
 import { ArrowLeftIcon, CheckIcon, CopyIcon, EyeIcon } from '../../common/Icons'
 import { Header } from '../../header/Header'
-import { fetchPostBySlug, incrementPostView } from '../api'
+import {
+  deletePost,
+  fetchPostBySlug,
+  incrementPostView,
+  setPostStatus,
+} from '../api'
 import { Content } from '../components/Content'
 
 /**
@@ -30,11 +36,14 @@ function formatDate(value: string | null): string {
 
 export function Article() {
   const { slug = '' } = useParams()
+  const { navigate } = useRouter()
+  const isAdmin = useIsAdmin()
   const [post, setPost] = useState<Post | null>(null)
   const [images, setImages] = useState<PostImage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [adminBusy, setAdminBusy] = useState<'status' | 'delete' | null>(null)
 
   useEffect(() => {
     let active = true
@@ -95,6 +104,41 @@ export function Article() {
     }
   }, [])
 
+  const handleToggleStatus = useCallback(async () => {
+    if (!post || !isAdmin || adminBusy) return
+    const nextStatus = post.status === 'published' ? 'archived' : 'published'
+    setAdminBusy('status')
+    try {
+      await setPostStatus(post.id, nextStatus)
+      setPost((prev) => (prev ? { ...prev, status: nextStatus } : prev))
+    } catch (actionError) {
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : 'Could not update the post status.',
+      )
+    } finally {
+      setAdminBusy(null)
+    }
+  }, [post, isAdmin, adminBusy])
+
+  const handleDelete = useCallback(async () => {
+    if (!post || !isAdmin || adminBusy) return
+    if (!window.confirm(`Delete "${post.title}" permanently?`)) return
+    setAdminBusy('delete')
+    try {
+      await deletePost(post.id)
+      navigate(ROUTES.posts)
+    } catch (actionError) {
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : 'Could not delete the post.',
+      )
+      setAdminBusy(null)
+    }
+  }, [post, isAdmin, adminBusy, navigate])
+
   return (
     <div className="shell-frame">
       <Header />
@@ -107,14 +151,42 @@ export function Article() {
               <span>All posts</span>
             </Link>
             {post ? (
-              <button
-                type="button"
-                className="btn btn-small"
-                onClick={() => void handleCopyLink()}
-              >
-                {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-                <span>{copied ? 'Link copied' : 'Copy link'}</span>
-              </button>
+              <div className="post-article-actions">
+                {isAdmin ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      disabled={adminBusy !== null}
+                      onClick={() => void handleToggleStatus()}
+                    >
+                      <span>
+                        {adminBusy === 'status'
+                          ? 'Saving…'
+                          : post.status === 'published'
+                            ? 'Unpublish'
+                            : 'Publish'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-danger"
+                      disabled={adminBusy !== null}
+                      onClick={() => void handleDelete()}
+                    >
+                      <span>{adminBusy === 'delete' ? 'Deleting…' : 'Delete'}</span>
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => void handleCopyLink()}
+                >
+                  {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+                  <span>{copied ? 'Link copied' : 'Copy link'}</span>
+                </button>
+              </div>
             ) : null}
           </div>
 
@@ -165,7 +237,7 @@ export function Article() {
                         {(post.author_name ?? 'T').slice(0, 1).toUpperCase()}
                       </span>
                     )}
-                    <span className="post-card-author">{post.author_name ?? 'Tabula'}</span>
+                    <span className="post-card-author">{post.author_name ?? 'Lumina Tabula'}</span>
                     <span className="post-dot" aria-hidden>
                       ·
                     </span>
@@ -194,7 +266,7 @@ export function Article() {
               <Content blocks={post.blocks} images={images} />
 
               <footer className="post-article-footer">
-                <span>Made with Tabula — private data workbench.</span>
+                <span>Made with Lumina Tabula — private data workbench.</span>
                 <Link to={ROUTES.posts}>Browse all posts</Link>
               </footer>
             </>

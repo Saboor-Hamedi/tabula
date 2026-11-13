@@ -54,7 +54,7 @@ export function createAgentTools(context: ToolContext): ToolSet {
   return {
     inspect_schema: tool({
       description:
-        'Inspect the DuckDB schema before writing SQL. Returns tables, column names, data types, null counts, distinct counts, min/max values, and sample values. Call this first on every turn. Omit "table" to inspect all tables.',
+        'Inspect DuckDB table schemas (column types, null counts, distinct counts, min/max, samples). Only call when the Column Digest lacks needed details (e.g. null counts, min/max, or unlisted tables). Omit "table" to inspect largest tables.',
       inputSchema: inspectSchemaInput,
       execute: async (args) => executeTool('inspect_schema', args, context),
     }),

@@ -15,7 +15,7 @@ export function Privacy() {
             <span className="landing-subhead">Privacy Guarantee</span>
             <h2 className="landing-section-title">Your Data Stays With You. Period.</h2>
             <p className="landing-section-desc">
-              We engineered Tabula so that it is physically impossible for us to save, access, or lose your data.
+              We engineered Lumina Tabula so that it is physically impossible for us to save, access, or lose your data.
             </p>
           </div>
 
@@ -41,7 +41,7 @@ export function Privacy() {
 
             <div className="landing-arch-card arch-tabula">
               <div className="landing-arch-badge badge-success">
-                <ShieldCheckIcon size={13} /> The Tabula Guarantee
+                <ShieldCheckIcon size={13} /> The Lumina Tabula Guarantee
               </div>
               <h3 className="landing-arch-title">Total Local Privacy</h3>
               <ul className="landing-arch-list">

@@ -53,7 +53,7 @@ export function Insights() {
           <span className="landing-subhead">Posts</span>
           <h2 className="landing-section-title">Published Posts From The Workspace</h2>
           <p className="landing-section-desc">
-            Search published analyses, summary tables, charts, and diagrams directly from Tabula.
+            Search published analyses, summary tables, charts, and diagrams directly from Lumina Tabula.
           </p>
 
           <form

@@ -33,7 +33,7 @@ export function Footer() {
               <span className="landing-logo-badge">
                 <DatabaseIcon size={14} />
               </span>
-              <span className="landing-brand-name">Tabula</span>
+              <span className="landing-brand-name">Lumina Tabula</span>
             </Link>
             <p className="landing-footer-tagline">
               The private data analysis tool where files never leave your computer.
@@ -68,7 +68,7 @@ export function Footer() {
 
         <div className="landing-footer-bottom">
           <div className="footer-copy">
-            © {new Date().getFullYear()} Tabula. Your data stays with you.
+            © {new Date().getFullYear()} Lumina Tabula. Your data stays with you.
           </div>
         </div>
       </div>

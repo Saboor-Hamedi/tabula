@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Tabula — Administration
+-- Lumina Tabula — Administration
 -- ------------------------------------------------------------------------------
 -- What an administrator sees about the people on the account: when they signed
 -- up, when they last signed in, and the window of their subscription.

@@ -50,7 +50,7 @@ export function Nav({ isAuthenticated, onSignIn, onOpenApp }: NavProps) {
             <DatabaseIcon size={15} />
           </span>
           <span className="landing-brand-text">
-            <span className="landing-brand-name">Tabula</span>
+            <span className="landing-brand-name">Lumina Tabula</span>
           </span>
         </Link>
 

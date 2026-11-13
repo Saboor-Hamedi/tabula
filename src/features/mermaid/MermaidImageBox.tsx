@@ -9,6 +9,7 @@ export interface MermaidImageBoxProps {
   code: string
   inView?: boolean
   containerRef?: React.RefObject<HTMLDivElement | null>
+  onClick?: () => void
 }
 
 /**
@@ -53,9 +54,16 @@ export function MermaidImageBox({
   code,
   inView = true,
   containerRef,
+  onClick,
 }: MermaidImageBoxProps) {
   return (
-    <div className="mermaid-diagram-canvas mermaid-image-box" ref={containerRef}>
+    <div
+      className="mermaid-diagram-canvas mermaid-image-box"
+      ref={containerRef}
+      onClick={onClick}
+      style={onClick ? { cursor: 'zoom-in' } : undefined}
+      title={onClick ? 'Click to enlarge' : undefined}
+    >
       {inView ? (
         <DiagramBoundary code={code}>
           <Suspense fallback={<MermaidFallback />}>

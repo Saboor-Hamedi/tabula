@@ -23,9 +23,7 @@
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  box-shadow:
-    0 28px 72px -12px rgba(0, 0, 0, 0.45),
-    0 8px 24px -4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   outline: none;
   animation: modal-pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1);

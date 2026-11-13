@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from '../../core/router'
 import { ROUTES, userPath } from '../../core/router/paths'
 import { signOutAccount } from '../../core/supabase/signOut'
+import { useUsageStatus } from '../../core/supabase/usage'
 import { SettingsIcon, UserIcon } from '../common/Icons'
 import { useSessionActions } from '../SessionProvider'
 import { useAuthUser, useIsAdmin, useProfile, useUserSlug } from '../auth/useProfile'
@@ -20,6 +21,7 @@ export function SidebarFooter() {
   const profile = useProfile()
   const isAdmin = useIsAdmin()
   const userSlug = useUserSlug()
+  const { usage } = useUsageStatus()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -45,10 +47,23 @@ export function SidebarFooter() {
   const displayName = profile?.display_name || email.split('@')[0] || 'User'
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U'
   const avatarUrl = profile?.avatar_url ?? null
+  const tierText = usage?.isAdmin
+    ? 'Admin'
+    : usage?.tier === 'pro'
+      ? 'Plus'
+      : usage?.tier === 'enterprise'
+        ? 'Enterprise'
+        : usage?.trialExpired
+          ? 'Trial Ended'
+          : 'Trial'
+  const isPaidTier = Boolean(
+    usage?.isAdmin ||
+      usage?.tier === 'pro' ||
+      usage?.tier === 'enterprise',
+  )
 
   return (
     <>
-      {user ? <UsageQuotaCard /> : null}
       <div className="sidebar-footer" ref={menuRef}>
       {menuOpen && user ? (
         <div className="sidebar-account-menu" role="menu">
@@ -66,6 +81,8 @@ export function SidebarFooter() {
             </div>
             {isAdmin ? <span className="sidebar-account-badge is-pro">Admin</span> : null}
           </div>
+
+          <UsageQuotaCard />
 
           <div className="account-menu-divider" />
 
@@ -113,6 +130,11 @@ export function SidebarFooter() {
               )}
             </span>
             <span className="sidebar-account-name">{email || displayName}</span>
+            {usage ? (
+              <span className={`account-menu-tier-pill ${isPaidTier ? 'is-pro' : 'is-free'}`}>
+                {tierText}
+              </span>
+            ) : null}
           </button>
         </div>
       ) : (

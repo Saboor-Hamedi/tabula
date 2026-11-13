@@ -81,7 +81,6 @@ export function Account({
             {initial}
           </span>
         )}
-        <span className="header-account-name">{name.split(' ')[0]}</span>
       </button>
 
       {open ? (

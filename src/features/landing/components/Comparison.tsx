@@ -10,7 +10,7 @@ export function Comparison() {
         <div className="landing-container">
           <div className="landing-section-header">
             <span className="landing-subhead">Comparison</span>
-            <h2 className="landing-section-title">Tabula vs. Cloud Software</h2>
+            <h2 className="landing-section-title">Lumina Tabula vs. Cloud Software</h2>
             <p className="landing-section-desc">
               Why business professionals choose private on-device analysis.
             </p>
@@ -21,7 +21,7 @@ export function Comparison() {
               <thead>
                 <tr>
                   <th>Feature</th>
-                  <th className="highlight-col">Tabula</th>
+                  <th className="highlight-col">Lumina Tabula</th>
                   <th>Standard Cloud Tools</th>
                 </tr>
               </thead>

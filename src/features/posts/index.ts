@@ -1,7 +1,7 @@
 /**
  * Published insights.
  *
- * A post is a Tabula answer that an administrator released to the public
+ * A post is a Lumina Tabula answer that an administrator released to the public
  * page. The schema and the queries live in `features/migration`.
  *
  *   api/        the PostgREST calls

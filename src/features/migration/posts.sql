@@ -1,7 +1,7 @@
 -- ==============================================================================
--- Tabula — Posts
+-- Lumina Tabula — Posts
 -- ------------------------------------------------------------------------------
--- A published Tabula answer.
+-- A published Lumina Tabula answer.
 --
 -- A post keeps the raw markdown *and* the parsed render blocks, so the public
 -- page draws the exact same Mermaid diagrams, charts and tables the
@@ -34,7 +34,7 @@ create table if not exists public.posts (
   subtitle text,
   excerpt text,
 
-  -- The raw answer exactly as Tabula produced it.
+  -- The raw answer exactly as Lumina Tabula produced it.
   content text not null default '',
 
   -- Parsed render blocks, stored as JSON:
@@ -70,7 +70,7 @@ create table if not exists public.posts (
 );
 
 comment on table public.posts is
-  'Published Tabula answers. Public once published; writable only by administrators.';
+  'Published Lumina Tabula answers. Public once published; writable only by administrators.';
 comment on column public.posts.blocks is
   'JSON array of render blocks: {type:"markdown"|"mermaid"|"chart"|"table"}.';
 
@@ -98,6 +98,8 @@ create table if not exists public.post_images (
 -- Everyone may read a published post. Only administrators may write.
 -- ------------------------------------------------------------------------------
 alter table public.posts enable row level security;
+grant select on public.posts to anon, authenticated;
+grant insert, update, delete on public.posts to authenticated;
 
 drop policy if exists "Published posts are public" on public.posts;
 create policy "Published posts are public"
@@ -144,6 +146,8 @@ create policy "Admins can delete posts"
 -- RLS — post images
 -- ------------------------------------------------------------------------------
 alter table public.post_images enable row level security;
+grant select on public.post_images to anon, authenticated;
+grant insert, update, delete on public.post_images to authenticated;
 
 drop policy if exists "Images of published posts are public" on public.post_images;
 create policy "Images of published posts are public"
@@ -210,7 +214,7 @@ begin
       into new.author_name, new.author_avatar_url
       from public.profiles p
      where p.id = auth.uid();
-    new.author_name := coalesce(new.author_name, 'Tabula');
+    new.author_name := coalesce(new.author_name, 'Lumina Tabula');
   end if;
 
   if new.status = 'published' and new.published_at is null then

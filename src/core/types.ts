@@ -117,6 +117,13 @@ export interface UploadState {
   message: string
 }
 
+export interface UploadQueueItem {
+  id: string
+  fileName: string
+  phase: UploadPhase | 'queued'
+  message: string
+}
+
 export interface ElbowPoint {
   x: number
   y: number

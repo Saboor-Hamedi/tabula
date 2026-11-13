@@ -13,6 +13,7 @@ import {
   UserIcon,
 } from '../common/Icons'
 import { Header } from '../header/Header'
+import { useAuth } from './useAuth'
 import {
   describeAuthError,
   fetchProviderAvailability,
@@ -20,7 +21,7 @@ import {
   type ProviderAvailability,
 } from './providers'
 
-type AuthMode = 'signin' | 'signup' | 'forgot-password' | 'magic-link'
+type AuthMode = 'signin' | 'signup' | 'forgot-password' | 'magic-link' | 'update-password'
 
 interface AuthScreenProps {
   initialMode?: 'signin' | 'signup'
@@ -28,11 +29,15 @@ interface AuthScreenProps {
 
 export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   const { navigate } = useRouter()
+  const { passwordRecovery, updatePassword, clearPasswordRecovery } = useAuth()
 
   const onSuccess = () => navigate(ROUTES.workspace, { replace: true })
-  const [mode, setMode] = useState<AuthMode>(initialMode)
+  const [mode, setMode] = useState<AuthMode>(() =>
+    passwordRecovery ? 'update-password' : initialMode,
+  )
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [honeypot, setHoneypot] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -42,6 +47,13 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   const [providers, setProviders] = useState<ProviderAvailability | null>(null)
 
   const isSignUp = mode === 'signup'
+
+  useEffect(() => {
+    if (passwordRecovery) {
+      setMode('update-password')
+      setMessage(null)
+    }
+  }, [passwordRecovery])
 
   // Ask the project which providers are enabled, so the screen only offers
   // the ones that can actually work.
@@ -102,6 +114,42 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
       return
     }
 
+    if (mode === 'update-password') {
+      if (!password || password.length < 6) {
+        setMessage({
+          type: 'error',
+          text: 'New password must be at least 6 characters long.',
+        })
+        return
+      }
+      if (password !== confirmPassword) {
+        setMessage({
+          type: 'error',
+          text: 'Passwords do not match.',
+        })
+        return
+      }
+      setLoading(true)
+      setMessage(null)
+      try {
+        const { error } = await updatePassword(password)
+        if (error) throw error
+        setMessage({
+          type: 'success',
+          text: 'Password updated! Redirecting to your workspace…',
+        })
+        setTimeout(() => onSuccess(), 900)
+      } catch (err: unknown) {
+        setMessage({
+          type: 'error',
+          text: describeAuthError(err),
+        })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     const cleanEmail = email.trim()
     if (!cleanEmail || !cleanEmail.includes('@')) {
       setMessage({
@@ -117,7 +165,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     try {
       if (mode === 'forgot-password') {
         const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-          redirectTo: `${window.location.origin}/login`,
+          redirectTo: `${window.location.origin}/login?type=recovery`,
         })
         if (error) throw error
         setMessage({
@@ -156,8 +204,10 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           email: cleanEmail,
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/workspace`,
             data: {
               name: displayName.trim() || undefined,
+              app_name: 'Lumina Tabula',
             },
           },
         })
@@ -221,7 +271,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           </div>
 
           <h1 className="auth-hero-title">
-            Tabula
+            Lumina Tabula
             <span className="auth-hero-tag">Analytics</span>
           </h1>
 
@@ -276,16 +326,20 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         <div className="auth-screen-card">
           <div className="auth-card-header">
             <h2>
-              {mode === 'forgot-password'
+              {mode === 'update-password'
+                ? 'Set a new password'
+                : mode === 'forgot-password'
                 ? 'Reset your password'
                 : mode === 'magic-link'
                 ? 'Sign in with magic link'
                 : isSignUp
                 ? 'Create your account'
-                : 'Sign in to Tabula'}
+                : 'Sign in to Lumina Tabula'}
             </h2>
             <p>
-              {mode === 'forgot-password'
+              {mode === 'update-password'
+                ? 'Enter a new password for your Lumina Tabula account'
+                : mode === 'forgot-password'
                 ? "Enter your email address and we'll send you a recovery link"
                 : mode === 'magic-link'
                 ? "We'll email you a one-click login link with no password needed"
@@ -426,37 +480,39 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               </div>
             )}
 
-            <div className="auth-input-group">
-              <label className="auth-input-label" htmlFor="auth-email">
-                Work Email
-              </label>
-              <div className="auth-input-wrap">
-                <span className="auth-input-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                </span>
-                <input
-                  id="auth-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  className="auth-input"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+            {mode !== 'update-password' && (
+              <div className="auth-input-group">
+                <label className="auth-input-label" htmlFor="auth-email">
+                  Work Email
+                </label>
+                <div className="auth-input-wrap">
+                  <span className="auth-input-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                  </span>
+                  <input
+                    id="auth-email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    className="auth-input"
+                    placeholder="name@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {mode !== 'forgot-password' && mode !== 'magic-link' && (
               <div className="auth-input-group">
                 <div className="auth-label-row">
                   <label className="auth-input-label" htmlFor="auth-password">
-                    Password
+                    {mode === 'update-password' ? 'New Password' : 'Password'}
                   </label>
-                  {!isSignUp && (
+                  {mode === 'signin' && (
                     <button
                       type="button"
                       className="auth-forgot-link"
@@ -478,7 +534,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                     type={showPassword ? 'text' : 'password'}
                     required
                     minLength={6}
-                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                    autoComplete={isSignUp || mode === 'update-password' ? 'new-password' : 'current-password'}
                     className="auth-input"
                     placeholder="••••••••••••"
                     value={password}
@@ -496,9 +552,35 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               </div>
             )}
 
+            {mode === 'update-password' && (
+              <div className="auth-input-group">
+                <label className="auth-input-label" htmlFor="auth-confirm-password">
+                  Confirm New Password
+                </label>
+                <div className="auth-input-wrap">
+                  <span className="auth-input-icon">
+                    <LockIcon size={15} />
+                  </span>
+                  <input
+                    id="auth-confirm-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    className="auth-input"
+                    placeholder="••••••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
             <button type="submit" className="auth-primary-submit" disabled={loading}>
               {loading ? (
                 <span className="auth-spinner" />
+              ) : mode === 'update-password' ? (
+                'Update Password'
               ) : mode === 'forgot-password' ? (
                 'Send Password Reset Link'
               ) : mode === 'magic-link' ? (
@@ -513,11 +595,12 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
 
           {/* Mode Switchers & Alternative Options */}
           <div className="auth-aux-links">
-            {mode === 'forgot-password' || mode === 'magic-link' ? (
+            {mode === 'forgot-password' || mode === 'magic-link' || mode === 'update-password' ? (
               <button
                 type="button"
                 className="auth-aux-btn"
                 onClick={() => {
+                  clearPasswordRecovery()
                   setMode('signin')
                   setMessage(null)
                 }}
@@ -540,7 +623,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
 
           <div className="auth-card-footer">
             <span>
-              By signing in, you agree to local data processing terms. Tabula operates 100% on-device.
+              By signing in, you agree to local data processing terms. Lumina Tabula operates 100% on-device.
             </span>
           </div>
         </div>

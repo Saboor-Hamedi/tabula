@@ -33,7 +33,7 @@ export function Pricing({
             <div className="landing-pricing-card">
               <div className="card-top">
                 <h3 className="plan-name">7-Day Free Trial</h3>
-                <p className="plan-desc">Try Tabula with full access — no card required.</p>
+                <p className="plan-desc">Try Lumina Tabula with full access — no card required.</p>
                 <div className="plan-price">
                   <span className="price-amount">$0</span>
                   <span className="price-period">/ 7 days</span>
