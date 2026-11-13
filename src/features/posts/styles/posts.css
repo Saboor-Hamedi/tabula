@@ -41,7 +41,7 @@
 
 .feed-stack .pagination-bar {
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 10px;
 }
 
 .post-grid {
@@ -62,7 +62,7 @@
   height: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 10px;
   overflow: hidden;
   color: inherit;
   text-decoration: none;
@@ -73,7 +73,7 @@
 
 .post-card:hover {
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .post-card.is-featured {
@@ -1140,45 +1140,19 @@ a.post-tag:hover {
   text-wrap: pretty;
 }
 
-.insights-search {
-  margin: 28px auto 0;
-  max-width: 560px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 6px 6px 18px;
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--text) 12%, var(--border));
-  border-radius: var(--radius-full);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--text) 7%, transparent);
-}
-
-.insights-search .btn-primary {
-  color: #090d16;
-  font-weight: 600;
-  border-radius: var(--radius-full);
-  padding-inline: 16px;
-  flex-shrink: 0;
-}
-
-.insights-search svg {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.insights-search input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: none;
-  outline: none;
-  font-size: 13.5px;
-  color: var(--text);
-}
-
 .insights-body {
   flex: 1;
   padding: 34px 0 56px;
+}
+
+@media (max-width: 640px) {
+  .insights-body {
+    padding: 20px 0 40px;
+  }
+
+  .post-grid {
+    gap: 14px;
+  }
 }
 
 .insights-page .landing-brand {

@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useRouter } from '../../core/router'
-import { ROUTES, userPath } from '../../core/router/paths'
-import { useUserSlug } from '../auth/useProfile'
+import { ROUTES } from '../../core/router/paths'
 
 /**
  * Top navigation for public pages (front page and posts).
- * Includes smooth-scroll section links, Posts, and Workspace (when signed in).
+ * Includes smooth-scroll section links and Posts.
  */
 
 export interface NavProps {
-  /** Visitors who have not signed in only get the public sections. */
+  /** Kept for caller compatibility. */
   isAuthenticated?: boolean
 }
 
@@ -21,9 +20,8 @@ const SECTION_LINKS = [
   { id: 'faq', label: 'FAQ' },
 ] as const
 
-export function Nav({ isAuthenticated = false }: NavProps) {
+export function Nav(_props: NavProps) {
   const { path, navigate } = useRouter()
-  const userSlug = useUserSlug()
   const isLanding = path === ROUTES.landing || path === '/'
   const [activeSection, setActiveSection] = useState<string | null>(null)
 
@@ -62,24 +60,11 @@ export function Nav({ isAuthenticated = false }: NavProps) {
     }, 80)
   }
 
-  const items = [
-    {
-      to: ROUTES.posts,
-      matches: (p: string) =>
-        p === ROUTES.posts ||
-        p.startsWith('/posts/') ||
-        p === ROUTES.insights ||
-        p.startsWith('/insights/'),
-      label: 'Posts',
-      visible: true,
-    },
-    {
-      to: userPath('/workspace', userSlug),
-      matches: (p: string) => p === ROUTES.workspace || p.endsWith('/workspace'),
-      label: 'Workspace',
-      visible: isAuthenticated,
-    },
-  ].filter((item) => item.visible)
+  const isPostsActive =
+    path === ROUTES.posts ||
+    path.startsWith('/posts/') ||
+    path === ROUTES.insights ||
+    path.startsWith('/insights/')
 
   return (
     <nav className="header-nav" aria-label="Product">
@@ -93,15 +78,12 @@ export function Nav({ isAuthenticated = false }: NavProps) {
           {sec.label}
         </button>
       ))}
-      {items.map((item) => (
-        <Link
-          key={item.label}
-          to={item.to}
-          className={`header-nav-link ${item.matches(path) ? 'is-active' : ''}`}
-        >
-          {item.label}
-        </Link>
-      ))}
+      <Link
+        to={ROUTES.posts}
+        className={`header-nav-link ${isPostsActive ? 'is-active' : ''}`}
+      >
+        Posts
+      </Link>
     </nav>
   )
 }

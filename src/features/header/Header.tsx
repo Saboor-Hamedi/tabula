@@ -5,15 +5,12 @@ import { signOutAccount } from '../../core/supabase/signOut'
 import { useAuthUser, useProfile, useUserSlug } from '../auth/useProfile'
 import { BackTop } from '../common/BackTop'
 import {
-  MoonIcon,
   PanelRightIcon,
   SidebarIcon,
-  SunIcon,
   TrashIcon,
 } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 import { useOnline } from '../common/useOnline'
-import { useTheme } from '../common/useTheme'
 import {
   SessionActionsContext,
   SessionStateContext,
@@ -53,7 +50,6 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
   const user = useAuthUser()
   const profile = useProfile()
   const userSlug = useUserSlug()
-  const { theme, toggleTheme } = useTheme()
   const online = useOnline()
 
   const isWorkspace = variant === 'workspace'
@@ -106,13 +102,6 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
             <TrashIcon size={16} />
           </IconButton>
         ) : null}
-
-        <IconButton
-          label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          onClick={(event) => toggleTheme(event)}
-        >
-          {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
-        </IconButton>
 
         {isWorkspace && session && actions ? (
           <span className="workspace-header-toggle-desktop">

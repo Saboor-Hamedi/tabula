@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useQuery, useRouter } from '../../../core/router'
+import { useQuery, useRouter } from '../../../core/router'
 import { ROUTES } from '../../../core/router/paths'
 import { HeroPixelField } from '../../common/HeroPixelField'
 import { Header } from '../../header/Header'
@@ -71,12 +71,6 @@ export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProp
           />
         </div>
       </main>
-
-      <footer className="insights-footer">
-        <div className="shell-container">
-          <Link to={ROUTES.landing}>Back to home</Link>
-        </div>
-      </footer>
     </div>
   )
 }

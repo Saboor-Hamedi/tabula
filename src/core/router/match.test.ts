@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildHash, matchPath, parseHash } from './match'
+import {
+  buildHash,
+  joinPath,
+  matchPath,
+  normalizeRouteTarget,
+  parseBrowserLocation,
+  parseHash,
+} from './match'
 
 describe('parseHash', () => {
   it('treats a bare fragment as a path', () => {
@@ -61,5 +68,58 @@ describe('buildHash', () => {
 
   it('appends the query string', () => {
     expect(buildHash('/insights', { tag: 'revenue' })).toBe('#/insights?tag=revenue')
+  })
+})
+
+describe('parseBrowserLocation', () => {
+  it('prefers a legacy hash when it looks like a route', () => {
+    expect(parseBrowserLocation('/', '', '#/posts').path).toBe('/posts')
+  })
+
+  it('ignores hashes that look like OAuth tokens', () => {
+    expect(parseBrowserLocation('/landing', '', '#access_token=abc123').path).toBe('/landing')
+  })
+
+  it('reads clean pathname and search', () => {
+    const location = parseBrowserLocation('/posts', '?tag=revenue', '')
+    expect(location.path).toBe('/posts')
+    expect(location.query.get('tag')).toBe('revenue')
+  })
+
+  it('normalizes a trailing slash and a leading-slash-less path', () => {
+    expect(parseBrowserLocation('/posts/', '', '').path).toBe('/posts')
+    expect(parseBrowserLocation('posts', '', '').path).toBe('/posts')
+  })
+
+  it('returns the root path for an empty pathname', () => {
+    expect(parseBrowserLocation('', '', '').path).toBe('/')
+  })
+})
+
+describe('normalizeRouteTarget', () => {
+  it('strips a leading hash', () => {
+    expect(normalizeRouteTarget('#posts')).toBe('/posts')
+  })
+
+  it('adds a leading slash to a bare path', () => {
+    expect(normalizeRouteTarget('posts')).toBe('/posts')
+  })
+
+  it('leaves a clean path untouched', () => {
+    expect(normalizeRouteTarget('/posts?tag=x')).toBe('/posts?tag=x')
+  })
+})
+
+describe('joinPath', () => {
+  it('returns the base when the path is empty', () => {
+    expect(joinPath('/posts', '')).toBe('/posts')
+  })
+
+  it('returns absolute paths unchanged', () => {
+    expect(joinPath('/posts', '/app')).toBe('/app')
+  })
+
+  it('joins relative paths with exactly one slash', () => {
+    expect(joinPath('/posts/', 'q3')).toBe('/posts/q3')
   })
 })

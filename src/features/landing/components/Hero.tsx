@@ -1,13 +1,10 @@
-import {
-  ArrowRightIcon,
-  ChevronDownIcon,
-} from '../../common/Icons'
+import { ArrowRightIcon } from '../../common/Icons'
 import { HeroPixelField } from '../../common/HeroPixelField'
 
 /**
  * The hero.
  *
- * One promise, one sentence, two actions. The ribbon underneath is the proof.
+ * One promise, one sentence, one clear Workspace action.
  */
 
 export interface HeroProps {
@@ -15,15 +12,13 @@ export interface HeroProps {
   onNavigateToAuth: (mode?: 'signin' | 'signup') => void
   onNavigateToApp: () => void
   onTryDemo?: () => void
-  scrollTo: (id: string) => void
+  scrollTo?: (id: string) => void
 }
 
 export function Hero({
   isAuthenticated,
   onNavigateToAuth,
   onNavigateToApp,
-  onTryDemo,
-  scrollTo,
 }: HeroProps) {
   return (
 <section className="landing-hero">
@@ -35,55 +30,21 @@ export function Hero({
           </div>
           <h1 className="landing-hero-title">
             Instant spreadsheet answers. <br />
-            Zero files uploaded or saved.
+            Zero files uploaded.
           </h1>
 
           <p className="landing-hero-subtitle">
-            Open your Excel and CSV files without uploading them to any cloud. Ask questions in
-            plain English to get automated charts, business trends, and executive summaries
-            in seconds.
+            Analyze Excel and CSV files locally in your browser with automated charts and summaries.
           </p>
 
           <div className="landing-hero-cta-group">
-            {isAuthenticated ? (
-              <button
-                type="button"
-                className="landing-cta-btn landing-cta-primary"
-                onClick={onNavigateToApp}
-              >
-                <span>Open Workspace</span>
-                <ArrowRightIcon size={14} />
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="landing-cta-btn landing-cta-primary"
-                  onClick={() => onNavigateToAuth('signup')}
-                >
-                  <span>Start Analyzing Free</span>
-                  <ArrowRightIcon size={14} />
-                </button>
-                {onTryDemo && (
-                  <button
-                    type="button"
-                    className="landing-cta-btn landing-cta-demo"
-                    onClick={onTryDemo}
-                  >
-                    <span>Try the Demo (No Signup)</span>
-                    <ArrowRightIcon size={14} />
-                  </button>
-                )}
-              </>
-            )}
-
             <button
               type="button"
-              className="landing-cta-btn landing-cta-secondary"
-              onClick={() => scrollTo('demo')}
+              className="landing-cta-btn landing-cta-primary"
+              onClick={() => (isAuthenticated ? onNavigateToApp() : onNavigateToAuth('signup'))}
             >
-              <span>See Walkthrough</span>
-              <ChevronDownIcon size={13} />
+              <span>Workspace</span>
+              <ArrowRightIcon size={16} />
             </button>
           </div>
 

@@ -1,33 +1,163 @@
-Act as a senior product designer specializing in quiet, high-craft, editorial interfaces (NotebookLM / Linear aesthetic) and refactor the **Tabula Workspace** (`/:username/workspace` or `Workspace` component) to match the refined floating 3-pane layout while preserving all existing DuckDB-WASM, Supabase Auth, token tracking, and AI chat functionality.
+Act as a senior frontend engineer and premium mobile UI/UX specialist.
 
-Please inspect the workspace component and apply these exact design and responsive layout rules:
+I want you to audit and improve three existing mobile interfaces:
 
-1. **Floating 3-Pane Shell with `5px` Border Radius**
-   - Wrap the entire workspace in a `h-[100dvh] w-full overflow-hidden flex flex-col` outer shell (`bg-[#F1F0EC]` in light mode, `bg-[#131315]` in dark mode) so mobile browser bars on iPhone, Xiaomi, and Android never clip the bottom composer.
-   - Render the **Left Sources Sidebar**, **Center Chat Canvas**, and **Right Studio Panel** as floating cards separated by `gap-2 lg:gap-2.5` with **`rounded-[5px]`** on all four corners and `1px` hairline borders (`border-[#E2E1DC] dark:border-[#29292E]`, surface `bg-[#FFFFFF] dark:bg-[#1B1B1E]`).
-   - Support collapsible desktop side rails (`lg:w-11`) for both the left and right panels.
+1. Article / Post Detail Page
+2. Workspace / Sources Page
+3. Posts Listing Page
 
-2. **Unified Top App Bar**
-   - Keep a single slim top header (`h-12 px-2.5 sm:px-3.5`) containing:
-     - **Left:** Tabula brand mark (`rounded-[5px]`), active workspace/file title, and a subtle `Local Workspace` badge.
-     - **Right:** `New analysis` button (`rounded-[5px]`), `Export` button, Light/Dark theme toggle, `TRIAL` (or subscription tier) badge, and user avatar.
+These interfaces already work. This is a UI refinement task, not a complete redesign or architectural rewrite.
 
-3. **Left Sidebar: Selectable Sources + Compact Trial Meter**
-   - Add a `+ Sources` and `+ Note` 2-column action row (`rounded-[5px]`), a live file filter input, and a `Select all sources` toggle with individual file checkboxes so users can control which loaded spreadsheets are included in the active query context.
-   - Pin a clean, minimal trial/token progress footer at the bottom of the left card (`tabular-nums`, `2px` progress bar, and an `Upgrade` link) without heavy gradients or clutter.
+### 1. Design Direction
 
-4. **Center Research Memo Canvas & Untouched Composer**
-   - **Editorial Memo Flow:** Render user questions as clean headings (`text-[15.5px] sm:text-[16.5px] font-semibold`) above a `max-w-[660px]` centered column rather than chat bubbles.
-   - **Connected Progress Stepper & Diagnostic Strip:** Display a clean step-by-step progress/diagnostic strip (`grid-cols-1 sm:grid-cols-3 gap-2`) with subtle `rounded-[5px]` surface cards (`bg-[#FAF9F6] dark:bg-[#222226]`) and restrained left-border highlights for key insights.
-   - **Margin Actions:** Include subtle `Copy` and `Save to Studio` actions below each AI response (visible on touchscreens, hover-revealed on desktop).
-   - **Adaptive Follow-Up Prompts:** Display the 4 suggested follow-up prompts as a horizontally swipeable strip on narrow phones (`flex overflow-x-auto snap-x sm:grid sm:grid-cols-2`) so the chat area stays spacious when the mobile keyboard opens.
-   - **DO NOT change the bottom textarea design:** Keep the exact rounded composer box (`rounded-2xl bg-[#F4F4F5] dark:bg-[#242428]`) with `"Ask questions, analyze trends, or request a summary..."`, `"Enter to send · Shift+Enter for a new line"` on the bottom left, and the `w-8 h-8 rounded-lg` `↑` send button on the bottom right—with **no file chips or extra badges inside the textarea**.
+Establish one consistent visual language across all three screens.
 
-5. **Right Studio Panel (`Data` | `Notes` | `Results` | `Activity`)**
-   - Use a flush 4-tab switcher (`Data`, `Notes`, `Results`, `Activity`) with a clean active underline/pill indicator.
-   - Include a 2-column **Quick Studio** grid (`Executive Summary`, `Data Table`, `Trend Breakdown`, `Cohort Comparison`, `Outlier Audit`, `Study Guide`) that generates pinned cards into a **Saved Outputs** list below it, alongside full views for the live DuckDB data table preview, manual Studio notes, pinned result tables, and local execution audit logs (`0 bytes uploaded`).
+Design characteristics:
 
-6. **Mobile & Tablet Navigation (`< 1024px`)**
-   - On viewports below `lg` (`< 1024px` — iPhone, Xiaomi, Android, iPad portrait), display one active panel at a time (`Sources`, `Chat`, or `Studio`) controlled by a clean `rounded-[5px]` 3-segment bottom navigation bar (`lg:hidden`) so nothing ever squashes horizontally.
+- Premium dark interface.
+- Near-black and dark charcoal backgrounds.
+- Existing turquoise/teal accent color.
+- Subtle borders and restrained surface contrast.
+- Clean typography and consistent spacing.
+- Professional, minimal, modern appearance.
+- Excellent mobile responsiveness.
 
-Show a brief summary of the files modified and verify there are no TypeScript errors or layout overflow issues on mobile viewports.
+Avoid:
+
+- Excessive rounded cards.
+- Unnecessary gradients.
+- Excessive shadows and glowing effects.
+- Oversized headings.
+- Excessive empty space.
+- Unnecessary dashboard widgets.
+- Excessive animations.
+- Making everything look like a generic AI-generated dashboard.
+
+Preserve the existing brand identity, logo, colors and established design language.
+
+### 2. Article / Post Detail Page
+
+Improve the article reading experience.
+
+Requirements:
+
+- Redesign the top action toolbar for mobile.
+- Prevent "All posts" and other navigation labels from wrapping awkwardly.
+- Move secondary actions such as Unpublish and Delete into a contextual menu.
+- Keep Share and Copy Link accessible.
+- Improve article title sizing and typography.
+- Establish consistent spacing between headings, paragraphs and sections.
+- Improve rendering of Markdown elements, including tables, code blocks, lists, quotes and images.
+- Make the reading area comfortable on narrow screens.
+- Improve author metadata and reading statistics.
+- Implement a contextual back-to-top button.
+
+The article should feel like a premium publishing platform, not an ordinary social media post.
+
+### 3. Workspace / Sources Page
+
+Improve the workspace layout without changing its functionality.
+
+Requirements:
+
+- Reduce unnecessary vertical spacing.
+- Make the workspace header compact.
+- Improve the Export Analysis component.
+- Refine the Sources section hierarchy.
+- Redesign Add Source with a clean dashed-outline treatment.
+- Improve source cards, including file icons, filenames, file types, row counts and action buttons.
+- Ensure multiple sources can be displayed efficiently.
+- Make the account/profile section more compact.
+- Keep Sources, Chat and Studio navigation accessible at the bottom.
+- Ensure the layout adapts properly to different phone dimensions.
+
+Do not introduce unnecessary statistics or widgets simply to occupy empty space.
+
+The workspace should feel like a focused professional productivity application.
+
+### 4. Posts Listing Page
+
+Improve the mobile browsing experience.
+
+Requirements:
+
+- Fix the search header so it never overlaps post content.
+- Correct sticky header positioning and content offsets.
+- Improve post card proportions and spacing.
+- Make visualization previews responsive.
+- Prevent enormous empty image placeholders.
+- Preserve actual chart, diagram and image previews whenever available.
+- Improve title and description hierarchy.
+- Make author information, publication date, views and reading time visually consistent.
+- Reduce unnecessary vertical space between cards.
+- Improve floating back-to-top button positioning and visibility.
+- Ensure the final content does not become obscured by fixed interface elements.
+
+### 5. Responsive Engineering
+
+Test all three screens at different mobile widths.
+
+Pay particular attention to:
+
+- 320px
+- 360px
+- 375px
+- 390px
+- 412px
+- 430px
+
+Requirements:
+
+- No horizontal overflow.
+- No overlapping elements.
+- No text clipping.
+- No awkward button wrapping.
+- No content hidden behind sticky headers or bottom navigation.
+- Proper handling of long titles and filenames.
+- Consistent safe-area handling on Android and iOS.
+
+### 6. Component Architecture
+
+Do not duplicate components or introduce unnecessary abstractions.
+
+First inspect the existing project architecture.
+
+Identify shared elements that should be reused, such as:
+
+- Mobile header.
+- Action toolbar.
+- Author metadata.
+- Post card.
+- Source card.
+- Empty states.
+- Floating action buttons.
+- Bottom navigation.
+
+Keep screen-specific components separate where appropriate.
+
+Respect the existing framework, styling conventions and component architecture.
+
+### 7. Implementation and Validation
+
+Before making changes:
+
+1. Inspect the three existing screens.
+2. Identify their actual components and styles.
+3. Understand existing responsive behavior.
+4. Identify shared components and potential regressions.
+
+Then implement the improvements.
+
+After implementation:
+
+- Test all three screens.
+- Verify scrolling behavior.
+- Verify sticky headers and bottom navigation.
+- Check long content and large visualizations.
+- Ensure existing functionality remains intact.
+- Check desktop layouts for regressions.
+- Run the existing build and relevant tests.
+
+Do not modify unrelated screens or functionality.
+
+The final result should be cohesive, polished, lightweight and production-ready.

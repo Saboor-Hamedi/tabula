@@ -15,6 +15,10 @@ export default defineConfig({
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      VITE_SUPABASE_URL: 'https://dummy.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'dummy-anon-key-for-e2e',
+    },
   },
   projects: [
     {

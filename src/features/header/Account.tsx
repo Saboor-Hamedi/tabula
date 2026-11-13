@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProfile } from '../auth/useProfile'
-import { CheckIcon, UserIcon } from '../common/Icons'
+import { CheckIcon, MoonIcon, SunIcon, UserIcon } from '../common/Icons'
+import { useTheme } from '../common/useTheme'
 
 /**
  * The account control.
@@ -30,6 +31,7 @@ export function Account({
   onOpenWorkspace,
 }: AccountProps) {
   const profile = useProfile()
+  const { theme, toggleTheme } = useTheme()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -112,6 +114,17 @@ export function Account({
               <span>Open workspace</span>
             </button>
           ) : null}
+          <button
+            type="button"
+            className="header-account-menu-item"
+            role="menuitem"
+            onClick={(event) => {
+              toggleTheme(event)
+            }}
+          >
+            {theme === 'dark' ? <SunIcon size={13} /> : <MoonIcon size={13} />}
+            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
           <button
             type="button"
             className="header-account-menu-item is-danger"

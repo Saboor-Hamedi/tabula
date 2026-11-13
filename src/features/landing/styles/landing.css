@@ -262,20 +262,20 @@
 }
 
 .landing-hero-title {
-  font-size: clamp(32px, 4.8vw, 56px);
+  font-size: clamp(26px, 4.4vw, 52px);
   font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.035em;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
   color: var(--text);
-  margin: 0 auto 18px;
-  max-width: 800px;
+  margin: 0 auto 16px;
+  max-width: 780px;
 }
 
 .landing-hero-subtitle {
-  max-width: 620px;
-  margin: 0 auto 30px;
-  font-size: clamp(15px, 1.5vw, 17px);
-  line-height: 1.62;
+  max-width: 540px;
+  margin: 0 auto 28px;
+  font-size: clamp(14px, 1.4vw, 16.5px);
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
@@ -290,21 +290,40 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 
-/* Compact, clean hero CTA buttons */
+/* Single clear hero CTA button */
 .landing-cta-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 40px;
-  padding: 0 20px;
-  font-size: 13.5px;
+  gap: 8px;
+  height: 46px;
+  padding: 0 26px;
+  font-size: 14.5px;
   font-weight: 600;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+  transition: transform var(--transition), background var(--transition), border-color var(--transition);
+}
+
+@media (max-width: 640px) {
+  .landing-hero-title {
+    font-size: 25px;
+    line-height: 1.16;
+    margin-bottom: 12px;
+  }
+
+  .landing-hero-subtitle {
+    font-size: 13.5px;
+    line-height: 1.48;
+    max-width: 320px;
+    margin-bottom: 22px;
+  }
+
+  .landing-hero-cta-group {
+    margin-bottom: 26px;
+  }
 }
 
 .landing-cta-btn:hover {
@@ -453,11 +472,9 @@
 /* 3. Live Interactive Demo */
 .landing-demo-section {
   position: relative;
-  background:
-    radial-gradient(ellipse 70% 45% at 50% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 72%),
-    var(--surface-2);
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border);
-  padding: 72px 0;
+  padding: 64px 0;
 }
 
 .landing-demo-tabs {
@@ -465,10 +482,12 @@
   flex-wrap: nowrap;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  gap: 12px;
-  justify-content: flex-start;
-  margin-bottom: 18px;
-  padding-bottom: 4px;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -479,21 +498,15 @@
 
 .landing-demo-tab {
   flex: 0 0 auto;
-  min-width: 215px;
+  min-width: 190px;
   scroll-snap-align: start;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  padding: 9px 12px;
   text-align: left;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition);
-}
-
-.landing-demo-tab:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--text) 6%, transparent);
+  transition: background var(--transition), border-color var(--transition);
 }
 
 @media (min-width: 640px) {
@@ -501,7 +514,6 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow-x: visible;
-    padding-bottom: 0;
   }
 
   .landing-demo-tab {
@@ -511,12 +523,11 @@
 
 .landing-demo-tab:hover {
   background: var(--surface-hover);
-  border-color: var(--border-strong);
 }
 
 .landing-demo-tab.is-active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  background: var(--surface-2);
+  border-color: var(--border);
 }
 
 .landing-tab-title {
@@ -537,12 +548,10 @@
 
 .landing-sandbox-card {
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--text) 10%, var(--border));
-  border-radius: var(--radius-md, var(--radius-sm));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  box-shadow:
-    0 20px 50px color-mix(in srgb, var(--text) 8%, transparent),
-    0 2px 8px color-mix(in srgb, var(--text) 4%, transparent);
+  box-shadow: none;
 }
 
 .landing-window-header {
@@ -914,20 +923,24 @@
 .landing-bento-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 18px;
+  border-radius: 10px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .landing-bento-item:hover {
   border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .landing-bento-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-xs);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--accent-soft);
   color: var(--accent);
   display: flex;
@@ -953,7 +966,7 @@
 .landing-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   background: var(--surface);
 }
 
@@ -965,9 +978,17 @@
 
 .landing-comparison-table th,
 .landing-comparison-table td {
-  padding: 10px 14px;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
+}
+
+.landing-comparison-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.landing-comparison-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
 }
 
 .landing-comparison-table th {
@@ -978,11 +999,11 @@
 
 .landing-comparison-table th.highlight-col,
 .landing-comparison-table td.highlight-col {
-  background: color-mix(in srgb, var(--accent-soft) 30%, var(--surface));
+  background: color-mix(in srgb, var(--surface-2) 65%, var(--surface));
   font-weight: 600;
   color: var(--text);
-  border-left: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
 
 .feature-name {
@@ -1067,15 +1088,23 @@
 .landing-pricing-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 22px 18px;
+  border-radius: 10px;
+  padding: 22px 20px;
   display: flex;
   flex-direction: column;
   position: relative;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.landing-pricing-card:hover {
+  border-color: var(--border-strong);
 }
 
 .card-featured {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: var(--shadow-sm);
 }
 
 .featured-pill {
@@ -1214,7 +1243,7 @@
 
 .faq-question-btn {
   width: 100%;
-  padding: 20px 0;
+  padding: 18px 0;
   background: none;
   border: none;
   text-align: left;
@@ -1226,6 +1255,17 @@
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
+  transition: color var(--transition);
+}
+
+.faq-question-btn:hover {
+  color: var(--accent);
+}
+
+.faq-question-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .faq-chevron {
@@ -1255,8 +1295,8 @@
 .landing-cta-inner {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 36px 16px;
+  border-radius: 10px;
+  padding: 36px 20px;
   max-width: 680px;
   margin: 0 auto;
 }
@@ -1316,7 +1356,8 @@
 
 .landing-footer-cols {
   display: flex;
-  gap: 36px;
+  flex-wrap: wrap;
+  gap: 24px 36px;
 }
 
 .col-title {
@@ -1338,6 +1379,7 @@
   cursor: pointer;
   margin-bottom: 6px;
   text-align: left;
+  transition: color var(--transition);
 }
 
 .footer-link:hover {
