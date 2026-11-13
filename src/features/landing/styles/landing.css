@@ -9,7 +9,7 @@
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  overflow-x: hidden;
+  overflow-x: clip;
   position: relative;
 }
 
@@ -72,6 +72,14 @@
   cursor: pointer;
   user-select: none;
   text-decoration: none;
+}
+
+.landing-brand-logo {
+  height: 30px;
+  width: 30px;
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
 }
 
 .landing-logo-badge {
@@ -192,28 +200,76 @@
   border-color: var(--accent-hover);
 }
 
-/* 2. Sober Hero Section */
+/* 2. Full-Viewport Cursor-Reactive Hero Section */
 .landing-hero {
-  padding: 56px 0 40px;
-  text-align: center;
   position: relative;
+  width: 100%;
+  min-height: calc(100vh - 50px);
+  padding: 56px 0 48px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(ellipse 75% 50% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+    var(--bg);
+}
+
+.hero-pixel-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-hero-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.landing-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  margin: 0 auto 20px;
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.landing-hero-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .landing-hero-title {
-  font-size: clamp(28px, 4vw, 44px);
+  font-size: clamp(32px, 4.8vw, 56px);
   font-weight: 800;
-  line-height: 1.12;
-  letter-spacing: -0.03em;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
   color: var(--text);
-  margin: 0 auto 16px;
-  max-width: 720px;
+  margin: 0 auto 18px;
+  max-width: 800px;
 }
 
 .landing-hero-subtitle {
-  max-width: 600px;
-  margin: 0 auto 26px;
-  font-size: 15px;
-  line-height: 1.55;
+  max-width: 620px;
+  margin: 0 auto 30px;
+  font-size: clamp(15px, 1.5vw, 17px);
+  line-height: 1.62;
   color: var(--text-secondary);
 }
 
@@ -227,22 +283,26 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 32px;
+  gap: 12px;
+  margin-bottom: 40px;
 }
 
 /* Compact, clean hero CTA buttons */
 .landing-cta-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 16px;
-  font-size: 13px;
+  gap: 7px;
+  height: 40px;
+  padding: 0 20px;
+  font-size: 13.5px;
   font-weight: 600;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+}
+
+.landing-cta-btn:hover {
+  transform: translateY(-1px);
 }
 
 .landing-cta-primary {
@@ -339,14 +399,24 @@
 
 /* Common Section Headers */
 .landing-section {
-  padding: 52px 0;
+  width: 100%;
+  min-height: calc(100vh - 50px);
+  padding: 64px 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  scroll-margin-top: 50px;
+}
+
+.landing-section > .landing-container {
+  width: 100%;
 }
 
 .landing-section-header {
   text-align: center;
-  max-width: 600px;
-  margin: 0 auto 30px;
+  max-width: 620px;
+  margin: 0 auto 38px;
 }
 
 .landing-subhead {
@@ -376,9 +446,12 @@
 
 /* 3. Live Interactive Demo */
 .landing-demo-section {
-  background: var(--surface-2);
-  border-top: 1px solid var(--border);
+  position: relative;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 72%),
+    var(--surface-2);
   border-bottom: 1px solid var(--border);
+  padding: 72px 0;
 }
 
 .landing-demo-tabs {
@@ -386,9 +459,9 @@
   flex-wrap: nowrap;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  gap: 10px;
+  gap: 12px;
   justify-content: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   padding-bottom: 4px;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -404,11 +477,17 @@
   scroll-snap-align: start;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
   text-align: left;
   cursor: pointer;
-  transition: all var(--transition);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+
+.landing-demo-tab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 @media (min-width: 640px) {
@@ -452,10 +531,12 @@
 
 .landing-sandbox-card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, var(--border));
+  border-radius: var(--radius-md, var(--radius-sm));
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    0 20px 50px color-mix(in srgb, var(--text) 8%, transparent),
+    0 2px 8px color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .landing-window-header {

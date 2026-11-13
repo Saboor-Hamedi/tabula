@@ -1,6 +1,6 @@
 import { Link } from '../../../core/router'
 import { ROUTES } from '../../../core/router/paths'
-import { DatabaseIcon } from '../../common/Icons'
+import logoUrl from '../../../assets/logo.png'
 
 /**
  * The footer.
@@ -29,11 +29,8 @@ export function Footer() {
       <div className="landing-container">
         <div className="landing-footer-top">
           <div className="landing-footer-brand">
-            <Link className="landing-brand" to={ROUTES.landing}>
-              <span className="landing-logo-badge">
-                <DatabaseIcon size={14} />
-              </span>
-              <span className="landing-brand-name">Lumina Tabula</span>
+            <Link className="landing-brand" to={ROUTES.landing} aria-label="Lumina Tabula home">
+              <img src={logoUrl} alt="Lumina Tabula" className="landing-brand-logo" />
             </Link>
             <p className="landing-footer-tagline">
               The private data analysis tool where files never leave your computer.

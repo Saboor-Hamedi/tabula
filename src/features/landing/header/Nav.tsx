@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from '../../../core/router'
 import { ROUTES } from '../../../core/router/paths'
+import logoUrl from '../../../assets/logo.png'
 import {
   ArrowRightIcon,
-  DatabaseIcon,
   MoonIcon,
   ShieldCheckIcon,
   SunIcon,
+  UserIcon,
 } from '../../common/Icons'
 import { useTheme } from '../../common/useTheme'
 import { Dropdown } from './Dropdown'
@@ -45,13 +46,8 @@ export function Nav({ isAuthenticated, onSignIn, onOpenApp }: NavProps) {
       </div>
 
       <div className="landing-nav-inner">
-        <Link className="landing-brand" to={ROUTES.landing}>
-          <span className="landing-logo-badge">
-            <DatabaseIcon size={15} />
-          </span>
-          <span className="landing-brand-text">
-            <span className="landing-brand-name">Lumina Tabula</span>
-          </span>
+        <Link className="landing-brand" to={ROUTES.landing} aria-label="Lumina Tabula home">
+          <img src={logoUrl} alt="Lumina Tabula" className="landing-brand-logo" />
         </Link>
 
         <nav className="landing-links" onMouseLeave={() => setOpenId(null)}>
@@ -91,10 +87,11 @@ export function Nav({ isAuthenticated, onSignIn, onOpenApp }: NavProps) {
           ) : (
             <button
               type="button"
-              className="landing-btn landing-btn-primary"
+              className="header-login-btn"
               onClick={onSignIn}
             >
-              Sign In
+              <UserIcon size={15} />
+              <span>Login</span>
             </button>
           )}
         </div>

@@ -2,6 +2,7 @@ import {
   ArrowRightIcon,
   ChevronDownIcon,
 } from '../../common/Icons'
+import { HeroPixelField } from '../../common/HeroPixelField'
 
 /**
  * The hero.
@@ -26,7 +27,12 @@ export function Hero({
 }: HeroProps) {
   return (
 <section className="landing-hero">
-        <div className="landing-container">
+      <HeroPixelField />
+        <div className="landing-container landing-hero-inner">
+          <div className="landing-hero-eyebrow">
+            <span className="landing-hero-eyebrow-dot" />
+            <span>Private, local-first spreadsheet intelligence</span>
+          </div>
           <h1 className="landing-hero-title">
             Instant spreadsheet answers. <br />
             Zero files uploaded or saved.

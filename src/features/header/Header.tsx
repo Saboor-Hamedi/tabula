@@ -1,8 +1,9 @@
-import { useContext } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { useRouter } from '../../core/router'
 import { ROUTES, userPath } from '../../core/router/paths'
 import { signOutAccount } from '../../core/supabase/signOut'
 import { useAuthUser, useProfile, useUserSlug } from '../auth/useProfile'
+import { BackTop } from '../common/BackTop'
 import {
   MoonIcon,
   PanelRightIcon,
@@ -19,6 +20,7 @@ import {
 } from '../session/sessionContext'
 import { Account } from './Account'
 import { Brand } from './Brand'
+import { HeaderSearch } from './HeaderSearch'
 import { Nav } from './Nav'
 
 /**
@@ -56,10 +58,24 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
 
   const isWorkspace = variant === 'workspace'
   const isDashboard = variant === 'dashboard'
+  const isPage = variant === 'page'
   const canClearChat = isWorkspace && Boolean(session?.activeSession) && (session?.messages.length ?? 0) > 0
 
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    if (!isPage) return
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isPage])
+
   return (
-    <header className={`app-header ${isWorkspace ? 'is-workspace' : isDashboard ? 'is-dashboard' : 'is-page'}`}>
+    <>
+    <header
+      className={`app-header ${isWorkspace ? 'is-workspace' : isDashboard ? 'is-dashboard' : 'is-page'}${scrolled ? ' is-scrolled' : ''}`}
+    >
       <div className="app-header-left">
         {isWorkspace && session && actions ? (
           <span className="workspace-header-toggle-desktop">
@@ -84,6 +100,7 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
       </div>
 
       <div className="app-header-right">
+        {isPage ? <HeaderSearch /> : null}
         {canClearChat && actions ? (
           <IconButton label="Clear chat history" onClick={actions.requestClearChat}>
             <TrashIcon size={16} />
@@ -124,5 +141,7 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
         ) : null}
       </div>
     </header>
+    {isPage ? <BackTop /> : null}
+    </>
   )
 }

@@ -74,6 +74,25 @@ export async function listPublishedPostsPage(
   const client = requireClient()
   const limit = options.limit ?? 24
   const offset = options.offset ?? 0
+  const searchTerm = options.search?.trim() ?? ''
+
+  if (searchTerm.length > 0) {
+    const { data: rpcData, error: rpcError } = await client.rpc(
+      'search_published_posts',
+      {
+        p_query: searchTerm,
+        p_tag: options.tag ?? null,
+        p_limit: limit,
+        p_offset: offset,
+      },
+    )
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      const rows = rpcData as Array<PostSummary & { total_count?: number | string }>
+      const total = rows.length > 0 ? Number(rows[0].total_count ?? rows.length) : 0
+      return { posts: rows, total }
+    }
+  }
 
   let query = client
     .from(POSTS)
@@ -87,8 +106,8 @@ export async function listPublishedPostsPage(
     query = query.contains('tags', [options.tag])
   }
 
-  if (options.search && options.search.trim().length > 0) {
-    const term = options.search.trim().replace(/[%,()]/g, ' ')
+  if (searchTerm.length > 0) {
+    const term = searchTerm.replace(/[%,()]/g, ' ')
     query = query.or(
       `title.ilike.*${term}*,excerpt.ilike.*${term}*,subtitle.ilike.*${term}*,dataset_name.ilike.*${term}*`,
     )

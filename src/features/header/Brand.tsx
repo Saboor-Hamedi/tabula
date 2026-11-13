@@ -1,6 +1,6 @@
 import { Link } from '../../core/router'
 import { ROUTES } from '../../core/router/paths'
-import { DatabaseIcon } from '../common/Icons'
+import logoUrl from '../../assets/logo.png'
 
 /**
  * The brand.
@@ -15,13 +15,10 @@ export interface BrandProps {
   compact?: boolean
 }
 
-export function Brand({ to = ROUTES.dashboard, compact = false }: BrandProps) {
+export function Brand({ to = ROUTES.dashboard }: BrandProps) {
   return (
     <Link className="header-brand" to={to} aria-label="Lumina Tabula home">
-      <span className="header-brand-badge">
-        <DatabaseIcon size={15} />
-      </span>
-      {compact ? null : <span className="header-brand-name">Lumina Tabula</span>}
+      <img src={logoUrl} alt="Lumina Tabula" className="header-brand-logo" />
     </Link>
   )
 }

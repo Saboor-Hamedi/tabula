@@ -5,7 +5,7 @@ import type { Post, PostImage } from '../../../core/supabase/types'
 import { isSupabaseConfigured } from '../../../core/supabase/client'
 import { formatCount } from '../../../core/utils/format'
 import { useIsAdmin } from '../../auth/useProfile'
-import { ArrowLeftIcon, CheckIcon, CopyIcon, EyeIcon } from '../../common/Icons'
+import { ArrowLeftIcon, CheckIcon, CopyIcon, EyeIcon, ShareIcon } from '../../common/Icons'
 import { Header } from '../../header/Header'
 import {
   deletePost,
@@ -104,6 +104,62 @@ export function Article() {
     }
   }, [])
 
+  const handleShare = useCallback(async () => {
+    const shareUrl = window.location.href
+    const shareTitle = post?.title || 'Lumina Tabula'
+    const shareText =
+      post?.excerpt || post?.subtitle || post?.title || 'Private, in-browser data analysis.'
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: shareTitle, text: shareText, url: shareUrl })
+        return
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+      }
+    }
+    await handleCopyLink()
+  }, [post, handleCopyLink])
+
+  useEffect(() => {
+    if (!post) return
+    const prevTitle = document.title
+    const siteLogo = 'https://www.luminatabula.com/logo.png'
+    const image = post.cover_image_url || images[0]?.url || siteLogo
+    const desc =
+      post.excerpt?.trim() ||
+      post.subtitle?.trim() ||
+      'Private, in-browser data analysis on Lumina Tabula.'
+    const pageUrl = window.location.href
+
+    document.title = `${post.title} — Lumina Tabula`
+
+    const updates: Array<[string, string, string]> = [
+      ['property', 'og:title', post.title],
+      ['property', 'og:description', desc],
+      ['property', 'og:image', image],
+      ['property', 'og:url', pageUrl],
+      ['name', 'twitter:title', post.title],
+      ['name', 'twitter:description', desc],
+      ['name', 'twitter:image', image],
+    ]
+    const previous = new Map<Element, string | null>()
+    for (const [attr, key, value] of updates) {
+      const el = document.querySelector(`meta[${attr}="${key}"]`)
+      if (el) {
+        previous.set(el, el.getAttribute('content'))
+        el.setAttribute('content', value)
+      }
+    }
+
+    return () => {
+      document.title = prevTitle
+      for (const [el, prev] of previous) {
+        if (prev === null) el.removeAttribute('content')
+        else el.setAttribute('content', prev)
+      }
+    }
+  }, [post, images])
+
   const handleToggleStatus = useCallback(async () => {
     if (!post || !isAdmin || adminBusy) return
     const nextStatus = post.status === 'published' ? 'archived' : 'published'
@@ -178,6 +234,14 @@ export function Article() {
                     </button>
                   </>
                 ) : null}
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={() => void handleShare()}
+                >
+                  <ShareIcon size={13} />
+                  <span>Share</span>
+                </button>
                 <button
                   type="button"
                   className="btn btn-small"

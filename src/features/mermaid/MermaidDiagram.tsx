@@ -153,13 +153,24 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
       const id = getNextRenderId()
       try {
         await mermaid.parse(source)
-        const rendered = await enqueue(() => mermaid.render(id, source))
         if (!active) return
+        const rendered = await enqueue(async () => {
+          if (!active) return null
+          try {
+            return await mermaid.render(id, source)
+          } finally {
+            document.getElementById(`d${id}`)?.remove()
+            document.getElementById(id)?.remove()
+          }
+        })
+        if (!active || !rendered) return
         const svg = customTextColor
           ? applyCustomTextColor(rendered.svg, customTextColor)
           : rendered.svg
         setResult({ code, svg, error: null })
       } catch (renderError) {
+        document.getElementById(`d${id}`)?.remove()
+        document.getElementById(id)?.remove()
         if (!active) return
         setResult({
           code,

@@ -60,6 +60,10 @@ create trigger set_user_balances_updated_at
   before update on public.user_balances
   for each row execute function public.touch_user_balances_updated_at();
 
+-- Ensure trial_ends_at exists on subscriptions
+alter table public.subscriptions
+  add column if not exists trial_ends_at timestamptz;
+
 -- 5. Update signup trigger so every new user starts with 250,000 tokens
 create or replace function public.handle_new_user()
 returns trigger
@@ -73,30 +77,31 @@ begin
   insert into public.profiles (id, email, display_name, avatar_url, tier)
   values (
     new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    coalesce(new.email, ''),
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(coalesce(new.email, ''), '@', 1)),
     coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture'),
     'free'
   )
   on conflict (id) do nothing;
 
-  insert into public.subscriptions (
-    user_id,
-    tier,
-    status,
-    trial_ends_at,
-    current_period_start,
-    current_period_end
-  )
-  values (
-    new.id,
-    'free',
-    'trialing',
-    v_trial_end,
-    v_now,
-    v_trial_end
-  )
-  on conflict (user_id) do nothing;
+  if not exists (select 1 from public.subscriptions where user_id = new.id) then
+    insert into public.subscriptions (
+      user_id,
+      tier,
+      status,
+      trial_ends_at,
+      current_period_start,
+      current_period_end
+    )
+    values (
+      new.id,
+      'free',
+      'trialing',
+      v_trial_end,
+      v_now,
+      v_trial_end
+    );
+  end if;
 
   insert into public.user_balances (user_id, tokens_remaining)
   values (new.id, 250000)

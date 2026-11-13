@@ -465,7 +465,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                 </label>
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon">
-                    <UserIcon size={15} />
+                    <UserIcon size={16} />
                   </span>
                   <input
                     id="auth-name"
@@ -487,9 +487,9 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                 </label>
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                     </svg>
                   </span>
                   <input
@@ -527,7 +527,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                 </div>
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon">
-                    <LockIcon size={15} />
+                    <LockIcon size={16} />
                   </span>
                   <input
                     id="auth-password"
@@ -546,7 +546,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                     onClick={() => setShowPassword(!showPassword)}
                     title={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+                    {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
                   </button>
                 </div>
               </div>
@@ -559,7 +559,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                 </label>
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon">
-                    <LockIcon size={15} />
+                    <LockIcon size={16} />
                   </span>
                   <input
                     id="auth-confirm-password"

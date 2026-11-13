@@ -1,5 +1,8 @@
 # Tabula — Private In-Browser Data Workbench
 
+<img src="/background.png" width="120" alt="Tabula logo" />
+
+[![Build Status](https://github.com/tabula/tabula/actions/workflows/build.yml/badge.svg)](https://github.com/tabula/tabula/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-tabula.app-0f766e.svg)](https://tabula.app/#demo)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Client--Side-emerald.svg)](https://tabula.app/#privacy)
@@ -24,6 +27,7 @@ Tabula is a fast, local-first conversational workbench for exploring CSV and Exc
 ## Privacy Guarantee
 
 Your data security is guaranteed by design:
+
 1. Spreadsheets are parsed into computer memory (RAM) via web workers.
 2. Calculations run in DuckDB-WASM and client-side Python (Pyodide).
 3. Only your question and a compact schema dictionary (column names and types) are sent to the AI model.
@@ -62,15 +66,15 @@ Open `http://localhost:5173` to explore the interactive demo or upload your own 
 The fragment is the URL. Every surface is a route, and the router lives in
 `src/core/router/`.
 
-| Route | Surface |
-| --- | --- |
-| `#/landing` | The front page, with the hover menus |
-| `#/app` | **Analyse** — the signed-in home: identity, activity, and (for administrators) the member list and the published insights |
-| `#/workspace` | The chat workspace |
-| `#/insights` | The published insights index |
-| `#/insights/:slug` | One published insight |
-| `#/login` `#/signup` `#/verify` | The account screens |
-| `#/workspace?demo=1` | The workspace in demo mode, without an account |
+| Route                           | Surface                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `#/landing`                     | The front page, with the hover menus                                                                                      |
+| `#/app`                         | **Analyse** — the signed-in home: identity, activity, and (for administrators) the member list and the published insights |
+| `#/workspace`                   | The chat workspace                                                                                                        |
+| `#/insights`                    | The published insights index                                                                                              |
+| `#/insights/:slug`              | One published insight                                                                                                     |
+| `#/login` `#/signup` `#/verify` | The account screens                                                                                                       |
+| `#/workspace?demo=1`            | The workspace in demo mode, without an account                                                                            |
 
 ## Sign-in providers
 
@@ -96,11 +100,11 @@ free for the router.
 **2. Google**
 
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) →
-   Create Credentials → OAuth client ID → *Web application*.
+   Create Credentials → OAuth client ID → _Web application_.
 2. **Authorized JavaScript origins**: `https://<project-ref>.supabase.co`
 3. **Authorized redirect URIs**: `https://<project-ref>.supabase.co/auth/v1/callback`
 4. Copy the Client ID and Client Secret into Supabase → Authentication →
-   Providers → Google, tick *Enable Google*, paste both, and Save.
+   Providers → Google, tick _Enable Google_, paste both, and Save.
 
 **3. GitHub**
 
@@ -108,7 +112,7 @@ free for the router.
 2. **Homepage URL**: `https://<project-ref>.supabase.co`
 3. **Authorization callback URL**: `https://<project-ref>.supabase.co/auth/v1/callback`
 4. Copy the Client ID and Client Secret into Supabase → Authentication →
-   Providers → GitHub, tick *Enable GitHub*, paste both, and Save.
+   Providers → GitHub, tick _Enable GitHub_, paste both, and Save.
 
 `<project-ref>` is the first part of your project URL, for example
 `iaxbixtmymalzhryhazz` in `https://iaxbixtmymalzhryhazz.supabase.co`.
@@ -139,7 +143,6 @@ Each feature folder keeps its files in sub-folders by role — `pages/`,
 `components/`, `api/`, `lib/`, `styles/` — with single-purpose file names.
 
 Core code must not import from features.
-
 
 ## Privacy and deployment
 

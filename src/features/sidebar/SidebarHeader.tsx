@@ -1,16 +1,12 @@
-import { useRef } from 'react'
-import { ACCEPTED_EXTENSIONS } from '../../core/constants'
-import { CloseIcon, DatabaseIcon, PlusIcon, SidebarIcon } from '../common/Icons'
+import logoUrl from '../../assets/logo.png'
+import { CloseIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
-import { useSessionActions } from '../SessionProvider'
 
 /**
  * Sidebar header.
  *
  * Its height is bound to `--header-height`, the same variable the app header
  * uses, so the two bars always line up across the split.
- *
- * Contains brand, add dataset trigger, and collapse toggle button.
  */
 
 export interface SidebarHeaderProps {
@@ -19,42 +15,19 @@ export interface SidebarHeaderProps {
 }
 
 export function SidebarHeader({ onClose, closable = false }: SidebarHeaderProps) {
-  const { uploadFile } = useSessionActions()
-  const inputRef = useRef<HTMLInputElement>(null)
-
   return (
     <div className="sidebar-header">
       <div className="brand">
-        <span className="brand-mark" aria-hidden>
-          <DatabaseIcon size={16} />
-        </span>
-        <span className="brand-name">Lumina Tabula</span>
+        <img src={logoUrl} alt="Lumina Tabula" className="header-brand-logo" />
       </div>
 
-      <div className="sidebar-header-actions">
-        <IconButton label="Add dataset" size="sm" onClick={() => inputRef.current?.click()}>
-          <PlusIcon size={16} />
-        </IconButton>
-        <IconButton
-          label={closable ? 'Close sidebar' : 'Collapse sidebar'}
-          size="sm"
-          onClick={onClose}
-        >
-          {closable ? <CloseIcon size={16} /> : <SidebarIcon size={16} />}
-        </IconButton>
-      </div>
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED_EXTENSIONS.join(',')}
-        className="visually-hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0]
-          if (file) void uploadFile(file)
-          event.target.value = ''
-        }}
-      />
+      {closable ? (
+        <div className="sidebar-header-actions">
+          <IconButton label="Close sidebar" size="sm" onClick={onClose}>
+            <CloseIcon size={16} />
+          </IconButton>
+        </div>
+      ) : null}
     </div>
   )
 }
