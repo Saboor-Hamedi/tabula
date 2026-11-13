@@ -57,7 +57,7 @@ export function MermaidBlock({
     const svg = diagramContainerRef.current?.querySelector('svg')
     if (!(svg instanceof SVGSVGElement)) return
     try {
-      const blob = await svgToPngBlob(svg, 2)
+      const blob = await svgToPngBlob(svg, 2, false)
       const url = URL.createObjectURL(blob)
       setLightboxSrc((prev) => {
         if (prev) URL.revokeObjectURL(prev)

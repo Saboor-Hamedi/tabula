@@ -54,9 +54,14 @@ export function Account({
   if (!isAuthenticated) {
     return (
       <div className="header-account">
-        <button type="button" className="header-login-btn" onClick={onSignIn}>
-          <UserIcon size={15} />
-          <span>Login</span>
+        <button
+          type="button"
+          className="header-login-btn"
+          onClick={onSignIn}
+          aria-label="Login"
+          title="Login"
+        >
+          <UserIcon size={16} />
         </button>
       </div>
     )

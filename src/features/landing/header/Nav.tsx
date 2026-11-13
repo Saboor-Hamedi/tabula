@@ -89,9 +89,10 @@ export function Nav({ isAuthenticated, onSignIn, onOpenApp }: NavProps) {
               type="button"
               className="header-login-btn"
               onClick={onSignIn}
+              aria-label="Login"
+              title="Login"
             >
-              <UserIcon size={15} />
-              <span>Login</span>
+              <UserIcon size={16} />
             </button>
           )}
         </div>

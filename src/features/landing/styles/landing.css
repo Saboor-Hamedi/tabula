@@ -19,6 +19,12 @@
   padding: 0 20px;
 }
 
+@media (max-width: 640px) {
+  .landing-container {
+    padding: 0 5px;
+  }
+}
+
 /* 1. Sticky Fixed Header */
 .landing-nav {
   position: sticky;

@@ -853,3 +853,87 @@
   align-items: center;
   gap: 5px;
 }
+
+@media (max-width: 640px) {
+  .dash-page {
+    padding: 16px 5px 48px;
+  }
+
+  .dash-hero {
+    padding: 2px 0 14px;
+  }
+
+  .dash-notice {
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .dash-top {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .dash-identity {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .dash-identity-id {
+    flex-wrap: wrap;
+  }
+
+  .dash-metrics {
+    gap: 8px;
+  }
+
+  .dash-metric {
+    padding: 12px;
+  }
+
+  .dash-metric-value {
+    font-size: 20px;
+  }
+
+  .dash-panel {
+    margin-bottom: 14px;
+  }
+
+  .dash-panel-head {
+    padding: 12px;
+    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dash-table-tools,
+  .dash-posts-tools {
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dash-table-search {
+    width: 100%;
+    max-width: none;
+  }
+
+  .dash-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dash-table th,
+  .dash-table td {
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+
+  .dash-key {
+    padding: 12px;
+  }
+
+  .dash-key-field {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

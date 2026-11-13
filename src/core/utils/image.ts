@@ -28,7 +28,11 @@ function isLightColor(color: string): boolean {
 }
 
 /** Rasterizes an SVG element to a PNG blob at the given scale. */
-export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob> {
+export async function svgToPngBlob(
+  svg: SVGSVGElement,
+  scale = 2,
+  includeWatermark = true,
+): Promise<Blob> {
   const bounds = svg.getBoundingClientRect()
   const viewBox = svg.viewBox?.baseVal
   const width = Math.max(1, Math.round(viewBox?.width || bounds.width || 960))
@@ -181,35 +185,37 @@ export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob>
     context.drawImage(image, 0, 0, canvas.width, canvas.height)
     context.scale(renderScale, renderScale)
 
-    // Subtle "Made with Lumina Tabula" watermark badge on exported chart PNGs (Prompt 5.1)
-    context.save()
-    const watermarkText = 'Made with Lumina Tabula'
-    context.font = '500 11px Inter, system-ui, -apple-system, sans-serif'
-    const metrics = context.measureText(watermarkText)
-    const padX = 8
-    const badgeW = metrics.width + padX * 2
-    const badgeH = 20
-    const badgeX = width - badgeW - 10
-    const badgeY = height - badgeH - 8
+    if (includeWatermark) {
+      // Subtle "Made with Lumina Tabula" watermark badge on exported chart PNGs (Prompt 5.1)
+      context.save()
+      const watermarkText = 'Made with Lumina Tabula'
+      context.font = '500 11px Inter, system-ui, -apple-system, sans-serif'
+      const metrics = context.measureText(watermarkText)
+      const padX = 8
+      const badgeW = metrics.width + padX * 2
+      const badgeH = 20
+      const badgeX = width - badgeW - 10
+      const badgeY = height - badgeH - 8
 
-    // Pill background
-    context.fillStyle = 'rgba(248, 250, 252, 0.88)'
-    context.beginPath()
-    if (typeof context.roundRect === 'function') {
-      context.roundRect(badgeX, badgeY, badgeW, badgeH, 4)
-    } else {
-      context.rect(badgeX, badgeY, badgeW, badgeH)
+      // Pill background
+      context.fillStyle = 'rgba(248, 250, 252, 0.88)'
+      context.beginPath()
+      if (typeof context.roundRect === 'function') {
+        context.roundRect(badgeX, badgeY, badgeW, badgeH, 4)
+      } else {
+        context.rect(badgeX, badgeY, badgeW, badgeH)
+      }
+      context.fill()
+      context.strokeStyle = 'rgba(203, 213, 225, 0.8)'
+      context.lineWidth = 1
+      context.stroke()
+
+      // Text
+      context.fillStyle = '#475569'
+      context.textBaseline = 'middle'
+      context.fillText(watermarkText, badgeX + padX, badgeY + badgeH / 2)
+      context.restore()
     }
-    context.fill()
-    context.strokeStyle = 'rgba(203, 213, 225, 0.8)'
-    context.lineWidth = 1
-    context.stroke()
-
-    // Text
-    context.fillStyle = '#475569'
-    context.textBaseline = 'middle'
-    context.fillText(watermarkText, badgeX + padX, badgeY + badgeH / 2)
-    context.restore()
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((blob) => {
