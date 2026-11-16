@@ -16,12 +16,16 @@ export interface MessageRendererProps {
   /** While streaming, hold back chart rendering until fences close. */
   streaming?: boolean
   onEditFigure?: (figureIndex: number, changes: FigureChanges) => void
+  images?: string[]
+  onOpenImage?: (index: number) => void
 }
 
 export const Renderer = memo(function Renderer({
   content,
   streaming = false,
   onEditFigure,
+  images,
+  onOpenImage,
 }: MessageRendererProps) {
   const blocks = useMemo(() => parseMessageContent(content), [content])
 
@@ -31,6 +35,8 @@ export const Renderer = memo(function Renderer({
         blocks={blocks}
         streaming={streaming}
         onEditFigure={onEditFigure}
+        images={images}
+        onOpenImage={onOpenImage}
       />
     </div>
   )

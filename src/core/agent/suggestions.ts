@@ -27,7 +27,15 @@ export interface SuggestionInput {
   question?: string
   /** The start of the answer, so follow-ups build on it. */
   answer?: string
+  /** Other loaded sessions in the workspace for cross-file suggestions. */
+  allSessions?: Session[]
   signal?: AbortSignal
+}
+
+export interface LocalSuggestionOptions {
+  question?: string
+  answer?: string
+  allSessions?: Session[]
 }
 
 /** Repairs a digest restored from an older/corrupt cache. */
@@ -118,6 +126,20 @@ function findDimensions(columns: DigestColumn[]): DigestColumn[] {
   return columns.filter(isCategoricalColumn).slice(0, 4)
 }
 
+function isSimilarQuestion(candidate: string, asked: string): boolean {
+  const normCandidate = candidate.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim()
+  const normAsked = asked.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim()
+  if (!normCandidate || !normAsked) return false
+  if (normCandidate === normAsked || normCandidate.includes(normAsked) || normAsked.includes(normCandidate)) {
+    return true
+  }
+  const askedTokens = new Set(normAsked.split(/\s+/).filter((w) => w.length > 3))
+  const candTokens = normCandidate.split(/\s+/).filter((w) => w.length > 3)
+  if (askedTokens.size === 0 || candTokens.length === 0) return false
+  const overlap = candTokens.filter((w) => askedTokens.has(w)).length
+  return overlap / Math.min(askedTokens.size, candTokens.length) >= 0.75
+}
+
 /**
  * Deterministic, dataset-specific questions. Ordered by how likely they are to
  * be useful, then de-duplicated and capped.
@@ -125,6 +147,7 @@ function findDimensions(columns: DigestColumn[]): DigestColumn[] {
 export function buildLocalSuggestions(
   session: Session,
   digest: DatasetDigest | null,
+  options?: LocalSuggestionOptions,
 ): string[] {
   const safeDigest = normalizeDigest(digest)
   const table = safeDigest ? pickPrimaryTable(safeDigest, session) : null
@@ -136,10 +159,27 @@ export function buildLocalSuggestions(
   const measures = findMeasures(columns)
   const dimensions = findDimensions(columns)
   const measure = measures[0]
+  const secondMeasure = measures[1]
   const dimension = dimensions[0]
   const secondDimension = dimensions[1]
 
   const questions: string[] = []
+
+  // Cross-file comparison suggestion when multiple datasets are loaded.
+  const otherSession = (options?.allSessions ?? []).find(
+    (s) => s && s.id !== session.id && Array.isArray(s.tables) && s.tables.length > 0,
+  )
+  if (otherSession) {
+    if (measure) {
+      questions.push(
+        `Compare ${humanize(measure.name)} between ${session.fileName} and ${otherSession.fileName}.`,
+      )
+    } else {
+      questions.push(
+        `Compare ${session.fileName} with ${otherSession.fileName} and highlight key differences.`,
+      )
+    }
+  }
 
   // Trend questions — only when there is a real date column and a real measure.
   if (temporal && measure) {
@@ -175,6 +215,18 @@ export function buildLocalSuggestions(
     questions.push(`Which ${humanize(dimension.name)} values stand out the most?`)
   }
 
+  // Secondary measure / dimension angles so follow-up chips stay fresh across turns.
+  if (secondMeasure && dimension) {
+    questions.push(
+      `Break down ${humanize(secondMeasure.name)} by ${humanize(dimension.name)}.`,
+    )
+  }
+  if (secondDimension && measure) {
+    questions.push(
+      `Plot the distribution of ${humanize(measure.name)} across ${humanize(secondDimension.name)}.`,
+    )
+  }
+
   // Outlier and data-quality questions are always valuable.
   if (measure) {
     questions.push(`What are the outliers and unusual rows in ${humanize(measure.name)}?`)
@@ -183,7 +235,12 @@ export function buildLocalSuggestions(
   questions.push(`Profile ${tableName} and flag any data-quality issues.`)
   questions.push(`Give me a full overview of ${tableName} with the key patterns.`)
 
-  return dedupe(questions).slice(0, SUGGESTION_COUNT)
+  const asked = options?.question?.trim()
+  const filtered = asked
+    ? questions.filter((q) => !isSimilarQuestion(q, asked))
+    : questions
+
+  return dedupe(filtered.length > 0 ? filtered : questions).slice(0, SUGGESTION_COUNT)
 }
 
 function dedupe(values: string[]): string[] {
@@ -205,7 +262,13 @@ function dedupe(values: string[]): string[] {
 export async function generateSuggestions({
   session,
   digest,
+  question,
+  answer,
+  allSessions,
 }: SuggestionInput): Promise<string[]> {
   const safeDigest = normalizeDigest(digest)
-  return buildLocalSuggestions(session, safeDigest)
+  if (!question && !answer && !allSessions) {
+    return buildLocalSuggestions(session, safeDigest)
+  }
+  return buildLocalSuggestions(session, safeDigest, { question, answer, allSessions })
 }

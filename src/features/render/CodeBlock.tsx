@@ -3,12 +3,17 @@ import type { PythonExecutionResult } from '../../core/python/types'
 import {
   CheckIcon,
   CopyIcon,
+  DownloadIcon,
   PencilIcon,
   PlayIcon,
+  PlusIcon,
   RefreshIcon,
   SendIcon,
+  SheetIcon,
 } from '../common/Icons'
+import { buildCsv } from '../../core/export/csv'
 import { useSessionActions, useSessionState } from '../SessionProvider'
+import { exportSheetsToXlsx, parseCsvToGrid } from '../spreadsheet/utils'
 import { CodeHighlight } from './CodeHighlight'
 
 interface CodeBlockProps {
@@ -29,8 +34,8 @@ function CodeCellEditor({
   language,
   isPython,
 }: CodeCellProps) {
-  const { runPythonCode, sendMessage } = useSessionActions()
-  const { pythonStatus, pythonResult } = useSessionState()
+  const { runPythonCode, sendMessage, openSpreadsheet, uploadFiles } = useSessionActions()
+  const { pythonStatus, pythonResult, activeSession } = useSessionState()
 
   // Editing state
   const [currentCode, setCurrentCode] = useState(initialCode)
@@ -154,6 +159,67 @@ function CodeCellEditor({
 
   const isCurrentRun = Boolean(pythonResult && pythonResult.code.trim() === currentCode.trim())
   const resultToDisplay = localResult || (isCurrentRun ? pythonResult : null)
+  const datasetResult =
+    resultToDisplay?.dfCsv || resultToDisplay?.dfPreview
+      ? resultToDisplay
+      : pythonResult?.dfCsv || pythonResult?.dfPreview
+        ? pythonResult
+        : null
+
+  const getDatasetSheet = () => {
+    if (!datasetResult) return null
+    if (datasetResult.dfCsv) {
+      const parsed = parseCsvToGrid(datasetResult.dfCsv)
+      if (parsed.headers.length > 0) {
+        return { name: 'Merged Data', headers: parsed.headers, rows: parsed.rows }
+      }
+    }
+    if (datasetResult.dfPreview && datasetResult.dfPreview.columns.length > 0) {
+      return {
+        name: 'Preview',
+        headers: datasetResult.dfPreview.columns,
+        rows: datasetResult.dfPreview.rows,
+      }
+    }
+    return null
+  }
+
+  const handleOpenExcel = () => {
+    const sheet = getDatasetSheet()
+    if (!sheet) return
+    const baseName = activeSession?.fileName
+      ? activeSession.fileName.replace(/\.[^.]+$/, '')
+      : 'tabula-data'
+    openSpreadsheet({
+      kind: 'static',
+      title: `${baseName} (Merged Result)`,
+      sheets: [sheet],
+    })
+  }
+
+  const handleDownloadXlsx = () => {
+    const sheet = getDatasetSheet()
+    if (!sheet) return
+    const baseName = activeSession?.fileName
+      ? activeSession.fileName.replace(/\.[^.]+$/, '')
+      : 'tabula-merged'
+    exportSheetsToXlsx(`${baseName}-merged`, [sheet])
+  }
+
+  const handleSaveAsSource = () => {
+    if (!datasetResult) return
+    const csvText =
+      datasetResult.dfCsv ||
+      (datasetResult.dfPreview
+        ? buildCsv(datasetResult.dfPreview.columns, datasetResult.dfPreview.rows)
+        : '')
+    if (!csvText) return
+    const baseName = activeSession?.fileName
+      ? activeSession.fileName.replace(/\.[^.]+$/, '')
+      : 'tabula'
+    const file = new File([csvText], `${baseName}-merged.csv`, { type: 'text/csv' })
+    void uploadFiles([file])
+  }
 
   return (
     <div
@@ -251,6 +317,39 @@ function CodeCellEditor({
               <PlayIcon size={11} />
               <span>{runningThis ? 'Running…' : 'Run'}</span>
             </button>
+          ) : null}
+
+          {/* Open in Excel & Download (.xlsx) buttons when dataset result exists */}
+          {isPython && datasetResult && !runningThis ? (
+            <>
+              <button
+                type="button"
+                className="code-tool-btn"
+                onClick={handleOpenExcel}
+                title="Open merged/transformed dataset in Excel modal"
+              >
+                <SheetIcon size={11} />
+                <span>Excel</span>
+              </button>
+              <button
+                type="button"
+                className="code-tool-btn"
+                onClick={handleDownloadXlsx}
+                title="Download merged/transformed dataset as .xlsx"
+              >
+                <DownloadIcon size={11} />
+                <span>.xlsx</span>
+              </button>
+              <button
+                type="button"
+                className="code-tool-btn"
+                onClick={handleSaveAsSource}
+                title="Save merged/transformed dataset as a permanent sidebar source"
+              >
+                <PlusIcon size={11} />
+                <span>Save Source</span>
+              </button>
+            </>
           ) : null}
 
           {/* Copy code button */}

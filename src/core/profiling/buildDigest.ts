@@ -51,32 +51,102 @@ async function readColumns(
   }))
 }
 
+interface SummarizeStats {
+  approxUnique: number
+  min: string | null
+  max: string | null
+  nullPct: number | null
+}
+
+function parseNullPct(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null
+  const num = Number.parseFloat(String(raw).replace('%', '').trim())
+  return Number.isFinite(num) ? num : null
+}
+
+/**
+ * Runs DuckDB's single-pass `SUMMARIZE` on a table to collect approx_unique,
+ * min, max, and null_percentage for every column in one query.
+ */
+async function readTableSummarize(
+  connection: AsyncDuckDBConnection,
+  target: string,
+): Promise<Map<string, SummarizeStats>> {
+  const stats = new Map<string, SummarizeStats>()
+  try {
+    const result = await connection.query(`SUMMARIZE ${target}`)
+    for (const row of result.toArray()) {
+      const colName = typeof row.column_name === 'string' ? row.column_name : String(row.column_name ?? '')
+      if (!colName) continue
+      const approxUniqueRaw = row.approx_unique
+      const approxUnique =
+        typeof approxUniqueRaw === 'bigint'
+          ? Number(approxUniqueRaw)
+          : typeof approxUniqueRaw === 'number'
+            ? approxUniqueRaw
+            : Number.parseInt(String(approxUniqueRaw ?? '0'), 10) || 0
+      const min = row.min === null || row.min === undefined ? null : String(row.min)
+      const max = row.max === null || row.max === undefined ? null : String(row.max)
+      stats.set(colName, {
+        approxUnique,
+        min,
+        max,
+        nullPct: parseNullPct(row.null_percentage),
+      })
+    }
+  } catch {
+    // Fall back gracefully to per-column queries if SUMMARIZE is unsupported
+  }
+  return stats
+}
+
 /** Cardinality plus the most common values for a single column. */
 async function describeColumn(
   connection: AsyncDuckDBConnection,
   target: string,
   name: string,
   type: string,
+  summary?: SummarizeStats,
 ): Promise<DigestColumn> {
   const identifier = quoteIdent(name)
 
   if (!isGroupable(type)) {
-    return { name, type, distinctCount: 0, topValues: [] }
+    return {
+      name,
+      type,
+      distinctCount: summary?.approxUnique ?? 0,
+      topValues: [],
+      min: summary?.min ?? null,
+      max: summary?.max ?? null,
+      nullPct: summary?.nullPct ?? null,
+    }
   }
 
   try {
-    const result = await connection.query(
-      `SELECT
-         COUNT(DISTINCT ${identifier}) AS distinct_count
-       FROM ${target}`,
-    )
-    const distinctCount = firstNumber(result, 'distinct_count')
+    let distinctCount = summary?.approxUnique ?? -1
+    if (distinctCount < 0) {
+      const result = await connection.query(
+        `SELECT
+           COUNT(DISTINCT ${identifier}) AS distinct_count
+         FROM ${target}`,
+      )
+      distinctCount = firstNumber(result, 'distinct_count')
+    }
 
     // Only sample values for columns with a readable number of categories.
     // A high-cardinality free-text column would produce noise, not insight.
     const worthSampling = distinctCount > 0 && distinctCount <= 200
     if (!worthSampling) {
-      return { name, type, distinctCount, topValues: [] }
+      return {
+        name,
+        type,
+        distinctCount,
+        topValues: [],
+        min: summary?.min ?? null,
+        max: summary?.max ?? null,
+        nullPct: summary?.nullPct ?? null,
+      }
     }
 
     const valuesResult = await connection.query(
@@ -93,9 +163,25 @@ async function describeColumn(
       .map((row) => String(row.value ?? '').trim())
       .filter((value) => value.length > 0 && value.length <= 48)
 
-    return { name, type, distinctCount, topValues }
+    return {
+      name,
+      type,
+      distinctCount,
+      topValues,
+      min: summary?.min ?? null,
+      max: summary?.max ?? null,
+      nullPct: summary?.nullPct ?? null,
+    }
   } catch {
-    return { name, type, distinctCount: 0, topValues: [] }
+    return {
+      name,
+      type,
+      distinctCount: summary?.approxUnique ?? 0,
+      topValues: [],
+      min: summary?.min ?? null,
+      max: summary?.max ?? null,
+      nullPct: summary?.nullPct ?? null,
+    }
   }
 }
 
@@ -129,17 +215,37 @@ export async function buildDatasetDigest(
     const target = qualifiedName(schema, table.name)
 
     try {
-      const columns = await readColumns(connection, schema, table.name)
+      const [columns, summaryMap] = await Promise.all([
+        readColumns(connection, schema, table.name),
+        readTableSummarize(connection, target),
+      ])
       const described: DigestColumn[] = []
 
       for (const column of columns.slice(0, DIGEST_MAX_COLUMNS)) {
         if (!column || !column.name) continue
-        described.push(await describeColumn(connection, target, column.name, column.type))
+        described.push(
+          await describeColumn(
+            connection,
+            target,
+            column.name,
+            column.type,
+            summaryMap.get(column.name),
+          ),
+        )
       }
 
       for (const column of columns.slice(DIGEST_MAX_COLUMNS)) {
         if (!column || !column.name) continue
-        described.push({ name: column.name, type: column.type, distinctCount: -1, topValues: [] })
+        const summary = summaryMap.get(column.name)
+        described.push({
+          name: column.name,
+          type: column.type,
+          distinctCount: summary?.approxUnique ?? -1,
+          topValues: [],
+          min: summary?.min ?? null,
+          max: summary?.max ?? null,
+          nullPct: summary?.nullPct ?? null,
+        })
       }
 
       tables.push({

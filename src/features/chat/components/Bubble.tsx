@@ -3,6 +3,7 @@ import type { ChatMessage } from '../../../core/types'
 import { openPricingModal } from '../../../core/supabase/usage'
 import { formatCompact, formatTime } from '../../../core/utils/format'
 import { ArrowRightIcon, CheckIcon, CopyIcon, FileIcon } from '../../common/Icons'
+import { FigureLightbox } from '../../common/FigureLightbox'
 import { useIsAdmin } from '../../auth/useProfile'
 import { Composer, Publish } from '../../posts'
 import { useSessionActions } from '../../SessionProvider'
@@ -40,6 +41,7 @@ export const Bubble = memo(function Bubble({
   const [copied, setCopied] = useState(false)
   const [savedNote, setSavedNote] = useState(false)
   const [composing, setComposing] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const content = typeof message.content === 'string' ? message.content : ''
 
@@ -90,9 +92,23 @@ export const Bubble = memo(function Bubble({
             onEditFigure={(figureIndex, changes) =>
               editFigure(message.id, figureIndex, changes)
             }
+            images={message.images}
+            onOpenImage={(idx) => setLightboxIndex(idx)}
           />
         </div>
       )}
+
+      <FigureLightbox
+        src={
+          lightboxIndex !== null && Array.isArray(message.images)
+            ? (message.images[lightboxIndex] ?? null)
+            : null
+        }
+        title={
+          lightboxIndex !== null ? `Generated chart ${lightboxIndex + 1}` : 'Chart'
+        }
+        onClose={() => setLightboxIndex(null)}
+      />
 
       {streaming && !isThinking ? <span className="stream-caret" aria-hidden /> : null}
 

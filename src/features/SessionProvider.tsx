@@ -15,7 +15,9 @@ import {
 import { closeDuckDB } from "../core/duckdb/closeDuckDB";
 import { ingestCSV } from "../core/duckdb/ingestCSV";
 import { ingestExcel } from "../core/duckdb/ingestExcel";
-import { buildSchemaName, quoteIdent } from "../core/duckdb/sql";
+import { tableColumns, tableToRows } from "../core/duckdb/result";
+import { buildSchemaName, quoteIdent, quoteString } from "../core/duckdb/sql";
+import { parseCsvToGrid } from "./spreadsheet/utils";
 import { buildDatasetDigest } from "../core/profiling/buildDigest";
 import {
   runPython,
@@ -25,6 +27,7 @@ import {
   type PythonExecutionResult,
   type PythonStatus,
 } from "../core/python";
+import { buildExtraDatasets } from "../core/python/extraDatasets";
 import {
   buildLocalSuggestions,
 } from "../core/agent/suggestions";
@@ -251,12 +254,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
   const [spreadsheetSource, setSpreadsheetSource] =
     useState<SpreadsheetSource | null>(null);
-  const openSpreadsheet = useCallback((source: SpreadsheetSource) => {
-    setSpreadsheetSource(source);
-  }, []);
-  const closeSpreadsheet = useCallback(() => {
-    setSpreadsheetSource(null);
-  }, []);
   const [model, setModelState] = useState<ModelId>(() => getStoredModel());
   const modelRef = useRef<ModelId>(model);
   modelRef.current = model;
@@ -452,11 +449,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       session: Session,
       messageId: string,
       currentDigest: DatasetDigest | null,
-      _question?: string,
-      _answer?: string,
+      question?: string,
+      answer?: string,
     ): Promise<void> => {
       try {
-        const local = buildLocalSuggestions(session, currentDigest);
+        const local = buildLocalSuggestions(session, currentDigest, {
+          question,
+          answer,
+          allSessions: sessions,
+        });
         patchMessage(session.id, messageId, {
           suggestions: local,
           suggestionsPending: false,
@@ -466,7 +467,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         patchMessage(session.id, messageId, { suggestionsPending: false });
       }
     },
-    [patchMessage],
+    [patchMessage, sessions],
   );
 
   const startUpload = useCallback(
@@ -993,6 +994,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
       };
 
+      const turnImages: string[] = [];
+
       try {
         const result = await runAgentTurn({
           model: currentModel,
@@ -1006,6 +1009,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           onDelta: scheduleDelta,
           onTrace: (entry) => upsertTrace(sessionId, entry),
           onPythonResult: (pyResult) => {
+            if (pyResult.error) return;
             setPythonResult(pyResult);
             setPythonHistory((prev) => {
               if (prev.length > 0 && prev[0]?.code?.trim() === pyResult.code?.trim()) {
@@ -1015,6 +1019,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             });
             setPanelOpenState(true);
             setPanelTabState('python');
+            if (Array.isArray(pyResult.images) && pyResult.images.length > 0) {
+              for (const img of pyResult.images) {
+                if (typeof img === 'string' && !turnImages.includes(img)) {
+                  turnImages.push(img);
+                }
+              }
+            }
           },
         });
 
@@ -1024,6 +1035,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         patchMessage(sessionId, assistantId, {
           content: result.text,
           usage: result.usage,
+          ...(turnImages.length > 0 ? { images: turnImages } : {}),
         });
 
         // Follow-ups are derived from the question, the answer, and the data.
@@ -1324,6 +1336,108 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     downloadFile(stored);
   }, [activeSession, workspaceScope]);
 
+  const spreadsheetReqRef = useRef(0);
+
+  const closeSpreadsheet = useCallback(() => {
+    spreadsheetReqRef.current += 1;
+    setSpreadsheetSource(null);
+  }, []);
+
+  const openSpreadsheet = useCallback(
+    (source: SpreadsheetSource) => {
+      const reqId = ++spreadsheetReqRef.current;
+      let nextSource = source;
+
+      if (source.kind === 'static' && source.sheets.length === 1) {
+        const baseSheet = source.sheets[0];
+        if (pythonResult?.dfCsv) {
+          const parsed = parseCsvToGrid(pythonResult.dfCsv);
+          if (parsed.headers.length > 0 && parsed.rows.length > baseSheet.rows.length) {
+            const baseSet = new Set(baseSheet.headers.map((h) => h.trim().toLowerCase()));
+            const overlap = parsed.headers.filter((h) => baseSet.has(h.trim().toLowerCase())).length;
+            if (overlap >= Math.ceil(baseSheet.headers.length / 2)) {
+              nextSource = {
+                ...source,
+                sheets: [{ name: baseSheet.name, headers: parsed.headers, rows: parsed.rows }],
+              };
+            } else {
+              nextSource = {
+                ...source,
+                sheets: [
+                  baseSheet,
+                  { name: 'Full Merged Data', headers: parsed.headers, rows: parsed.rows },
+                ],
+              };
+            }
+          }
+        }
+      }
+
+      setSpreadsheetSource(nextSource);
+
+      if (
+        nextSource.kind === 'static' &&
+        nextSource.sheets[0] &&
+        nextSource.sheets[0].rows.length <= 50 &&
+        dbHandleRef.current?.connection &&
+        activeSession
+      ) {
+        const baseSheet = nextSource.sheets[0];
+        const sessionTraces = tracesBySession[activeSession.id] ?? [];
+        const lastSqlTrace = [...sessionTraces]
+          .reverse()
+          .find(
+            (t) =>
+              t.toolName === 'run_sql' &&
+              t.status === 'success' &&
+              typeof t.args?.sql === 'string' &&
+              t.args.sql.trim().length > 0,
+          );
+        const rawSql = typeof lastSqlTrace?.args?.sql === 'string' ? lastSqlTrace.args.sql.trim() : '';
+        if (rawSql && /^\s*(SELECT|WITH|FROM|VALUES|TABLE|PIVOT|UNPIVOT)\b/i.test(rawSql)) {
+          const stripped = rawSql.replace(/;\s*$/, '');
+          const expandedSql = /\blimit\s+\d+(?:\s+offset\s+\d+)?\s*$/i.test(stripped)
+            ? stripped.replace(/\blimit\s+\d+(?:\s+offset\s+\d+)?\s*$/i, 'LIMIT 25000')
+            : `${stripped} LIMIT 25000`;
+
+          const conn = dbHandleRef.current.connection;
+          const schemaName = activeSession.schemaName;
+          void (async () => {
+            try {
+              await conn.query(`SET search_path = ${quoteString(schemaName)}`);
+              const arrow = await conn.query(expandedSql);
+              if (spreadsheetReqRef.current !== reqId) return;
+              const cols = tableColumns(arrow);
+              const rawRows = tableToRows(arrow);
+              if (cols.length === 0 || rawRows.length <= baseSheet.rows.length) return;
+              const baseSet = new Set(baseSheet.headers.map((h) => h.trim().toLowerCase()));
+              const overlap = cols.filter((c) => baseSet.has(c.trim().toLowerCase())).length;
+              if (overlap < Math.ceil(baseSheet.headers.length / 2)) return;
+              const rows = rawRows.map((r) =>
+                cols.map((col) => {
+                  const v = r[col];
+                  return v === null || v === undefined ? '' : String(v);
+                }),
+              );
+              setSpreadsheetSource((current) => {
+                if (!current || spreadsheetReqRef.current !== reqId || current.kind !== 'static') {
+                  return current;
+                }
+                return {
+                  ...current,
+                  sheets: [{ name: baseSheet.name, headers: cols, rows }],
+                };
+              });
+            } catch {
+              // Keep initial preview sheet if full query cannot re-run
+            }
+          })();
+        }
+      }
+    },
+    [activeSession, pythonResult?.dfCsv, tracesBySession],
+  );
+
   const runPythonCode = useCallback(
     async (code: string, options?: { openPanel?: boolean }): Promise<PythonExecutionResult> => {
       if (options?.openPanel) {
@@ -1333,12 +1447,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       const session = activeSession;
       const primaryTable = session?.primaryTable ?? session?.tables?.[0]?.name;
+      const extraDatasets = buildExtraDatasets(
+        sessions,
+        session?.schemaName,
+        session?.tables?.map((t) => t.name),
+      );
 
       try {
         const result = await runPython(code, {
           connection: dbHandleRef.current?.connection ?? null,
           schemaName: session?.schemaName,
           tableName: primaryTable,
+          extraDatasets: extraDatasets.length > 0 ? extraDatasets : undefined,
         });
         setPythonResult(result);
         setPythonHistory((prev) => {
@@ -1369,7 +1489,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return failedResult;
       }
     },
-    [activeSession],
+    [activeSession, sessions],
   );
 
   const removePythonRun = useCallback((index: number) => {

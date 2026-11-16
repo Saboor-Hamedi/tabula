@@ -108,6 +108,7 @@ function SpreadsheetWorkbook({
   const [sortSpec, setSortSpec] = useState<SortSpec | null>(null)
   const [sliceMode, setSliceMode] = useState<SliceMode>('all')
   const [sliceCount, setSliceCount] = useState(25)
+  const [sliceCountInput, setSliceCountInput] = useState('25')
   const [wrapCells, setWrapCells] = useState(false)
   const [showStatsDrawer, setShowStatsDrawer] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -602,33 +603,51 @@ function SpreadsheetWorkbook({
               </button>
             </div>
 
-            {sliceMode !== 'all' ? (
-              <div className="sheet-slice-counts">
-                {SLICE_PRESETS.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`sheet-preset-btn ${sliceCount === n ? 'is-active' : ''}`}
-                    onClick={() => setSliceCount(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <input
-                  type="number"
-                  min={1}
-                  max={25000}
-                  value={sliceCount}
-                  onChange={(e) => {
-                    const num = Number.parseInt(e.target.value, 10)
-                    if (Number.isFinite(num) && num > 0) setSliceCount(num)
+            <div className="sheet-slice-counts">
+              {SLICE_PRESETS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`sheet-preset-btn ${sliceMode !== 'all' && sliceCount === n ? 'is-active' : ''}`}
+                  onClick={() => {
+                    if (sliceMode === 'all') setSliceMode('head')
+                    setSliceCount(n)
+                    setSliceCountInput(String(n))
                   }}
-                  className="sheet-count-input"
-                  aria-label="Custom row count"
-                  title="Custom row count"
-                />
-              </div>
-            ) : null}
+                >
+                  {n}
+                </button>
+              ))}
+              <input
+                type="number"
+                min={1}
+                max={25000}
+                value={sliceCountInput}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  setSliceCountInput(raw)
+                  const num = Number.parseInt(raw, 10)
+                  if (Number.isFinite(num) && num > 0) {
+                    const clamped = Math.min(25000, num)
+                    setSliceCount(clamped)
+                    if (sliceMode === 'all') setSliceMode('head')
+                  }
+                }}
+                onBlur={() => {
+                  const num = Number.parseInt(sliceCountInput, 10)
+                  if (!Number.isFinite(num) || num <= 0) {
+                    setSliceCountInput(String(sliceCount))
+                  } else {
+                    const clamped = Math.min(25000, num)
+                    setSliceCount(clamped)
+                    setSliceCountInput(String(clamped))
+                  }
+                }}
+                className="sheet-count-input"
+                aria-label="Custom row count"
+                title="Custom row count"
+              />
+            </div>
           </div>
 
           <div className="sheet-toolbar-divider" />

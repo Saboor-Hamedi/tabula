@@ -7,6 +7,7 @@ import {
   DownloadIcon,
   ExternalIcon,
   PlayIcon,
+  PlusIcon,
   SheetIcon,
   TrashIcon,
 } from '../common/Icons'
@@ -43,7 +44,7 @@ const QUICK_STARTERS = [
 
 export function PythonPanel() {
   const { pythonResult, pythonHistory = [], pythonStatus, activeSession } = useSessionState()
-  const { runPythonCode, clearPythonResult, removePythonRun, openSpreadsheet } = useSessionActions()
+  const { runPythonCode, clearPythonResult, removePythonRun, openSpreadsheet, uploadFiles } = useSessionActions()
   const [selectedRunIndex, setSelectedRunIndex] = useState(0)
   const [copiedStdout, setCopiedStdout] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
@@ -121,6 +122,21 @@ export function PythonPanel() {
     downloadCsv(`${baseName}-transformed.csv`, csvContent)
   }
 
+  const handleSaveAsSource = () => {
+    if (!activeRun?.dfCsv && !activeRun?.dfPreview) return
+    const csvContent =
+      activeRun.dfCsv ||
+      (activeRun.dfPreview
+        ? buildCsv(activeRun.dfPreview.columns, activeRun.dfPreview.rows)
+        : '')
+    if (!csvContent) return
+    const baseName = activeSession?.fileName
+      ? activeSession.fileName.replace(/\.[^.]+$/, '')
+      : 'tabula'
+    const file = new File([csvContent], `${baseName}-merged.csv`, { type: 'text/csv' })
+    void uploadFiles([file])
+  }
+
   const handleOpenInExcel = () => {
     if (!activeRun?.dfCsv && !activeRun?.dfPreview) return
     const baseName = activeSession?.fileName
@@ -163,14 +179,14 @@ export function PythonPanel() {
           />
           <span className="python-status-text">
             {pythonStatus === 'running'
-              ? 'Executing code…'
+              ? 'Preparing results…'
               : pythonStatus === 'loading'
-                ? 'Warming up Python runtime…'
+                ? 'Preparing analysis engine…'
                 : pythonStatus === 'error'
-                  ? 'Encountered error'
+                  ? 'Attention needed'
                   : activeRun
-                    ? `Executed in ${activeRun.elapsedMs}ms`
-                    : 'Python Results'}
+                    ? `Completed in ${activeRun.elapsedMs}ms`
+                    : 'Analysis Results'}
           </span>
 
           {/* Active DataFrame dimensions pill */}
@@ -201,15 +217,26 @@ export function PythonPanel() {
 
             {/* Download Transformed CSV if df in memory */}
             {activeRun?.dfCsv || activeRun?.dfPreview ? (
-              <button
-                type="button"
-                className="code-tool-btn"
-                onClick={handleDownloadDataFrame}
-                title="Download transformed dataset as CSV"
-              >
-                <DownloadIcon size={11} />
-                <span>Dataset (.csv)</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="code-tool-btn"
+                  onClick={handleDownloadDataFrame}
+                  title="Download transformed dataset as CSV"
+                >
+                  <DownloadIcon size={11} />
+                  <span>Dataset (.csv)</span>
+                </button>
+                <button
+                  type="button"
+                  className="code-tool-btn"
+                  onClick={handleSaveAsSource}
+                  title="Save transformed dataset as a permanent sidebar source"
+                >
+                  <PlusIcon size={11} />
+                  <span>Save Source</span>
+                </button>
+              </>
             ) : null}
 
             {/* Export Jupyter Notebook */}

@@ -109,6 +109,29 @@ function toModelMessages(history: ChatMessage[], userText: string): ModelMessage
   return selected
 }
 
+function formatFallbackAnswer(pyResult?: PythonExecutionResult): string {
+  const preview = pyResult?.dfPreview
+  if (preview && Array.isArray(preview.columns) && preview.columns.length > 0) {
+    const cols = preview.columns.slice(0, 10)
+    const rows = (preview.rows ?? []).slice(0, 15)
+    const esc = (v: string) => String(v ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim() || '—'
+    const header = `| ${cols.map(esc).join(' | ')} |`
+    const sep = `| ${cols.map(() => '---').join(' | ')} |`
+    const body = rows.map((r) => `| ${cols.map((_, i) => esc(r[i] ?? '')).join(' | ')} |`).join('\n')
+    const intro = `Here is your prepared dataset (**${(preview.totalRows ?? rows.length).toLocaleString()} rows × ${preview.totalCols ?? cols.length} columns**). You can view or download the complete spreadsheet using **Open Excel**:`
+    return rows.length > 0 ? `${intro}\n\n${header}\n${sep}\n${body}` : intro
+  }
+  if (Array.isArray(pyResult?.images) && pyResult.images.length > 0) {
+    return 'Here is the chart generated from your data:'
+  }
+  const stdout = pyResult?.stdout?.trim()
+  if (stdout) {
+    const snippet = stdout.length > 1500 ? `${stdout.slice(0, 1500)}…` : stdout
+    return `Here is the summary from your data:\n\n${snippet}`
+  }
+  return 'Your data has been processed and is ready to view.'
+}
+
 export async function runAgentTurn({
   model,
   session,
@@ -122,6 +145,8 @@ export async function runAgentTurn({
   onTrace,
   onPythonResult,
 }: AgentTurnInput): Promise<AgentTurnResult> {
+  let lastPythonResult: PythonExecutionResult | undefined
+
   const toolContext: ToolContext = {
     handle: getDuckDBHandle(),
     sessionId: session.id,
@@ -131,7 +156,10 @@ export async function runAgentTurn({
     tables: Array.isArray(session?.tables) ? session.tables : [],
     allSessions,
     onTrace,
-    onPythonResult,
+    onPythonResult: (pyResult) => {
+      lastPythonResult = pyResult
+      onPythonResult?.(pyResult)
+    },
   }
 
   const tools = createAgentTools(toolContext)
@@ -213,8 +241,7 @@ export async function runAgentTurn({
       } else {
         const toolCalls = steps.flatMap((s) => s.toolCalls ?? [])
         if (toolCalls.length > 0) {
-          const toolsCalled = toolCalls.map((tc) => `\`${tc.toolName}\``).join(', ')
-          answer = `Completed execution with ${toolsCalled}. The transformed data is available in the table and on the Results inspector tab.`
+          answer = formatFallbackAnswer(lastPythonResult)
         }
       }
     } catch {

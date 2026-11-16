@@ -1293,6 +1293,24 @@ body.is-resizing * {
   color: var(--text-muted);
 }
 
+button.chip-action {
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+button.chip-action:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+button.chip-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chip-warn {
   border-color: var(--warning);
   background: var(--warning-soft);

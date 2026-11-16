@@ -40,6 +40,72 @@ function buildColumnNames(headerRow: unknown[], width: number): string[] {
   return names;
 }
 
+function countNonEmptyCells(row: unknown[]): { total: number; strings: number } {
+  let total = 0;
+  let strings = 0;
+  for (const cell of row) {
+    if (cell === null || cell === undefined) continue;
+    if (typeof cell === "string") {
+      const trimmed = cell.trim();
+      if (trimmed.length === 0) continue;
+      total += 1;
+      if (Number.isNaN(Number(trimmed))) strings += 1;
+    } else {
+      total += 1;
+    }
+  }
+  return { total, strings };
+}
+
+function parseBannerTitle(bannerTitle: string): { colName: string; value: string } {
+  const cleaned = bannerTitle.replace(/\s+/g, " ").trim();
+  const match = /^([A-Za-z][A-Za-z0-9 _-]{1,20}?)\s*[:\-–]?\s+([A-Za-z0-9._-]+)$/.exec(cleaned);
+  if (match) {
+    return {
+      colName: normalizeIdentifier(match[1], "group"),
+      value: match[2].trim(),
+    };
+  }
+  return { colName: "sheet_title", value: cleaned };
+}
+
+function detectHeaderRowIndex(
+  matrix: unknown[][],
+  width: number,
+): { headerIndex: number; bannerTitle: string | null } {
+  if (width < 3 || matrix.length < 2) {
+    return { headerIndex: 0, bannerTitle: null };
+  }
+  const firstRow = Array.isArray(matrix[0]) ? matrix[0] : [];
+  const firstCounts = countNonEmptyCells(firstRow);
+  if (firstCounts.total > 2) {
+    return { headerIndex: 0, bannerTitle: null };
+  }
+
+  const minHeaderCells = Math.max(3, Math.ceil(width * 0.5));
+  const limit = Math.min(5, matrix.length);
+  for (let r = 1; r < limit; r += 1) {
+    const row = Array.isArray(matrix[r]) ? matrix[r] : [];
+    const counts = countNonEmptyCells(row);
+    if (counts.total >= minHeaderCells && counts.strings >= Math.ceil(counts.total * 0.6)) {
+      let banner: string | null = null;
+      for (let b = 0; b < r; b += 1) {
+        const bRow = Array.isArray(matrix[b]) ? matrix[b] : [];
+        for (const cell of bRow) {
+          if (cell !== null && cell !== undefined && String(cell).trim().length > 0) {
+            banner = String(cell).trim();
+            break;
+          }
+        }
+        if (banner) break;
+      }
+      return { headerIndex: r, bannerTitle: banner };
+    }
+  }
+
+  return { headerIndex: 0, bannerTitle: null };
+}
+
 function sheetToCsv(sheet: XLSX.WorkSheet): string | null {
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
@@ -50,20 +116,32 @@ function sheetToCsv(sheet: XLSX.WorkSheet): string | null {
 
   if (!Array.isArray(matrix) || matrix.length === 0) return null;
 
-  const headerRow = Array.isArray(matrix[0]) ? matrix[0] : [];
-  const dataRows = Array.isArray(matrix) ? matrix.slice(1) : [];
-  const width = dataRows.reduce(
+  const firstRow = Array.isArray(matrix[0]) ? matrix[0] : [];
+  const width = matrix.reduce(
     (max, row) => Math.max(max, Array.isArray(row) ? row.length : 0),
-    headerRow.length,
+    firstRow.length,
   );
   if (width === 0) return null;
 
+  const { headerIndex, bannerTitle } = detectHeaderRowIndex(matrix, width);
+  const headerRow = Array.isArray(matrix[headerIndex]) ? matrix[headerIndex] : [];
+  const dataRows = matrix.slice(headerIndex + 1);
+
   const columns = buildColumnNames(headerRow, width);
-  const lines: string[] = [columns.map((name) => csvCell(name)).join(",")];
+  let bannerCol: { colName: string; value: string } | null = null;
+  if (bannerTitle) {
+    const parsed = parseBannerTitle(bannerTitle);
+    if (!columns.includes(parsed.colName)) {
+      bannerCol = parsed;
+    }
+  }
+
+  const finalColumns = bannerCol ? [bannerCol.colName, ...columns] : columns;
+  const lines: string[] = [finalColumns.map((name) => csvCell(name)).join(",")];
 
   for (const row of dataRows) {
     if (!Array.isArray(row)) continue;
-    const cells: string[] = [];
+    const cells: string[] = bannerCol ? [csvCell(bannerCol.value)] : [];
     for (let index = 0; index < width; index += 1) {
       cells.push(csvCell(row[index]));
     }

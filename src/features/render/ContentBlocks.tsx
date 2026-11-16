@@ -20,6 +20,9 @@ export interface ContentBlocksProps {
   streaming?: boolean
   /** Supplied by the workspace so a figure can be edited in place. */
   onEditFigure?: (figureIndex: number, changes: FigureChanges) => void
+  /** Optional Python-generated plot images to interleave between sections. */
+  images?: string[]
+  onOpenImage?: (index: number) => void
 }
 
 function renderBlock(
@@ -69,19 +72,84 @@ function renderBlock(
   return <MarkdownText key={`markdown-${index}`} content={block.content} />
 }
 
+function renderInlinePlot(
+  src: string,
+  imgIdx: number,
+  onOpenImage?: (index: number) => void,
+) {
+  return (
+    <div key={`py-plot-${imgIdx}`} className="python-plots-list" style={{ margin: '12px 0' }}>
+      <div className="python-plot-card">
+        <button
+          type="button"
+          onClick={() => onOpenImage?.(imgIdx)}
+          style={{
+            padding: 0,
+            border: 0,
+            background: 'transparent',
+            cursor: 'zoom-in',
+            width: '100%',
+          }}
+          title="Click to inspect full size"
+        >
+          <img
+            src={src}
+            alt={`Generated chart ${imgIdx + 1}`}
+            className="python-plot-image"
+            loading="lazy"
+          />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export const ContentBlocks = memo(function ContentBlocks({
   blocks,
   streaming = false,
   onEditFigure,
+  images,
+  onOpenImage,
 }: ContentBlocksProps) {
   let figureIndex = 0
+  const safeImages = !streaming && Array.isArray(images) ? images : []
+  const hasInlineCharts = blocks.some((b) => b.type === 'mermaid' || b.type === 'chart')
+  const shouldInterleaveImages = safeImages.length > 0 && !hasInlineCharts
+  const hasTables = blocks.some((b) => b.type === 'table')
+  let nextImageIdx = 0
+
   return (
     <>
       {blocks.map((block, index) => {
         const currentFigure =
           block.type === 'mermaid' || block.type === 'chart' ? figureIndex++ : null
-        return renderBlock(block, index, streaming, currentFigure, onEditFigure)
+        const node = renderBlock(block, index, streaming, currentFigure, onEditFigure)
+        const placeAfterThisBlock =
+          shouldInterleaveImages &&
+          nextImageIdx < safeImages.length &&
+          (hasTables
+            ? block.type === 'table'
+            : block.type === 'markdown' && index < blocks.length - 1)
+        const inlinePlot = placeAfterThisBlock
+          ? renderInlinePlot(safeImages[nextImageIdx], nextImageIdx++, onOpenImage)
+          : null
+
+        return inlinePlot ? (
+          <div key={`block-wrap-${index}`}>
+            {node}
+            {inlinePlot}
+          </div>
+        ) : (
+          node
+        )
       })}
+      {shouldInterleaveImages && nextImageIdx < safeImages.length
+        ? safeImages
+            .slice(nextImageIdx)
+            .map((src, offset) =>
+              renderInlinePlot(src, nextImageIdx + offset, onOpenImage),
+            )
+        : null}
     </>
   )
 })

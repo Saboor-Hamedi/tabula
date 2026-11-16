@@ -1,5 +1,5 @@
 import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
-import { LockIcon, SheetIcon } from '../common/Icons'
+import { LockIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { Input } from '../chat'
 import { useComposerDraft } from './useComposerDraft'
@@ -16,7 +16,7 @@ import { useComposerDraft } from './useComposerDraft'
  */
 
 export function Composer() {
-  const { activeSession, isStreaming, dbReady } = useSessionState()
+  const { activeSession, sessions, isStreaming, dbReady } = useSessionState()
   const { sendMessage, stopStreaming } = useSessionActions()
   const { usage } = useUsageStatus()
   const [value, setValue] = useComposerDraft()
@@ -72,10 +72,58 @@ export function Composer() {
 
         {activeSession ? (
           <div className="composer-chips">
-            <span className="chip" title={activeSession.fileName}>
-              <SheetIcon size={12} />
-              <span className="chip-text">{activeSession.fileName}</span>
-            </span>
+            {sessions.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  className="chip chip-action"
+                  disabled={disabled || isStreaming}
+                  onClick={() =>
+                    void sendMessage(
+                      'Merge all uploaded files into one clean unified dataset, normalize headers, and show the full summary and class/source breakdown.',
+                    )
+                  }
+                >
+                  Merge All Files
+                </button>
+                <button
+                  type="button"
+                  className="chip chip-action"
+                  disabled={disabled || isStreaming}
+                  onClick={() =>
+                    void sendMessage(
+                      'Compare all uploaded files side-by-side across key metrics, distributions, and top performers.',
+                    )
+                  }
+                >
+                  Compare Sources
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className="chip chip-action"
+              disabled={disabled || isStreaming}
+              onClick={() =>
+                void sendMessage(
+                  'Generate a comprehensive executive report with a KPI scorecard, key trends, statistical comparisons, charts, and recommendations.',
+                )
+              }
+            >
+              Executive Report
+            </button>
+            <button
+              type="button"
+              className="chip chip-action"
+              disabled={disabled || isStreaming}
+              onClick={() =>
+                void sendMessage(
+                  'Audit data quality and statistical outliers (IQR/Z-score), missing values, and duplicates across the dataset.',
+                )
+              }
+            >
+              Find Outliers
+            </button>
           </div>
         ) : null}
 

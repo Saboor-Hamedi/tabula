@@ -94,7 +94,7 @@ export function Inspector({ onSwitchToChat: _onSwitchToChat }: InspectorProps = 
             </div>
             <div className="panel-empty-title">No activity yet</div>
             <div className="panel-empty-desc">
-              When the assistant queries DuckDB or executes Python, tool calls and schema inspections will appear here.
+              Steps taken to read, combine, and summarize your data will appear here.
             </div>
           </div>
         ) : (

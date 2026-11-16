@@ -111,7 +111,7 @@ export const Welcome = memo(function Welcome() {
       <article className="message message-assistant message-welcome-plain">
         <div className="markdown">
           <p>
-            Upload a CSV or Excel spreadsheet to start exploring your data with DuckDB WASM and Python.
+            Upload a CSV or Excel spreadsheet to start exploring your data in plain English.
           </p>
         </div>
       </article>

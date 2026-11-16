@@ -19,8 +19,12 @@ function escapeCsvValue(val: unknown): string {
   return str
 }
 
+const MAX_CSV_CACHE = 20
+const csvCache = new Map<string, string>()
+
 /**
  * Extracts a table from DuckDB as a CSV text string, ready to be read by pandas.
+ * Results are cached per schema/table/limit to avoid re-exporting on repeat Python turns.
  */
 export async function exportTableToCsv(
   connection: AsyncDuckDBConnection,
@@ -28,6 +32,15 @@ export async function exportTableToCsv(
   tableName: string,
   maxRows = 50_000,
 ): Promise<string> {
+  const cacheKey = `${schemaName}:${tableName}:${maxRows}`
+  const cached = csvCache.get(cacheKey)
+  if (cached !== undefined) {
+    // Refresh LRU order
+    csvCache.delete(cacheKey)
+    csvCache.set(cacheKey, cached)
+    return cached
+  }
+
   const target = qualifiedName(schemaName, tableName)
   const result = await connection.query(`SELECT * FROM ${target} LIMIT ${maxRows}`)
 
@@ -47,5 +60,11 @@ export async function exportTableToCsv(
     }
   }
 
-  return lines.join('\n')
+  const csvText = lines.join('\n')
+  if (csvCache.size >= MAX_CSV_CACHE) {
+    const oldest = csvCache.keys().next().value
+    if (oldest !== undefined) csvCache.delete(oldest)
+  }
+  csvCache.set(cacheKey, csvText)
+  return csvText
 }

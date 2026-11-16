@@ -27,7 +27,7 @@ export const MAX_RESULT_ROWS = 200
 /** Hard cap on rows rendered inside a chat table. */
 export const MAX_PREVIEW_ROWS = 200
 export const MAX_SAMPLE_ROWS = 6
-export const MAX_AGENT_STEPS = 6
+export const MAX_AGENT_STEPS = 8
 export const MAX_PROFILED_COLUMNS = 160
 export const MAX_UPLOAD_BYTES = 80 * 1024 * 1024
 export const TRACE_DETAIL_LIMIT = 8000

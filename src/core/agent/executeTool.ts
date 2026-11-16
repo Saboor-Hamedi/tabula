@@ -3,6 +3,7 @@ import { listTables, tableExists } from '../duckdb/listTables'
 import { runSQL } from '../duckdb/runSQL'
 import { profileTable } from '../profiling/profileTable'
 import { runPython } from '../python'
+import { buildExtraDatasets } from '../python/extraDatasets'
 import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
 import type { PythonExecutionResult } from '../python'
 import type { Session, TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
@@ -315,6 +316,14 @@ async function runPythonTool(
     targetTable = extraDatasets[0].tableName
   }
 
+  // Always populate `dfs` and virtual files for all uploaded tables so single-file and
+  // multi-file scripts (including `dfs[...]`, `glob.glob`, and `os.listdir`) always work.
+  if (extraDatasets.length === 0) {
+    extraDatasets.push(
+      ...buildExtraDatasets(context.allSessions, context.schemaName, context.tableNames),
+    )
+  }
+
   const result = await runPython(code, {
     connection: context.handle?.connection ?? null,
     schemaName: targetSchema,
@@ -332,6 +341,12 @@ async function runPythonTool(
   }
 
   return compactPythonToolResult(result)
+}
+
+function buildErrorContext(context: ToolContext): { availableTables: string[] } {
+  return {
+    availableTables: listAvailableTargets(context),
+  }
 }
 
 export async function executeTool(
@@ -367,6 +382,10 @@ export async function executeTool(
       result = await runPythonTool(args, context)
     }
 
+    if (result.error && !result.availableTables) {
+      result = { ...result, ...buildErrorContext(context) }
+    }
+
     const summary = result.error
       ? summarizeToolError(result.error)
       : summarizeToolResult(toolName, result)
@@ -388,6 +407,11 @@ export async function executeTool(
     return result
   } catch (error) {
     const message = summarizeToolError(error)
+    const errorPayload: ToolResultPayload = {
+      error: message,
+      tool: toolName,
+      ...buildErrorContext(context),
+    }
     context.onTrace(
       createTraceEntry({
         id: traceId,
@@ -396,11 +420,11 @@ export async function executeTool(
         args,
         status: 'error',
         summary: message,
-        detail: truncateDetail(message),
+        detail: truncateDetail(errorPayload),
         startedAt,
         finishedAt: Date.now(),
       }),
     )
-    return { error: message, tool: toolName }
+    return errorPayload
   }
 }
