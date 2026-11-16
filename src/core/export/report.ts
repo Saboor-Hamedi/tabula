@@ -13,7 +13,7 @@ export interface ReportHtmlInput {
 }
 
 /** Wraps rendered report content in a standalone, print-friendly document. */
-export function buildReportHtml({ title, subtitle, body }: ReportHtmlInput): string {
+export function buildReportHtml({ title, body }: ReportHtmlInput): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -22,46 +22,42 @@ export function buildReportHtml({ title, subtitle, body }: ReportHtmlInput): str
 <title>${escapeHtml(title)}</title>
 <style>
   :root { color-scheme: light; }
+  @page { size: A4; margin: 20mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 40px 28px; background: #fff; color: #14171c;
-    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.65; }
-  main { max-width: 860px; margin: 0 auto; }
-  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.02em; }
-  .subtitle { color: #6b7280; font-size: 12px; margin-bottom: 28px; }
-  .report-entry { margin: 0 0 24px; }
-  .report-entry + .report-entry { border-top: 1px solid #e5e7eb; padding-top: 20px; }
-  .report-user { font-weight: 600; color: #0f766e; margin-bottom: 6px; }
-  .report-assistant-label { font-weight: 600; margin-bottom: 6px; }
+  body { margin: 0; padding: 20mm; background: #fff; color: #1e293b;
+    font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.5; }
+  main { max-width: 760px; margin: 0 auto; }
+  .report-entry { margin: 0 0 18px; }
   .markdown > :first-child { margin-top: 0; }
   .markdown > :last-child { margin-bottom: 0; }
-  .markdown p { margin: 0 0 10px; }
-  .markdown h1, .markdown h2, .markdown h3, .markdown h4 { margin: 18px 0 8px; line-height: 1.3; }
-  .markdown ul, .markdown ol { padding-left: 20px; margin: 0 0 10px; }
+  .markdown p, p { margin: 0 0 10px; font-size: 12pt; line-height: 1.5; text-align: justify; }
+  .markdown h1 { margin: 18px 0 8px; font-size: 14pt; font-weight: 700; line-height: 1.5; color: #0f172a; text-align: left; }
+  .markdown h2, .markdown h3, .markdown h4 { margin: 16px 0 6px; font-size: 12pt; font-weight: 700; line-height: 1.5; color: #0f172a; text-align: left; }
+  .markdown ul, .markdown ol { padding-left: 20px; margin: 0 0 10px; font-size: 12pt; line-height: 1.5; text-align: justify; }
   .markdown code { background: #f5f6f8; padding: 1px 4px; border-radius: 4px; font-size: 0.9em; }
-  .markdown pre { background: #f5f6f8; padding: 12px; border-radius: 8px; overflow: auto; }
-  .md-table-wrap, .data-table-block { overflow-x: auto; margin: 10px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { border-bottom: 1px solid #e5e7eb; padding: 6px 9px; text-align: left; }
-  th { background: #f6f7f9; color: #4b5563; text-transform: uppercase; font-size: 10px; }
-  .figure { margin: 12px 0; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-  .figure-canvas { padding: 16px; }
-  .figure svg, .mermaid-diagram svg, .elbow-chart svg, .series-chart svg { max-width: 100%; height: auto; }
-  .figure-tools, .message-tools, .suggestions, .stream-caret, .copy-btn { display: none !important; }
+  .markdown pre { display: none; }
+  .md-table-wrap, .data-table-block { overflow-x: auto; margin: 14px 0; }
+  table { width: 100%; margin: 12px 0; border-collapse: collapse; font-size: 12pt; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; vertical-align: middle; }
+  th { background: #f1f5f9; color: #0f172a; font-weight: 700; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .figure, .python-plots-list { margin: 14px auto; text-align: center; border: none; overflow: hidden; }
+  .figure-canvas { padding: 8px 0; }
+  .figure svg, .mermaid-diagram svg, .elbow-chart svg, .series-chart svg, .python-plot-image { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  .figure-tools, .figure-watermark, .message-tools, .suggestions, .stream-caret, .copy-btn, .mermaid-wrapper-header { display: none !important; }
   .message-time { display: none; }
   .data-table-foot { display: none; }
-  .report-entry { break-inside: avoid-page; }
   .figure { break-inside: avoid-page; }
   @media print {
     body { padding: 0; }
     main { max-width: none; }
-    .report-entry { page-break-inside: avoid; }
   }
 </style>
 </head>
 <body>
 <main>
-  <h1>${escapeHtml(title)}</h1>
-  <div class="subtitle">${escapeHtml(subtitle)}</div>
   ${body}
 </main>
 </body>

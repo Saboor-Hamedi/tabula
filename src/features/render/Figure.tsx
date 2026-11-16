@@ -15,9 +15,10 @@ export interface FigureProps {
   name: string
   children: React.ReactNode
   onEdit?: () => void
+  toolbarLeft?: React.ReactNode
 }
 
-export function Figure({ name, children, onEdit }: FigureProps) {
+export function Figure({ name, children, onEdit, toolbarLeft }: FigureProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<ImageExportMode | null>(null)
 
@@ -50,15 +51,18 @@ export function Figure({ name, children, onEdit }: FigureProps) {
       </div>
 
       <figcaption className="figure-tools">
-        <a
-          href="https://tabula.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="figure-watermark"
-          title="Made with Lumina Tabula · Private Data Workbench"
-        >
-          Made with Lumina Tabula
-        </a>
+        <div className="figure-tools-left" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {toolbarLeft}
+          <a
+            href="https://tabula.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="figure-watermark"
+            title="Made with Lumina Tabula · Private Data Workbench"
+          >
+            Made with Lumina Tabula
+          </a>
+        </div>
         <div className="figure-actions">
           <button type="button" className="tool-btn" onClick={handleCopy}>
             {status === 'copied' ? <CheckIcon size={13} /> : <ImageIcon size={13} />}

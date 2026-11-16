@@ -109,7 +109,7 @@ export type PostBlock =
           }
         | {
             type: 'series'
-            kind: 'bar' | 'line' | 'scatter'
+            kind: 'bar' | 'line' | 'scatter' | 'pie'
             title: string
             xLabel: string
             yLabel: string

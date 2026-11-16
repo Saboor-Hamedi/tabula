@@ -1,12 +1,14 @@
-import { memo, useRef, useState } from 'react'
-import type { ChatMessage } from '../../../core/types'
+import { memo, useContext, useRef, useState } from 'react'
+import { exportAnalysisAsDoc, exportAnalysisAsPdf } from '../../../core/export/exportFormats'
+import type { ChatMessage, Session } from '../../../core/types'
 import { openPricingModal } from '../../../core/supabase/usage'
 import { formatCompact, formatTime } from '../../../core/utils/format'
-import { ArrowRightIcon, CheckIcon, CopyIcon, FileIcon } from '../../common/Icons'
+import { ArrowRightIcon, CheckIcon, CopyIcon, DownloadIcon, FileIcon } from '../../common/Icons'
 import { FigureLightbox } from '../../common/FigureLightbox'
 import { useIsAdmin } from '../../auth/useProfile'
 import { Composer, Publish } from '../../posts'
 import { useSessionActions } from '../../SessionProvider'
+import { SessionStateContext } from '../../session/sessionContext'
 import { copyRichAnswer } from '../lib/copyAnswer'
 import { Renderer } from './Renderer'
 import { Suggestions } from './Suggestions'
@@ -37,9 +39,11 @@ export const Bubble = memo(function Bubble({
   datasetName = null,
 }: MessageBubbleProps) {
   const { editFigure, sendMessage, saveToNotes } = useSessionActions()
+  const sessionState = useContext(SessionStateContext)
   const isAdmin = useIsAdmin()
   const [copied, setCopied] = useState(false)
   const [savedNote, setSavedNote] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<'pdf' | 'docx' | null>(null)
   const [composing, setComposing] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -64,6 +68,46 @@ export const Bubble = memo(function Bubble({
     window.setTimeout(() => setSavedNote(false), 2000)
   }
 
+  const resolveExportPayload = (): { session: Session; exportMessages: ChatMessage[] } => {
+    const session: Session = sessionState?.activeSession ?? {
+      id: 'export',
+      fileName: datasetName || 'Executive_Report.xlsx',
+      fileType: 'xlsx',
+      fileSize: 0,
+      uploadedAt: Date.now(),
+      schemaName: 'main',
+      tables: [],
+      primaryTable: null,
+    }
+    return { session, exportMessages: [message] }
+  }
+
+  const handleExportPdf = async () => {
+    if (exportingFormat) return
+    setExportingFormat('pdf')
+    try {
+      const { session, exportMessages } = resolveExportPayload()
+      await exportAnalysisAsPdf(session, exportMessages)
+    } catch (err) {
+      console.warn('PDF export failed:', err)
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
+  const handleExportDocx = async () => {
+    if (exportingFormat) return
+    setExportingFormat('docx')
+    try {
+      const { session, exportMessages } = resolveExportPayload()
+      await exportAnalysisAsDoc(session, exportMessages)
+    } catch (err) {
+      console.warn('Word export failed:', err)
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
   if (isUser) {
     return (
       <article className="message message-user is-memo-heading">
@@ -74,7 +118,10 @@ export const Bubble = memo(function Bubble({
   }
 
   return (
-    <article className={`message message-assistant ${message.error ? 'is-error' : ''}`}>
+    <article
+      className={`message message-assistant ${message.error ? 'is-error' : ''}`}
+      data-message-id={message.id}
+    >
       {isThinking ? (
         <div className="thinking">
           <span className="thinking-dots" aria-hidden>
@@ -139,6 +186,26 @@ export const Bubble = memo(function Bubble({
           >
             {savedNote ? <CheckIcon size={13} /> : <FileIcon size={13} />}
             <span>{savedNote ? 'Saved to Notes' : 'Save to Notes'}</span>
+          </button>
+          <button
+            type="button"
+            className="tool-btn"
+            onClick={handleExportPdf}
+            disabled={exportingFormat !== null}
+            title="Download this executive report with tables and charts as a PDF"
+          >
+            <DownloadIcon size={13} />
+            <span>{exportingFormat === 'pdf' ? 'PDF…' : 'PDF'}</span>
+          </button>
+          <button
+            type="button"
+            className="tool-btn"
+            onClick={handleExportDocx}
+            disabled={exportingFormat !== null}
+            title="Download this executive report with editable tables and charts as a Word document (.docx)"
+          >
+            <DownloadIcon size={13} />
+            <span>{exportingFormat === 'docx' ? 'Word…' : 'Word'}</span>
           </button>
           {isAdmin ? (
             <Publish

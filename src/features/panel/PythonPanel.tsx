@@ -131,8 +131,8 @@ export function PythonPanel() {
         : '')
     if (!csvContent) return
     const baseName = activeSession?.fileName
-      ? activeSession.fileName.replace(/\.[^.]+$/, '')
-      : 'tabula'
+      ? activeSession.fileName.replace(/\.[^.]+$/, '').replace(/([_-]merged)+$/i, '')
+      : 'Data'
     const file = new File([csvContent], `${baseName}-merged.csv`, { type: 'text/csv' })
     void uploadFiles([file])
   }

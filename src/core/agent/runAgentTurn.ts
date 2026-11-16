@@ -109,6 +109,36 @@ function toModelMessages(history: ChatMessage[], userText: string): ModelMessage
   return selected
 }
 
+const PREAMBLE_LINE_RE =
+  /^(?:(?:first|to begin|now|next|okay|sure|certainly),?\s+)?(?:i(?:'ll| will|'m going to| am going to)|let me|let's)\s+(?:start|begin|examine|explore|inspect|check|look|analyze|analyse|review|load|merge|read|understand|profile|investigate|gather|pull|calculate|compute|summarize)[^.!?\n]*[.!?]?\s*$/i
+
+export function stripLeadingPreamble(raw: string): string {
+  const lines = raw.split('\n')
+  while (lines.length > 0) {
+    const first = lines[0].trim()
+    if (!first) {
+      lines.shift()
+      continue
+    }
+    if (PREAMBLE_LINE_RE.test(first)) {
+      lines.shift()
+      continue
+    }
+    // Also strip if the first paragraph starts with a preamble sentence followed by real content
+    const sentenceMatch =
+      /^(?:(?:first|to begin|now|next),?\s+)?(?:i(?:'ll| will|'m going to| am going to)|let me|let's)\s+(?:start|begin|examine|explore|inspect|check|look|analyze|analyse|review|load|merge|read|understand|profile|investigate|gather|pull|calculate|compute|summarize)[^.!?\n]*[.!?]\s+/i.exec(
+        lines[0],
+      )
+    if (sentenceMatch) {
+      lines[0] = lines[0].slice(sentenceMatch[0].length)
+      if (!lines[0].trim()) lines.shift()
+      continue
+    }
+    break
+  }
+  return lines.join('\n').trim()
+}
+
 function formatFallbackAnswer(pyResult?: PythonExecutionResult): string {
   const preview = pyResult?.dfPreview
   if (preview && Array.isArray(preview.columns) && preview.columns.length > 0) {
@@ -227,17 +257,23 @@ export async function runAgentTurn({
 
   const safeText = typeof text === 'string' ? text.trim() : ''
   const safeFinal = typeof finalText === 'string' ? finalText.trim() : ''
-  let answer = safeText.length > 0 ? text : safeFinal
+  let answer = ''
 
-  if (answer.trim().length === 0) {
-    // Attempt recovery from steps if multi-step tool call ran without final text delta
+  if (!signal.aborted) {
     try {
       const steps = await result.steps
-      const texts = steps
-        .map((s) => s.text?.trim())
-        .filter((t): t is string => Boolean(t && t.length > 0))
-      if (texts.length > 0) {
-        answer = texts.join('\n\n')
+      const lastFinalStep = [...steps]
+        .reverse()
+        .find((s) => s.text?.trim() && (!s.toolCalls || s.toolCalls.length === 0))
+      const lastTextStep = [...steps].reverse().find((s) => s.text?.trim())
+      if (lastFinalStep?.text?.trim()) {
+        answer = lastFinalStep.text
+      } else if (safeFinal.length > 0) {
+        answer = finalText
+      } else if (lastTextStep?.text?.trim()) {
+        answer = lastTextStep.text
+      } else if (safeText.length > 0) {
+        answer = text
       } else {
         const toolCalls = steps.flatMap((s) => s.toolCalls ?? [])
         if (toolCalls.length > 0) {
@@ -245,9 +281,13 @@ export async function runAgentTurn({
         }
       }
     } catch {
-      // Ignore step recovery error
+      answer = safeFinal.length > 0 ? finalText : safeText.length > 0 ? text : ''
     }
+  } else {
+    answer = safeFinal.length > 0 ? finalText : text
   }
+
+  answer = stripLeadingPreamble(answer)
 
   if (answer.trim().length === 0) {
     throw new Error('The model returned an empty response. Try asking again.')

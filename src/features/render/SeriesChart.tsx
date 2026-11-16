@@ -12,9 +12,71 @@ function shortenLabel(label: string): string {
   return label.length > 15 ? `${label.slice(0, 14)}…` : label
 }
 
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180
+  return {
+    x: cx + r * Math.cos(rad),
+    y: cy + r * Math.sin(rad),
+  }
+}
+
+function describeArcSlice(
+  cx: number,
+  cy: number,
+  rOuter: number,
+  rInner: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const clampedEnd = Math.min(endAngle, startAngle + 359.95)
+  const startOuter = polarToCartesian(cx, cy, rOuter, clampedEnd)
+  const endOuter = polarToCartesian(cx, cy, rOuter, startAngle)
+  const startInner = polarToCartesian(cx, cy, rInner, startAngle)
+  const endInner = polarToCartesian(cx, cy, rInner, clampedEnd)
+  const largeArc = clampedEnd - startAngle <= 180 ? '0' : '1'
+  return [
+    `M ${startOuter.x} ${startOuter.y}`,
+    `A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${endOuter.x} ${endOuter.y}`,
+    `L ${startInner.x} ${startInner.y}`,
+    `A ${rInner} ${rInner} 0 ${largeArc} 1 ${endInner.x} ${endInner.y}`,
+    'Z',
+  ].join(' ')
+}
+
 export function SeriesChart({ data }: { data: SeriesChartData }) {
   const textColor = data.textColor ?? 'var(--text)'
   const highlightColor = data.textColor ?? CHART_COLORS.highlight
+
+  const pieSlices = useMemo(() => {
+    const rawPoints = Array.isArray(data?.points) ? data.points : []
+    const positive = rawPoints
+      .map((p, idx) => ({
+        label: p?.label ?? `Item ${idx + 1}`,
+        value: Math.max(0, Number(p?.value) || 0),
+        index: idx,
+      }))
+      .filter((p) => p.value > 0)
+    const total = positive.reduce((sum, p) => sum + p.value, 0) || 1
+    let angle = 0
+    return positive.slice(0, 10).map((item, sliceIdx) => {
+      const span = (item.value / total) * 360
+      const startAngle = angle
+      const endAngle = angle + span
+      angle = endAngle
+      const pct = Math.round((item.value / total) * 1000) / 10
+      const color =
+        item.index === data.highlightIndex
+          ? highlightColor
+          : CHART_COLORS.palette[sliceIdx % CHART_COLORS.palette.length]
+      return {
+        ...item,
+        startAngle,
+        endAngle,
+        pct,
+        color,
+      }
+    })
+  }, [data?.points, data.highlightIndex, highlightColor])
 
   const geometry = useMemo(() => {
     const pointsList = Array.isArray(data?.points) ? data.points : []
@@ -68,6 +130,86 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
     ? Math.max(MARGIN.top + 18, highlighted.y - 30)
     : 0
   const labelStep = Math.ceil(Math.max(geometry.points.length, 1) / 12)
+
+  if (data.kind === 'pie') {
+    const cx = 240
+    const cy = 236
+    const rOuter = 132
+    const rInner = 56
+    return (
+      <div className="series-chart">
+        <svg
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          role="img"
+          aria-label={`${data.title}. pie chart.`}
+          data-export-text-color={data.textColor ?? undefined}
+        >
+          <text
+            className="series-chart-text"
+            x={WIDTH / 2}
+            y={30}
+            textAnchor="middle"
+            style={{ fill: textColor }}
+            fontSize="18"
+            fontWeight="700"
+          >
+            {data.title}
+          </text>
+          {data.note ? (
+            <text
+              className="series-chart-text"
+              x={WIDTH / 2}
+              y={50}
+              textAnchor="middle"
+              style={{ fill: textColor }}
+              fontSize="12"
+            >
+              {data.note}
+            </text>
+          ) : null}
+
+          {pieSlices.map((slice) => (
+            <path
+              key={`${slice.label}-${slice.index}`}
+              d={describeArcSlice(cx, cy, rOuter, rInner, slice.startAngle, slice.endAngle)}
+              fill={slice.color}
+              stroke="#ffffff"
+              strokeWidth="2"
+            />
+          ))}
+
+          {pieSlices.map((slice, idx) => {
+            const legendY = 92 + idx * 28
+            return (
+              <g key={`legend-${slice.index}`} transform={`translate(430, ${legendY})`}>
+                <rect x={0} y={-10} width={12} height={12} rx={3} fill={slice.color} />
+                <text
+                  className="series-chart-text"
+                  x={20}
+                  y={0}
+                  style={{ fill: textColor }}
+                  fontSize="12"
+                  fontWeight="600"
+                >
+                  {shortenLabel(slice.label)}
+                </text>
+                <text
+                  className="series-chart-text"
+                  x={280}
+                  y={0}
+                  textAnchor="end"
+                  style={{ fill: textColor }}
+                  fontSize="12"
+                >
+                  {formatCompact(slice.value)} ({slice.pct}%)
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+    )
+  }
 
   return (
     <div className="series-chart">

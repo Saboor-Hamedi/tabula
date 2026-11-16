@@ -1,8 +1,8 @@
 import type { Paragraph, Table, TableCell, TableRow, TextRun } from 'docx'
+import { stripLeadingPreamble } from '../agent/runAgentTurn'
 import { parseMessageContent } from '../parsing/parseMessage'
 import type { PythonExecutionResult } from '../python/types'
 import type { ChartData, ChatMessage, Session } from '../types'
-import { formatCount } from '../utils/format'
 import { svgToPngBlob } from '../utils/image'
 import { renderMermaidPngBatch } from './mermaidExport'
 
@@ -18,9 +18,10 @@ type Docx = typeof import('docx')
 type DocChild = Paragraph | Table
 
 const BODY_SIZE = 24 // half-points → 12pt
-const TABLE_SIZE = 18 // half-points → 9pt
+const TITLE_SIZE = 28 // half-points → 14pt
+const TABLE_SIZE = 24 // half-points → 12pt
 const CODE_SIZE = 18
-const HEADING_COLOR = '0F766E'
+const HEADING_COLOR = '0F172A'
 const BORDER_COLOR = 'CBD5E1'
 /** 2 cm on every A4 edge, in twips. */
 const PAGE_MARGIN_TWIPS = Math.round((2 / 2.54) * 1440)
@@ -58,14 +59,25 @@ function tokenizeInline(text: string): InlineToken[] {
   return tokens.length > 0 ? tokens : [{ text }]
 }
 
+function cleanDisplayText(raw: string): string {
+  return (raw || '')
+    .replace(/\.(csv|xlsx|xls|tsv|parquet)\b/gi, '')
+    .replace(/([_-]merged)+/gi, ' ')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function stripMarkdown(text: string): string {
-  return tokenizeInline(text)
-    .map((token) => token.text)
-    .join('')
+  return cleanDisplayText(
+    tokenizeInline(text)
+      .map((token) => token.text)
+      .join(''),
+  )
 }
 
 function inlineRuns(docx: Docx, text: string): TextRun[] {
-  return tokenizeInline(text).map(
+  return tokenizeInline(cleanDisplayText(text)).map(
     (token) =>
       new docx.TextRun({
         text: token.text,
@@ -79,12 +91,12 @@ function inlineRuns(docx: Docx, text: string): TextRun[] {
 }
 
 function paragraphFromLines(docx: Docx, lines: string[]): Paragraph {
-  const children: TextRun[] = []
-  lines.forEach((line, index) => {
-    if (index > 0) children.push(new docx.TextRun({ break: 1 }))
-    children.push(...inlineRuns(docx, line))
+  const joined = lines.map((l) => l.trim()).filter(Boolean).join(' ')
+  return new docx.Paragraph({
+    alignment: docx.AlignmentType.JUSTIFIED,
+    spacing: { line: 360, after: 140 },
+    children: inlineRuns(docx, joined),
   })
-  return new docx.Paragraph({ children, spacing: { after: 120 } })
 }
 
 function pushCode(docx: Docx, children: DocChild[], code: string): void {
@@ -120,12 +132,13 @@ function pushList(docx: Docx, children: DocChild[], chunk: string): void {
     const text = line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
     children.push(
       new docx.Paragraph({
+        alignment: docx.AlignmentType.JUSTIFIED,
         bullet: ordered ? undefined : { level: 0 },
         indent: ordered ? { left: 360 } : undefined,
-        spacing: { after: 40 },
+        spacing: { line: 360, after: 80 },
         children: [
           ...(ordered
-            ? [new docx.TextRun({ text: `${index + 1}. `, size: BODY_SIZE })]
+            ? [new docx.TextRun({ text: `${index + 1}. `, size: BODY_SIZE, font: 'Times New Roman' })]
             : []),
           ...inlineRuns(docx, text),
         ],
@@ -150,18 +163,25 @@ function pushChunk(docx: Docx, children: DocChild[], chunk: string): void {
   }
 
   for (const line of lines) {
+    if (/^\s*---+\s*$/.test(line)) {
+      flush()
+      continue
+    }
+
     const heading = /^(#{1,6})\s+(.*)$/.exec(line.trim())
     if (heading) {
       flush()
+      const level = heading[1].length
       children.push(
         new docx.Paragraph({
-          spacing: { before: 160, after: 60 },
+          spacing: { before: 200, after: 80, line: 360 },
           children: [
             new docx.TextRun({
               text: stripMarkdown(heading[2]),
               bold: true,
-              size: BODY_SIZE,
+              size: level === 1 ? TITLE_SIZE : BODY_SIZE,
               color: HEADING_COLOR,
+              font: 'Times New Roman',
             }),
           ],
         }),
@@ -174,14 +194,16 @@ function pushChunk(docx: Docx, children: DocChild[], chunk: string): void {
       flush()
       children.push(
         new docx.Paragraph({
+          alignment: docx.AlignmentType.JUSTIFIED,
           indent: { left: 360 },
-          spacing: { after: 80 },
+          spacing: { line: 360, after: 100 },
           children: [
             new docx.TextRun({
               text: stripMarkdown(quote[1]),
               italics: true,
               size: BODY_SIZE,
               color: '475569',
+              font: 'Times New Roman',
             }),
           ],
         }),
@@ -193,8 +215,9 @@ function pushChunk(docx: Docx, children: DocChild[], chunk: string): void {
       flush()
       children.push(
         new docx.Paragraph({
+          alignment: docx.AlignmentType.JUSTIFIED,
           bullet: { level: 0 },
-          spacing: { after: 40 },
+          spacing: { line: 360, after: 80 },
           children: inlineRuns(docx, line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')),
         }),
       )
@@ -245,13 +268,13 @@ function cell(
     children: [
       new docx.Paragraph({
         alignment: docx.AlignmentType.CENTER,
-        spacing: { after: 0 },
+        spacing: { before: 40, after: 40, line: 280 },
         children: [
           new docx.TextRun({
             text: stripMarkdown(text),
             bold: header,
             size: TABLE_SIZE,
-            color: header ? '0F172A' : '334155',
+            color: header ? '0F172A' : '1E293B',
             font: 'Times New Roman',
           }),
         ],
@@ -281,11 +304,13 @@ function pushTable(
   const tableRows: TableRow[] = [
     new docx.TableRow({
       tableHeader: true,
+      cantSplit: true,
       children: headers.map((header) => cell(docx, header, true, width)),
     }),
     ...rows.map(
       (row) =>
         new docx.TableRow({
+          cantSplit: true,
           children: headers.map((_header, index) => cell(docx, row[index] ?? '', false, width)),
         }),
     ),
@@ -294,17 +319,24 @@ function pushTable(
   children.push(
     new docx.Table({
       alignment: docx.AlignmentType.CENTER,
-      width: { size: 86, type: docx.WidthType.PERCENTAGE },
+      width: { size: 100, type: docx.WidthType.PERCENTAGE },
       borders,
       rows: tableRows,
     }),
   )
-  children.push(new docx.Paragraph({ spacing: { after: 80 }, children: [] }))
+  children.push(new docx.Paragraph({ spacing: { after: 100 }, children: [] }))
+}
+
+function normalizeImageDataUrl(img: string): string {
+  const trimmed = (img || '').trim()
+  if (!trimmed) return ''
+  return trimmed.startsWith('data:image/') ? trimmed : `data:image/png;base64,${trimmed}`
 }
 
 function pngDimensions(dataUrl: string): { width: number; height: number } {
   try {
-    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    const clean = normalizeImageDataUrl(dataUrl)
+    const base64 = clean.slice(clean.lastIndexOf(',') + 1)
     const binary = atob(base64)
     const bytes = new Uint8Array(binary.length)
     for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
@@ -315,7 +347,8 @@ function pngDimensions(dataUrl: string): { width: number; height: number } {
   }
 }
 
-function imageParagraph(docx: Docx, dataUrl: string): Paragraph {
+function imageParagraph(docx: Docx, rawDataUrl: string): Paragraph {
+  const dataUrl = normalizeImageDataUrl(rawDataUrl)
   const { width, height } = pngDimensions(dataUrl)
   const maxWidth = 480
   let renderWidth = Math.min(maxWidth, width || maxWidth)
@@ -411,15 +444,17 @@ export async function buildDocxReport(
   onProgress?: (status: string) => void,
 ): Promise<{ blob: Blob; fileName: string }> {
   const docx = await import('docx')
-  const baseName = session.fileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')
-  const totalRows = (session.tables ?? []).reduce((sum, table) => sum + (table.rowCount || 0), 0)
+  const baseName =
+    cleanDisplayText(session.fileName)
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'Report'
   const validMessages = messages.filter((message) => message.content && message.content.trim())
 
   const prepared: PreparedMessage[] = validMessages.map((message) => ({
     message,
     blocks:
       message.role === 'assistant'
-        ? parseMessageContent(message.content)
+        ? parseMessageContent(stripLeadingPreamble(message.content))
         : [],
   }))
 
@@ -439,92 +474,44 @@ export async function buildDocxReport(
 
   const domMessages = assistantMessageElements()
   const children: DocChild[] = []
+  const embeddedImages = new Set<string>()
   let assistantIndex = 0
   let mermaidIndex = 0
 
-  children.push(
-    new docx.Paragraph({
-      spacing: { after: 40 },
-      children: [
-        new docx.TextRun({
-          text: 'TABULA SOVEREIGN INTELLIGENCE',
-          bold: true,
-          size: 20,
-          color: HEADING_COLOR,
-        }),
-      ],
-    }),
-    new docx.Paragraph({
-      spacing: { after: 80 },
-      children: [
-        new docx.TextRun({
-          text: `${session.fileName} — Executive Analysis Report`,
-          bold: true,
-          size: BODY_SIZE,
-          color: '0F172A',
-        }),
-      ],
-    }),
-  )
-
-  pushTable(
-    docx,
-    children,
-    ['Source File', 'Total Records', 'Tables', 'Export Date'],
-    [
-      [
-        session.fileName,
-        `${formatCount(totalRows)} rows`,
-        `${session.tables?.length || 1} table(s)`,
-        new Date().toLocaleString(),
-      ],
-    ],
-  )
-
   for (let messageIndex = 0; messageIndex < prepared.length; messageIndex++) {
     const { message, blocks } = prepared[messageIndex]
-    const inquiry = Math.floor(messageIndex / 2) + 1
 
     if (message.role === 'user') {
-      children.push(
-        new docx.Paragraph({
-        spacing: { before: 160, after: 40 },
-          children: [
-            new docx.TextRun({
-              text: `Inquiry #${inquiry}`,
-              bold: true,
-              size: BODY_SIZE,
-              color: HEADING_COLOR,
-            }),
-          ],
-        }),
-      )
-      pushMarkdown(docx, children, message.content)
       continue
     }
 
-    const dom = domMessages[assistantIndex]
+    const dom =
+      globalThis.document.querySelector<HTMLElement>(
+        `.message-assistant[data-message-id="${message.id}"]`,
+      ) ?? domMessages[assistantIndex]
     assistantIndex += 1
-    const chartSvgs = dom?.querySelectorAll<SVGSVGElement>('.elbow-chart svg, .series-chart svg')
-    let chartIndex = 0
-
-    children.push(
-      new docx.Paragraph({
-        spacing: { before: 160, after: 40 },
-        children: [
-          new docx.TextRun({
-            text: `Lumina Tabula Analytical Findings #${inquiry}`,
-            bold: true,
-            size: BODY_SIZE,
-            color: '0284C7',
-          }),
-        ],
-      }),
+    const chartSvgs = dom?.querySelectorAll<SVGSVGElement>(
+      '.figure .elbow-chart svg, .figure .series-chart svg',
     )
+    const mermaidWrappers = dom?.querySelectorAll<HTMLElement>('.mermaid-wrapper')
+    let chartIndex = 0
+    let localMermaidIdx = 0
 
-    for (const block of blocks) {
+    const msgImages = Array.isArray(message.images)
+      ? message.images.map(normalizeImageDataUrl).filter(Boolean)
+      : []
+    const hasInlineCharts = blocks.some((b) => b.type === 'mermaid' || b.type === 'chart')
+    const shouldInterleaveImages = msgImages.length > 0 && !hasInlineCharts
+    const hasTables = blocks.some((b) => b.type === 'table')
+    let nextImageIdx = 0
+
+    for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+      const block = blocks[blockIdx]
       if (block.type === 'mermaid') {
-        const image = mermaidImages[mermaidIndex]
+        const wrapper = mermaidWrappers?.[localMermaidIdx++]
+        const switchedSvg = wrapper?.querySelector<SVGSVGElement>('.series-chart svg')
+        const switchedImage = switchedSvg ? await chartSvgToDataUrl(switchedSvg) : ''
+        const image = switchedImage || mermaidImages[mermaidIndex]
         mermaidIndex += 1
         if (image) {
           children.push(imageParagraph(docx, image))
@@ -544,60 +531,50 @@ export async function buildDocxReport(
 
       if (block.type === 'table') {
         pushTable(docx, children, block.headers, block.rows)
-        continue
+      } else {
+        pushMarkdown(docx, children, block.content)
       }
 
-      pushMarkdown(docx, children, block.content)
+      const placeAfterThisBlock =
+        shouldInterleaveImages &&
+        nextImageIdx < msgImages.length &&
+        (hasTables
+          ? block.type === 'table'
+          : block.type === 'markdown' && blockIdx < blocks.length - 1)
+      if (placeAfterThisBlock) {
+        const imgUrl = msgImages[nextImageIdx++]
+        embeddedImages.add(imgUrl)
+        children.push(imageParagraph(docx, imgUrl))
+      }
+    }
+
+    if (shouldInterleaveImages && nextImageIdx < msgImages.length) {
+      for (const imgUrl of msgImages.slice(nextImageIdx)) {
+        embeddedImages.add(imgUrl)
+        children.push(imageParagraph(docx, imgUrl))
+      }
     }
   }
 
-  if (pythonResult && (pythonResult.images?.length || pythonResult.stdout || pythonResult.code)) {
-    children.push(
-      new docx.Paragraph({
-        spacing: { before: 160, after: 40 },
-        children: [
-          new docx.TextRun({
-            text: 'Analytical Visualizations',
-            bold: true,
-            size: BODY_SIZE,
-            color: '7C3AED',
-          }),
-        ],
-      }),
-    )
+  const remainingPyImages = (pythonResult?.images ?? [])
+    .map(normalizeImageDataUrl)
+    .filter((img) => img && !embeddedImages.has(img))
 
-    if (pythonResult.code) {
-      pushCode(docx, children, pythonResult.code)
-    }
-
-    pythonResult.images?.forEach((image) => {
-      children.push(imageParagraph(docx, `data:image/png;base64,${image}`))
+  if (remainingPyImages.length > 0) {
+    remainingPyImages.forEach((image) => {
+      children.push(imageParagraph(docx, image))
     })
-
-    if (pythonResult.stdout) {
-      pushCode(docx, children, pythonResult.stdout)
-    }
   }
 
-  children.push(
-    new docx.Paragraph({
-      spacing: { before: 200 },
-      children: [
-        new docx.TextRun({
-          text: `Generated by Lumina Tabula Sovereign Analytics · ${new Date().toLocaleString()}`,
-          size: 16,
-          color: '94A3B8',
-        }),
-      ],
-    }),
-  )
-
-  const document = new docx.Document({
+  const wordDoc = new docx.Document({
     styles: {
       default: {
         document: {
           run: { font: 'Times New Roman', size: BODY_SIZE, color: '1E293B' },
-          paragraph: { spacing: { after: 120 } },
+          paragraph: {
+            alignment: docx.AlignmentType.JUSTIFIED,
+            spacing: { line: 360, after: 140 },
+          },
         },
       },
     },
@@ -618,6 +595,6 @@ export async function buildDocxReport(
     ],
   })
 
-  const blob = await docx.Packer.toBlob(document)
-  return { blob, fileName: `${baseName}_Analysis.docx` }
+  const blob = await docx.Packer.toBlob(wordDoc)
+  return { blob, fileName: `${baseName}_Report.docx` }
 }

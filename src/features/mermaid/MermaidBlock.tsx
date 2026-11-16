@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   readMermaidTextColor,
   readMermaidTitle,
@@ -21,16 +21,20 @@ import {
   PencilIcon,
 } from '../common/Icons'
 import { useInView } from '../common/useInView'
+import { DataTable } from '../render/DataTable'
 import { FigureEditor } from '../render/FigureEditor'
+import { SeriesChart } from '../render/SeriesChart'
 import { MermaidFallback } from './MermaidFallback'
 import { MermaidImageBox } from './MermaidImageBox'
-import { figureName } from './utils/mermaidUtils'
+import { extractSeriesFromMermaid, figureName } from './utils/mermaidUtils'
 
 export interface MermaidBlockProps {
   code: string
   streaming?: boolean
   onEdit?: (changes: FigureChanges) => void
 }
+
+type MermaidChartView = 'mermaid' | 'bar' | 'line' | 'pie' | 'table'
 
 export function MermaidBlock({
   code,
@@ -39,12 +43,14 @@ export function MermaidBlock({
 }: MermaidBlockProps) {
   const { ref, inView } = useInView<HTMLDivElement>()
   const [tab, setTab] = useState<'diagram' | 'code'>('diagram')
+  const [chartView, setChartView] = useState<MermaidChartView>('mermaid')
   const [editing, setEditing] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
   const [imageStatus, setImageStatus] = useState<ImageExportMode | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const diagramContainerRef = useRef<HTMLDivElement>(null)
 
+  const parsedSeries = useMemo(() => extractSeriesFromMermaid(code), [code])
   const name = figureName(code)
 
   useEffect(() => {
@@ -170,38 +176,84 @@ export function MermaidBlock({
           )}
         </div>
 
-        <div className="mermaid-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'diagram'}
-            className={`mermaid-tab ${tab === 'diagram' ? 'is-active' : ''}`}
-            onClick={() => setTab('diagram')}
-          >
-            <ImageIcon size={13} />
-            <span>Diagram</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'code'}
-            className={`mermaid-tab ${tab === 'code' ? 'is-active' : ''}`}
-            onClick={() => setTab('code')}
-          >
-            <CodeIcon size={13} />
-            <span>Code</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {parsedSeries && tab === 'diagram' ? (
+            <div className="mermaid-tabs" role="tablist" aria-label="Switch chart type">
+              {(['bar', 'line', 'pie', 'table'] as const).map((kind) => {
+                const isActive =
+                  chartView === kind || (chartView === 'mermaid' && parsedSeries.kind === kind)
+                const label = kind.charAt(0).toUpperCase() + kind.slice(1)
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    className={`mermaid-tab ${isActive ? 'is-active' : ''}`}
+                    onClick={() =>
+                      setChartView(kind === parsedSeries.kind ? 'mermaid' : kind)
+                    }
+                  >
+                    <span>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
+          <div className="mermaid-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'diagram'}
+              className={`mermaid-tab ${tab === 'diagram' ? 'is-active' : ''}`}
+              onClick={() => setTab('diagram')}
+            >
+              <ImageIcon size={13} />
+              <span>Diagram</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'code'}
+              className={`mermaid-tab ${tab === 'code' ? 'is-active' : ''}`}
+              onClick={() => setTab('code')}
+            >
+              <CodeIcon size={13} />
+              <span>Code</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="mermaid-wrapper-body">
         {tab === 'diagram' ? (
-          <MermaidImageBox
-            code={code}
-            inView={inView}
-            containerRef={diagramContainerRef}
-            onClick={handleOpenLightbox}
-          />
+          chartView === 'table' && parsedSeries ? (
+            <div style={{ padding: '12px' }}>
+              <DataTable
+                headers={[parsedSeries.xLabel, parsedSeries.yLabel]}
+                rows={parsedSeries.points.map((p) => [p.label, String(p.value)])}
+              />
+            </div>
+          ) : chartView !== 'mermaid' && chartView !== 'table' && parsedSeries ? (
+            <div className="mermaid-image-box" ref={diagramContainerRef}>
+              <SeriesChart
+                data={{
+                  ...parsedSeries,
+                  kind: chartView,
+                  title: readMermaidTitle(code) || parsedSeries.title,
+                  textColor: readMermaidTextColor(code),
+                }}
+              />
+            </div>
+          ) : (
+            <MermaidImageBox
+              code={code}
+              inView={inView}
+              containerRef={diagramContainerRef}
+              onClick={handleOpenLightbox}
+            />
+          )
         ) : (
           <div className="mermaid-code-view">
             <div className="mermaid-code-lines" aria-hidden="true">

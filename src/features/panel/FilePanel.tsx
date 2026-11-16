@@ -1,18 +1,39 @@
 import { useMemo } from 'react'
 import { formatCount } from '../../core/utils/format'
-import { ExternalIcon, SheetIcon, TableIcon } from '../common/Icons'
+import { CheckIcon, ExternalIcon, SheetIcon, SparklesIcon, TableIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 
 /**
  * Tables & schema inspector.
  *
- * Shows the tables and columns the agent is working from. Column metadata comes from
- * the live digest, so what is shown here is exactly what the agent sees.
+ * Shows the tables and columns the agent is working from in plain, non-technical
+ * language, along with a Data Health card and 1-click data cleaning action.
  */
 
+export function friendlyColumnType(rawType: string): string {
+  const upper = (rawType || '').toUpperCase()
+  if (
+    upper.includes('INT') ||
+    upper.includes('DOUBLE') ||
+    upper.includes('FLOAT') ||
+    upper.includes('DEC') ||
+    upper.includes('NUM') ||
+    upper.includes('REAL')
+  ) {
+    return 'Number'
+  }
+  if (upper.includes('DATE') || upper.includes('TIME') || upper.includes('INTERVAL')) {
+    return 'Date'
+  }
+  if (upper.includes('BOOL')) {
+    return 'Yes/No'
+  }
+  return 'Text'
+}
+
 export function FilePanel() {
-  const { activeSession, digest } = useSessionState()
-  const { openSpreadsheet } = useSessionActions()
+  const { activeSession, digest, isStreaming } = useSessionState()
+  const { openSpreadsheet, sendMessage } = useSessionActions()
 
   const openSessionWorkbook = (initialTableName?: string) => {
     if (!activeSession || (activeSession.tables?.length ?? 0) === 0) return
@@ -31,12 +52,31 @@ export function FilePanel() {
     [activeSession],
   )
 
+  const healthMetrics = useMemo(() => {
+    const allCols = (digest?.tables ?? []).flatMap((t) => t.columns ?? [])
+    if (allCols.length === 0) {
+      return { completenessPct: 100, missingColsCount: 0, totalCols: 0 }
+    }
+    const totalNullPct = allCols.reduce((sum, c) => sum + Math.max(0, Math.min(100, c.nullPct ?? 0)), 0)
+    const avgNullPct = totalNullPct / allCols.length
+    const completenessPct = Math.max(0, Math.min(100, Math.round((100 - avgNullPct) * 10) / 10))
+    const missingColsCount = allCols.filter((c) => (c.nullPct ?? 0) > 0).length
+    return { completenessPct, missingColsCount, totalCols: allCols.length }
+  }, [digest])
+
+  const handleCleanData = () => {
+    if (isStreaming) return
+    void sendMessage(
+      'Clean and standardize this dataset: fix missing values, remove any duplicate rows, standardize text and number formatting, and show a summary of what was cleaned along with the updated table.',
+    )
+  }
+
   if (!activeSession) {
     return (
       <div className="panel-empty">
         <TableIcon size={22} />
         <p>No tables loaded</p>
-        <span>Upload a spreadsheet to inspect its schema and columns here.</span>
+        <span>Upload a spreadsheet to inspect its fields and data health here.</span>
       </div>
     )
   }
@@ -68,7 +108,7 @@ export function FilePanel() {
 
       <div className="file-facts">
         <div className="file-fact">
-          <span className="file-fact-label">Tables</span>
+          <span className="file-fact-label">Sheets</span>
           <span className="file-fact-value">{activeSession.tables?.length ?? 0}</span>
         </div>
         <div className="file-fact">
@@ -76,6 +116,46 @@ export function FilePanel() {
           <span className="file-fact-value">{formatCount(totalRows)}</span>
         </div>
       </div>
+
+      {digest && healthMetrics.totalCols > 0 ? (
+        <div className="file-health-card">
+          <div className="file-health-head">
+            <span className="file-health-title">Data Health</span>
+            <span
+              className={`file-health-badge ${
+                healthMetrics.missingColsCount === 0 ? 'is-good' : 'is-warn'
+              }`}
+            >
+              {healthMetrics.completenessPct}% Complete
+            </span>
+          </div>
+          <div className="file-health-bar" aria-hidden>
+            <div
+              className="file-health-bar-fill"
+              style={{ width: `${Math.max(4, healthMetrics.completenessPct)}%` }}
+            />
+          </div>
+          <span className="file-health-desc">
+            {healthMetrics.missingColsCount === 0
+              ? `All ${healthMetrics.totalCols} fields are 100% populated.`
+              : `${healthMetrics.missingColsCount} of ${healthMetrics.totalCols} fields have missing cells.`}
+          </span>
+          <button
+            type="button"
+            className="file-health-clean-btn"
+            onClick={handleCleanData}
+            disabled={isStreaming}
+            title="Automatically clean missing values, duplicates, and formatting"
+          >
+            {healthMetrics.missingColsCount === 0 ? (
+              <CheckIcon size={12} />
+            ) : (
+              <SparklesIcon size={12} />
+            )}
+            <span>Clean & Fix Missing Values</span>
+          </button>
+        </div>
+      ) : null}
 
       <div className="file-tables">
         {(digest?.tables ?? []).map((table) => (
@@ -96,12 +176,20 @@ export function FilePanel() {
             </header>
 
             <ul className="file-columns">
-              {(table.columns ?? []).map((column) => (
-                <li key={column.name} className="file-column">
-                  <span className="file-column-name">{column.name}</span>
-                  <span className="file-column-type">{column.type.toLowerCase()}</span>
-                </li>
-              ))}
+              {(table.columns ?? []).map((column) => {
+                const filledPct = Math.max(0, Math.min(100, Math.round(100 - (column.nullPct ?? 0))))
+                return (
+                  <li key={column.name} className="file-column">
+                    <span className="file-column-name">{column.name}</span>
+                    <span className="file-column-type">
+                      {friendlyColumnType(column.type)}
+                      {column.nullPct !== undefined && column.nullPct !== null && column.nullPct > 0
+                        ? ` · ${filledPct}%`
+                        : ''}
+                    </span>
+                  </li>
+                )
+              })}
               {(table.columns?.length ?? 0) === 0 ? (
                 <li className="file-column is-empty">No columns readable</li>
               ) : null}
@@ -114,7 +202,7 @@ export function FilePanel() {
         ) : (digest.tables?.length ?? 0) < (activeSession.tables?.length ?? 0) ? (
           <div className="file-panel-note">
             Showing the {formatCount(digest.tables?.length ?? 0)} largest of{' '}
-            {formatCount(activeSession.tables?.length ?? 0)} tables. Ask about a specific sheet or column
+            {formatCount(activeSession.tables?.length ?? 0)} sheets. Ask about a specific sheet or field
             for more detail.
           </div>
         ) : null}

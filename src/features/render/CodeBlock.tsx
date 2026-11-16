@@ -188,8 +188,8 @@ function CodeCellEditor({
     const sheet = getDatasetSheet()
     if (!sheet) return
     const baseName = activeSession?.fileName
-      ? activeSession.fileName.replace(/\.[^.]+$/, '')
-      : 'tabula-data'
+      ? activeSession.fileName.replace(/\.[^.]+$/, '').replace(/([_-]merged)+$/i, '')
+      : 'Data'
     openSpreadsheet({
       kind: 'static',
       title: `${baseName} (Merged Result)`,
@@ -201,8 +201,8 @@ function CodeCellEditor({
     const sheet = getDatasetSheet()
     if (!sheet) return
     const baseName = activeSession?.fileName
-      ? activeSession.fileName.replace(/\.[^.]+$/, '')
-      : 'tabula-merged'
+      ? activeSession.fileName.replace(/\.[^.]+$/, '').replace(/([_-]merged)+$/i, '')
+      : 'Data'
     exportSheetsToXlsx(`${baseName}-merged`, [sheet])
   }
 
@@ -215,8 +215,8 @@ function CodeCellEditor({
         : '')
     if (!csvText) return
     const baseName = activeSession?.fileName
-      ? activeSession.fileName.replace(/\.[^.]+$/, '')
-      : 'tabula'
+      ? activeSession.fileName.replace(/\.[^.]+$/, '').replace(/([_-]merged)+$/i, '')
+      : 'Data'
     const file = new File([csvText], `${baseName}-merged.csv`, { type: 'text/csv' })
     void uploadFiles([file])
   }

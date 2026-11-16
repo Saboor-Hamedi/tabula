@@ -65,22 +65,13 @@ export function ReportView() {
 
         <div className="report-scroll">
           <article className="report-document" ref={bodyRef}>
-            <h1>{title}</h1>
-            <div className="report-subtitle">{subtitle}</div>
-            {messages.map((message) =>
-              !message.content.trim() ? null : (
+            {messages
+              .filter((message) => message.role === 'assistant' && message.content.trim())
+              .map((message) => (
                 <section key={message.id} className="report-entry">
-                  <div className={message.role === 'user' ? 'report-user' : 'report-assistant'}>
-                    {message.role === 'user' ? 'You' : 'Lumina Tabula'}
-                  </div>
-                  {message.role === 'user' ? (
-                    <p>{message.content}</p>
-                  ) : (
-                    <Renderer content={message.content} />
-                  )}
+                  <Renderer content={message.content} images={message.images} />
                 </section>
-              ),
-            )}
+              ))}
           </article>
         </div>
       </div>
