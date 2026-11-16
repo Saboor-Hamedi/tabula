@@ -137,6 +137,11 @@ export async function buildDatasetDigest(
         described.push(await describeColumn(connection, target, column.name, column.type))
       }
 
+      for (const column of columns.slice(DIGEST_MAX_COLUMNS)) {
+        if (!column || !column.name) continue
+        described.push({ name: column.name, type: column.type, distinctCount: -1, topValues: [] })
+      }
+
       tables.push({
         name: table.name,
         rowCount: table.rowCount ?? 0,

@@ -8,7 +8,7 @@ const inspectSchemaInput = jsonSchema<InspectSchemaArgs>({
     table: {
       type: 'string',
       description:
-        'Optional exact table name to profile. Omit this to inspect every table in the session.',
+        'Optional table name, "schema.table", or uploaded file name to profile. Omit to inspect the active session tables.',
     },
   },
   additionalProperties: false,
@@ -38,7 +38,18 @@ const runPythonInput = jsonSchema<RunPythonArgs>({
     code: {
       type: 'string',
       description:
-        'Python code to execute (using pandas as pd, numpy as np, matplotlib.pyplot as plt). The active dataset is loaded in `df`.',
+        'Python code to execute (using pandas as pd, numpy as np, matplotlib.pyplot as plt). The selected table is loaded in `df`. Never import duckdb or sqlite3.',
+    },
+    table: {
+      type: 'string',
+      description:
+        'Optional table name, "schema.table", or file name to load into `df`. Defaults to the primary table.',
+    },
+    tables: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Optional list of table names, "schema.table", or file names to load into `dfs` dict (keyed by each entry) for cross-file Python comparison.',
     },
     purpose: {
       type: 'string',

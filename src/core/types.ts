@@ -209,6 +209,8 @@ export interface RunSqlArgs {
 
 export interface RunPythonArgs {
   code: string
+  table?: string
+  tables?: string[]
   purpose?: string
 }
 

@@ -8,10 +8,12 @@ export interface RunPythonOptions {
   schemaName?: string
   tableName?: string
   csvData?: string
+  extraDatasets?: Array<{ key: string; schemaName: string; tableName: string }>
 }
 
 /**
- * Executes a Python script with the active table pre-loaded as pandas DataFrame `df`.
+ * Executes a Python script with the active table pre-loaded as pandas DataFrame `df`
+ * (and optional `extraDatasets` pre-loaded in `dfs` dict).
  */
 export async function runPython(
   code: string,
@@ -40,5 +42,20 @@ export async function runPython(
     }
   }
 
-  return executePythonInWorker(trimmed, csv, options?.tableName)
+  let extraCsvs: Record<string, string> | undefined
+  if (options?.connection && options.extraDatasets && options.extraDatasets.length > 0) {
+    const map: Record<string, string> = {}
+    for (const ds of options.extraDatasets) {
+      try {
+        map[ds.key] = await exportTableToCsv(options.connection, ds.schemaName, ds.tableName)
+      } catch {
+        // Skip failed dataset export
+      }
+    }
+    if (Object.keys(map).length > 0) {
+      extraCsvs = map
+    }
+  }
+
+  return executePythonInWorker(trimmed, csv, options?.tableName, extraCsvs)
 }

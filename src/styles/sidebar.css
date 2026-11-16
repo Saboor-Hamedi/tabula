@@ -359,6 +359,24 @@
   border-left: 2.5px solid var(--accent);
 }
 
+.session-card.is-uploading {
+  opacity: 0.88;
+}
+
+.session-card.is-uploading .session-card-main {
+  cursor: default;
+}
+
+.session-card.is-uploading .session-icon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.session-card.is-uploading .spinner {
+  width: 13px;
+  height: 13px;
+}
+
 .session-card-main {
   display: flex;
   align-items: center;

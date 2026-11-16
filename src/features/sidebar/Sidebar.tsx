@@ -272,25 +272,75 @@ export function Sidebar({
         />
 
         <div className="sidebar-list">
-          {sessions.length === 0 ? (
-            <div className="sidebar-empty">
-              <DatabaseIcon size={18} />
-              <p>No sources yet</p>
-              <span>Add a CSV or Excel workbook above to start.</span>
-            </div>
-          ) : (
-            sessions.map((session) => (
-              <SessionCard
-                key={session.id}
-                session={session}
-                active={session.id === activeSession?.id}
-                onSelect={(id) => {
-                  selectSession(id)
-                  onSelectSessionComplete?.()
-                }}
-              />
-            ))
-          )}
+          {(() => {
+            const busyItems =
+              uploadQueue.length > 0
+                ? uploadQueue.filter(
+                    (item) =>
+                      item.phase !== 'done' &&
+                      item.phase !== 'error' &&
+                      !sessions.some((s) => s.fileName === item.fileName),
+                  )
+                : upload.phase !== 'idle' &&
+                    upload.phase !== 'done' &&
+                    upload.phase !== 'error' &&
+                    !sessions.some((s) => s.fileName === upload.fileName)
+                  ? [
+                      {
+                        id: 'single-upload',
+                        fileName: upload.fileName,
+                        phase: upload.phase,
+                        message: upload.message,
+                      },
+                    ]
+                  : []
+
+            if (sessions.length === 0 && busyItems.length === 0) {
+              return (
+                <div className="sidebar-empty">
+                  <DatabaseIcon size={18} />
+                  <p>No sources yet</p>
+                  <span>Add a CSV or Excel workbook above to start.</span>
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {busyItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="session-card is-uploading"
+                    role="status"
+                    aria-label={`Uploading ${item.fileName || 'dataset'}`}
+                  >
+                    <div className="session-card-main">
+                      <span className="session-icon" aria-hidden>
+                        <span className="spinner" />
+                      </span>
+                      <span className="session-copy">
+                        <span className="session-name">
+                          {item.fileName || 'Uploading source…'}
+                        </span>
+                        <span className="session-meta">{item.message}</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {sessions.map((session) => (
+                  <SessionCard
+                    key={session.id}
+                    session={session}
+                    active={session.id === activeSession?.id}
+                    onSelect={(id) => {
+                      selectSession(id)
+                      onSelectSessionComplete?.()
+                    }}
+                  />
+                ))}
+              </>
+            )
+          })()}
         </div>
 
         <UploadStatus state={upload} queue={uploadQueue} />

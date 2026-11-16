@@ -998,6 +998,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           model: currentModel,
           session,
           digest: digestBySession[sessionId] ?? null,
+          allSessions: sessions,
+          digestBySession,
           history,
           userText: text,
           signal: controller.signal,

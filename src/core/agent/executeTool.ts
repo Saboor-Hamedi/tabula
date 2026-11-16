@@ -5,7 +5,7 @@ import { profileTable } from '../profiling/profileTable'
 import { runPython } from '../python'
 import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
 import type { PythonExecutionResult } from '../python'
-import type { TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
+import type { Session, TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
 import { compactPythonToolResult, stripCodeFences } from '../../tabula/utils/agentHelpers'
 import {
   createTraceEntry,
@@ -19,10 +19,87 @@ export interface ToolContext {
   handle: DuckDBHandle
   sessionId: string
   schemaName: string
+  primaryTable?: string
   tableNames: string[]
   tables: TableSummary[]
+  allSessions?: Session[]
   onTrace: (entry: ToolTraceEntry) => void
   onPythonResult?: (result: PythonExecutionResult) => void
+}
+
+interface ResolvedTableTarget {
+  schemaName: string
+  tableName: string
+}
+
+function stripQuotes(ident: string): string {
+  return ident.trim().replace(/^"+|"+$/g, '')
+}
+
+function resolveTableTarget(ref: string, context: ToolContext): ResolvedTableTarget | null {
+  const cleaned = ref.trim()
+  if (!cleaned) return null
+  const lower = stripQuotes(cleaned).toLowerCase()
+  const sessions = Array.isArray(context.allSessions) ? context.allSessions : []
+
+  // 1. Check schema.table format (e.g. s_123.orders or "s_123"."orders")
+  const dotIdx = cleaned.indexOf('.')
+  if (dotIdx > 0 && dotIdx < cleaned.length - 1) {
+    const rawSchema = stripQuotes(cleaned.slice(0, dotIdx)).toLowerCase()
+    const rawTable = stripQuotes(cleaned.slice(dotIdx + 1)).toLowerCase()
+    if (rawSchema === context.schemaName.toLowerCase()) {
+      const match = (context.tableNames ?? []).find((t) => t.toLowerCase() === rawTable)
+      if (match) return { schemaName: context.schemaName, tableName: match }
+    }
+    for (const s of sessions) {
+      if (s.schemaName?.toLowerCase() === rawSchema) {
+        const match = (s.tables ?? []).find((t) => t.name.toLowerCase() === rawTable)
+        if (match) return { schemaName: s.schemaName, tableName: match.name }
+      }
+    }
+  }
+
+  // 2. Check active session tables
+  const activeMatch = (context.tableNames ?? []).find((t) => t.toLowerCase() === lower)
+  if (activeMatch) {
+    return { schemaName: context.schemaName, tableName: activeMatch }
+  }
+
+  // 3. Check other sessions by table name or fileName
+  for (const s of sessions) {
+    const tableMatch = (s.tables ?? []).find((t) => t.name.toLowerCase() === lower)
+    if (tableMatch) {
+      return { schemaName: s.schemaName, tableName: tableMatch.name }
+    }
+    if (s.fileName && s.fileName.toLowerCase() === lower) {
+      const target = s.primaryTable ?? s.tables?.[0]?.name
+      if (target) return { schemaName: s.schemaName, tableName: target }
+    }
+  }
+
+  return null
+}
+
+function listAvailableTargets(context: ToolContext): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const t of context.tableNames ?? []) {
+    const key = `${context.schemaName}.${t}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      out.push(t)
+    }
+  }
+  for (const s of context.allSessions ?? []) {
+    for (const t of s.tables ?? []) {
+      const key = `${s.schemaName}.${t.name}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        out.push(`${s.schemaName}.${t.name} (${s.fileName})`)
+      }
+    }
+  }
+  return out.slice(0, 50)
 }
 
 const CACHE_LIMIT = 40
@@ -89,29 +166,32 @@ async function inspectSchema(
     .map((table) => table?.name)
     .filter((name): name is string => typeof name === 'string')
 
-  const tablesToProfile: string[] = []
+  const tablesToProfile: Array<{ schemaName: string; tableName: string }> = []
   if (requestedTable) {
-    const match = available.find((name) => name.toLowerCase() === requestedTable.toLowerCase())
-    if (!match) {
+    const resolved = resolveTableTarget(requestedTable, context)
+    if (!resolved) {
+      const allTargets = listAvailableTargets(context)
       return {
         error: `Table "${requestedTable}" was not found.`,
-        availableTables: available.slice(0, 50),
-        availableTableCount: available.length,
-        hint: 'Pass the exact table name, or omit it to inspect the largest tables.',
+        availableTables: allTargets,
+        availableTableCount: allTargets.length,
+        hint: 'Pass an exact table name, "schema.table", or uploaded file name.',
       }
     }
-    tablesToProfile.push(match)
+    tablesToProfile.push(resolved)
   } else {
     const ordered = rankedNames.filter((name) => available.includes(name))
-    tablesToProfile.push(...(ordered.length > 0 ? ordered : available).slice(0, DIGEST_MAX_TABLES))
+    for (const tableName of (ordered.length > 0 ? ordered : available).slice(0, DIGEST_MAX_TABLES)) {
+      tablesToProfile.push({ schemaName: context.schemaName, tableName })
+    }
   }
 
   const profiles: TableProfile[] = []
-  for (const tableName of tablesToProfile) {
+  for (const target of tablesToProfile) {
     try {
-      const exists = await tableExists(context.handle.connection, context.schemaName, tableName)
+      const exists = await tableExists(context.handle.connection, target.schemaName, target.tableName)
       if (!exists) continue
-      profiles.push(await profileTable(context.handle.connection, context.schemaName, tableName))
+      profiles.push(await profileTable(context.handle.connection, target.schemaName, target.tableName))
     } catch {
       // Ignore profiling failures on damaged tables
     }
@@ -150,8 +230,8 @@ async function runSql(
   const limitMatch = /\blimit\s+(\d+)\b/i.exec(sql)
   const explicitLimit = limitMatch ? parseInt(limitMatch[1], 10) : undefined
   const effectiveMaxRows = explicitLimit && explicitLimit > 0
-    ? Math.min(Math.max(explicitLimit, MAX_RESULT_ROWS), 500)
-    : MAX_RESULT_ROWS
+    ? Math.min(explicitLimit, MAX_RESULT_ROWS)
+    : 50
 
   const result = await runSQL({
     handle: context.handle,
@@ -161,8 +241,21 @@ async function runSql(
     readOnly: true,
   })
 
+  const compactRows = Array.isArray(result.rows)
+    ? result.rows.map((row) =>
+        Array.isArray(row)
+          ? row.map((cell) =>
+              typeof cell === 'string' && cell.length > 120
+                ? `${cell.slice(0, 117)}…`
+                : cell,
+            )
+          : row,
+      )
+    : result.rows
+
   return cacheResult(queryCache, cacheKey, {
     ...result,
+    rows: compactRows,
     purpose: purpose ?? undefined,
     note: result.truncated
       ? `Results were capped at ${result.returnedRows} returned rows out of ${result.rowCount}. Aggregate or filter further if you need the full picture.`
@@ -180,11 +273,53 @@ async function runPythonTool(
   }
   const code = stripCodeFences(rawCode)
 
-  const primaryTable = Array.isArray(context.tableNames) ? context.tableNames[0] : undefined
+  const available = Array.isArray(context.tableNames) ? context.tableNames : []
+  const requestedTable = readString(args, 'table')
+  const requestedTables = Array.isArray(args.tables)
+    ? args.tables.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+    : []
+
+  let targetSchema = context.schemaName
+  let targetTable = context.primaryTable ?? available[0]
+
+  if (requestedTable) {
+    const resolved = resolveTableTarget(requestedTable, context)
+    if (!resolved) {
+      return {
+        error: `Table "${requestedTable}" was not found.`,
+        availableTables: listAvailableTargets(context),
+      }
+    }
+    targetSchema = resolved.schemaName
+    targetTable = resolved.tableName
+  }
+
+  const extraDatasets: Array<{ key: string; schemaName: string; tableName: string }> = []
+  for (const ref of requestedTables) {
+    const resolved = resolveTableTarget(ref, context)
+    if (!resolved) {
+      return {
+        error: `Table "${ref}" in "tables" was not found.`,
+        availableTables: listAvailableTargets(context),
+      }
+    }
+    extraDatasets.push({
+      key: ref.trim(),
+      schemaName: resolved.schemaName,
+      tableName: resolved.tableName,
+    })
+  }
+
+  if (!requestedTable && extraDatasets.length > 0) {
+    targetSchema = extraDatasets[0].schemaName
+    targetTable = extraDatasets[0].tableName
+  }
+
   const result = await runPython(code, {
     connection: context.handle?.connection ?? null,
-    schemaName: context.schemaName,
-    tableName: primaryTable,
+    schemaName: targetSchema,
+    tableName: targetTable,
+    extraDatasets: extraDatasets.length > 0 ? extraDatasets : undefined,
   })
 
   // Synchronize with the UI's Python Results tab so transformed df and plots appear immediately

@@ -1,17 +1,13 @@
 import type { UploadQueueItem, UploadState } from '../../core/types'
-import { AlertIcon, CheckIcon } from '../common/Icons'
+import { AlertIcon } from '../common/Icons'
 
-function renderItem(item: { phase: UploadQueueItem['phase']; fileName: string | null; message: string }, key?: string) {
+function renderItem(
+  item: { phase: UploadQueueItem['phase']; fileName: string | null; message: string },
+  showBusy: boolean,
+  key?: string,
+) {
   if (item.phase === 'done') {
-    return (
-      <div key={key} className="upload-status is-success">
-        <CheckIcon size={15} />
-        <div>
-          {item.fileName ? <strong>{item.fileName}</strong> : null}
-          <span>{item.message}</span>
-        </div>
-      </div>
-    )
+    return null
   }
 
   if (item.phase === 'error') {
@@ -24,6 +20,10 @@ function renderItem(item: { phase: UploadQueueItem['phase']; fileName: string | 
         </div>
       </div>
     )
+  }
+
+  if (!showBusy) {
+    return null
   }
 
   return (
@@ -40,21 +40,31 @@ function renderItem(item: { phase: UploadQueueItem['phase']; fileName: string | 
 export function UploadStatus({
   state,
   queue,
+  showBusy = false,
 }: {
   state: UploadState
   queue?: UploadQueueItem[]
+  showBusy?: boolean
 }) {
   if (queue && queue.length > 0) {
+    const visibleItems = queue.filter(
+      (item) => item.phase === 'error' || (showBusy && item.phase !== 'done'),
+    )
+    if (visibleItems.length === 0) return null
     return (
       <div className="upload-status-list">
-        {queue.map((item) => renderItem(item, item.id))}
+        {visibleItems.map((item) => renderItem(item, showBusy, item.id))}
       </div>
     )
   }
 
-  if (state.phase === 'idle') {
+  if (state.phase === 'idle' || state.phase === 'done') {
     return null
   }
 
-  return renderItem(state)
+  if (state.phase !== 'error' && !showBusy) {
+    return null
+  }
+
+  return renderItem(state, showBusy)
 }

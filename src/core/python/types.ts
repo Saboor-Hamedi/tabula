@@ -30,6 +30,7 @@ export interface PythonWorkerRequest {
   action: 'init' | 'run' | 'reset'
   code?: string
   csvData?: string
+  extraCsvs?: Record<string, string>
   tableName?: string
 }
 

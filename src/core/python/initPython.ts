@@ -84,6 +84,7 @@ export function executePythonInWorker(
   code: string,
   csvData?: string,
   tableName?: string,
+  extraCsvs?: Record<string, string>,
 ): Promise<PythonExecutionResult> {
   return new Promise((resolve, reject) => {
     const worker = getOrCreatePythonWorker()
@@ -121,6 +122,7 @@ export function executePythonInWorker(
       action: 'run',
       code,
       csvData,
+      extraCsvs,
       tableName,
     } as PythonWorkerRequest)
   })

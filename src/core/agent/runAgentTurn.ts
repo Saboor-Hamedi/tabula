@@ -13,6 +13,8 @@ export interface AgentTurnInput {
   session: Session
   /** Live dataset digest, injected into the system prompt each turn. */
   digest: DatasetDigest | null
+  allSessions?: Session[]
+  digestBySession?: Record<string, DatasetDigest>
   history: ChatMessage[]
   userText: string
   signal: AbortSignal
@@ -36,8 +38,44 @@ export interface AgentTurnResult {
  * conversation. Keeping them out also stops the transcript from growing a
  * boilerplate preamble on every turn.
  */
-const MAX_HISTORY_MESSAGES = 12
-const MAX_HISTORY_CHARS = 24_000
+const MAX_HISTORY_MESSAGES = 8
+const MAX_HISTORY_CHARS = 12_000
+
+function compactOlderAssistantMessage(content: string): string {
+  // Strip large chart/mermaid blocks and long markdown tables from older turns
+  // so follow-up turns don't re-send thousands of redundant tokens.
+  const withoutCharts = content.replace(
+    /```(?:mermaid|chart)\b[\s\S]*?```/g,
+    '[chart omitted]',
+  )
+  const lines = withoutCharts.split('\n')
+  const compacted: string[] = []
+  let tableRows = 0
+  let omittedRows = 0
+  for (const line of lines) {
+    const isTableLine = /^\s*\|.*\|\s*$/.test(line)
+    if (isTableLine) {
+      tableRows += 1
+      if (tableRows <= 5) {
+        compacted.push(line)
+      } else {
+        omittedRows += 1
+      }
+    } else {
+      if (omittedRows > 0) {
+        compacted.push(`… [${omittedRows} table rows omitted]`)
+        omittedRows = 0
+      }
+      tableRows = 0
+      compacted.push(line)
+    }
+  }
+  if (omittedRows > 0) {
+    compacted.push(`… [${omittedRows} table rows omitted]`)
+  }
+  const result = compacted.join('\n').trim()
+  return result.length > 1600 ? `${result.slice(0, 1560)}\n… [truncated]` : result
+}
 
 function toModelMessages(history: ChatMessage[], userText: string): ModelMessage[] {
   const safeHistory = Array.isArray(history) ? history : []
@@ -54,10 +92,14 @@ function toModelMessages(history: ChatMessage[], userText: string): ModelMessage
   // Keep the newest messages that fit the context budget, then restore order.
   const selected: ModelMessage[] = []
   let characters = 0
+  let seenAssistant = false
   for (let index = cleaned.length - 1; index >= 0; index -= 1) {
     const message = cleaned[index]
-    const content = typeof message?.content === 'string' ? message.content.trim() : ''
-    if (!content) continue
+    const raw = typeof message?.content === 'string' ? message.content.trim() : ''
+    if (!raw) continue
+    const isOlderAssistant = message.role === 'assistant' && seenAssistant
+    if (message.role === 'assistant') seenAssistant = true
+    const content = isOlderAssistant ? compactOlderAssistantMessage(raw) : raw
     if (selected.length > 0 && characters + content.length > MAX_HISTORY_CHARS) break
     selected.unshift({ role: message.role, content })
     characters += content.length
@@ -71,6 +113,8 @@ export async function runAgentTurn({
   model,
   session,
   digest,
+  allSessions,
+  digestBySession,
   history,
   userText,
   signal,
@@ -82,8 +126,10 @@ export async function runAgentTurn({
     handle: getDuckDBHandle(),
     sessionId: session.id,
     schemaName: session.schemaName,
+    primaryTable: session.primaryTable ?? undefined,
     tableNames: Array.isArray(session?.tables) ? session.tables.map((table) => table.name) : [],
     tables: Array.isArray(session?.tables) ? session.tables : [],
+    allSessions,
     onTrace,
     onPythonResult,
   }
@@ -96,8 +142,11 @@ export async function runAgentTurn({
     model: createDeepSeekModel(model),
     system: buildSystemPrompt({
       fileName: session.fileName,
+      activeSessionId: session.id,
       tables: session.tables,
       digest,
+      allSessions,
+      digestBySession,
     }),
     messages: toModelMessages(history, userText),
     tools,

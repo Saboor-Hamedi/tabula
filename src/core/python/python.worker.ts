@@ -12,12 +12,52 @@ let pyodideInstance: any = null
 let initPromise: Promise<void> | null = null
 
 const PYTHON_HARNESS = `
-import sys, io, base64, traceback
+import sys, io, base64, traceback, math
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes as _MplAxes
 import pandas as pd
 import numpy as np
+
+def _sanitize_lim_arg(val):
+    if val is None:
+        return None
+    if isinstance(val, (int, float, np.floating, np.integer)):
+        f = float(val)
+        return f if math.isfinite(f) else None
+    return val
+
+_orig_set_ylim = _MplAxes.set_ylim
+def _safe_set_ylim(self, bottom=None, top=None, *, emit=True, auto=False, ymin=None, ymax=None):
+    if isinstance(bottom, (tuple, list, np.ndarray)) and len(bottom) == 2 and top is None:
+        bottom, top = bottom[0], bottom[1]
+    if ymin is not None and bottom is None:
+        bottom = ymin
+    if ymax is not None and top is None:
+        top = ymax
+    b = _sanitize_lim_arg(bottom)
+    t = _sanitize_lim_arg(top)
+    if b is None and t is None and (bottom is not None or top is not None):
+        return self.get_ylim()
+    return _orig_set_ylim(self, bottom=b, top=t, emit=emit, auto=auto)
+
+_orig_set_xlim = _MplAxes.set_xlim
+def _safe_set_xlim(self, left=None, right=None, *, emit=True, auto=False, xmin=None, xmax=None):
+    if isinstance(left, (tuple, list, np.ndarray)) and len(left) == 2 and right is None:
+        left, right = left[0], left[1]
+    if xmin is not None and left is None:
+        left = xmin
+    if xmax is not None and right is None:
+        right = xmax
+    l = _sanitize_lim_arg(left)
+    r = _sanitize_lim_arg(right)
+    if l is None and r is None and (left is not None or right is not None):
+        return self.get_xlim()
+    return _orig_set_xlim(self, left=l, right=r, emit=emit, auto=auto)
+
+_MplAxes.set_ylim = _safe_set_ylim
+_MplAxes.set_xlim = _safe_set_xlim
 
 def _format_cell(val):
     if val is None:
@@ -31,7 +71,7 @@ def _format_cell(val):
         pass
     return str(val)
 
-def __tabula_run__(user_code, csv_content=None):
+def __tabula_run__(user_code, csv_content=None, extra_csvs=None):
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     sys.stdout = stdout_io = io.StringIO()
@@ -49,6 +89,18 @@ def __tabula_run__(user_code, csv_content=None):
             if 'df' not in globals() or globals().get('__tabula_last_csv__') != csv_content:
                 globals()['df'] = pd.read_csv(io.StringIO(csv_content), skip_blank_lines=False)
                 globals()['__tabula_last_csv__'] = csv_content
+
+        if extra_csvs is not None:
+            _dfs = globals().get('dfs')
+            if not isinstance(_dfs, dict):
+                _dfs = {}
+            _extra_dict = extra_csvs.to_py() if hasattr(extra_csvs, 'to_py') else dict(extra_csvs)
+            for _k, _v in _extra_dict.items():
+                if _v is not None and len(_v) > 0:
+                    _dfs[str(_k)] = pd.read_csv(io.StringIO(_v), skip_blank_lines=False)
+            globals()['dfs'] = _dfs
+            if 'df' not in globals() and len(_dfs) > 0:
+                globals()['df'] = next(iter(_dfs.values()))
             
         plt.close('all')
         
@@ -129,7 +181,7 @@ async function getOrInitPyodide(): Promise<any> {
 }
 
 worker.onmessage = async (event: MessageEvent<PythonWorkerRequest>) => {
-  const { id, action, code, csvData } = event.data
+  const { id, action, code, csvData, extraCsvs } = event.data
 
   if (action === 'init') {
     try {
@@ -178,7 +230,9 @@ globals().pop('__tabula_last_csv__', None)
       }
 
       const runner = pyodide.globals.get('__tabula_run__')
-      const proxyResult = runner(code ?? '', csvData ?? null)
+      const extraProxy = extraCsvs ? pyodide.toPy(extraCsvs) : null
+      const proxyResult = runner(code ?? '', csvData ?? null, extraProxy)
+      if (extraProxy && typeof extraProxy.destroy === 'function') extraProxy.destroy()
       const jsResult = proxyResult.toJs({ dict_converter: Object.fromEntries })
       proxyResult.destroy()
 
