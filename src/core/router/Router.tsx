@@ -36,6 +36,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   const navigate = useCallback((to: string, options: { replace?: boolean } = {}) => {
     const target = normalizeRouteTarget(to)
     const current = `${window.location.pathname}${window.location.search}`
+    const prevPathname = window.location.pathname
     if (target === current && !window.location.hash) return
 
     if (options.replace) {
@@ -44,6 +45,13 @@ export function RouterProvider({ children }: { children: ReactNode }) {
       window.history.pushState(null, '', target)
     }
     setLocation(readCurrentLocation())
+    if (window.location.pathname !== prevPathname && typeof window.scrollTo === 'function') {
+      try {
+        window.scrollTo({ top: 0, left: 0 })
+      } catch {
+        // ignore in non-browser test runners
+      }
+    }
   }, [])
 
   const back = useCallback(() => {

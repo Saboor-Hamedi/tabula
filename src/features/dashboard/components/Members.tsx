@@ -165,7 +165,11 @@ export function Members({ members, loading = false }: MembersProps) {
                   <td>
                     <span className={`dash-plan is-${member.tier ?? 'free'}`}>{plan}</span>
                   </td>
-                  <td className="dash-cell-status">{status}</td>
+                  <td className="dash-cell-status">
+                    <span className={`dash-status-tag is-${member.subscription_status ?? 'none'}`}>
+                      {status}
+                    </span>
+                  </td>
                   <td className="dash-cell-date">{formatDate(member.current_period_start)}</td>
                   <td className="dash-cell-date">
                     {formatDate(member.current_period_end)}

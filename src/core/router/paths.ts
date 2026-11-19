@@ -9,7 +9,11 @@
  */
 
 export const ROUTES = {
-  landing: '/landing',
+  home: '/',
+  landing: '/',
+  features: '/features',
+  sources: '/sources',
+  pricing: '/pricing',
   dashboard: '/app',
   userDashboard: '/:username/app',
   workspace: '/workspace',
@@ -28,6 +32,9 @@ export type RouteName = keyof typeof ROUTES
 
 const RESERVED_SLUGS = new Set([
   'landing',
+  'features',
+  'sources',
+  'pricing',
   'app',
   'workspace',
   'posts',

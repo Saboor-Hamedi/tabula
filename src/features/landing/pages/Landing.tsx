@@ -4,29 +4,25 @@ import { ROUTES, userPath } from '../../../core/router/paths'
 import { useAuthUser, useUserSlug } from '../../auth/useProfile'
 import { Header } from '../../header/Header'
 import { DEMO_SCENARIOS, type DemoScenario } from '../data'
-import { Comparison } from '../components/Comparison'
 import { Cta } from '../components/Cta'
 import { Demo } from '../components/Demo'
-import { Faq } from '../components/Faq'
-import { Features } from '../components/Features'
 import { Footer } from '../components/Footer'
 import { Hero } from '../components/Hero'
 import { Insights } from '../components/Insights'
-import { Privacy } from '../components/Privacy'
-import { Pricing } from '../components/Pricing'
+import { ResearchSourcesSection } from '../components/ResearchSourcesSection'
 
 /**
- * The front page.
+ * The home page (`/`).
  *
- * Uses the same unified `<Header />` as Insights and Articles, and drives
- * smooth scroll-reveal motion across every section and post card.
+ * Focused editorial home page; Capabilities (`/features`), Open Research Sources
+ * (`/sources`), Pricing (`/pricing`), and Published Posts (`/posts`) live on
+ * their own dedicated routes.
  */
 export function Landing() {
   const { navigate } = useRouter()
   const user = useAuthUser()
   const userSlug = useUserSlug()
   const [activeScenario, setActiveScenario] = useState<DemoScenario>(DEMO_SCENARIOS[0])
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
   const pageRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -67,7 +63,6 @@ export function Landing() {
 
     observeAll()
 
-    // Watch for async-loaded posts appearing in the feed
     const mutation = new MutationObserver(() => observeAll())
     mutation.observe(root, { childList: true, subtree: true })
 
@@ -115,21 +110,9 @@ export function Landing() {
         onNavigateToApp={navigateToWorkspace}
       />
 
+      <ResearchSourcesSection />
+
       <Insights />
-
-      <Privacy />
-
-      <Features />
-
-      <Comparison />
-
-      <Pricing
-        isAuthenticated={isSignedInAccount}
-        onNavigateToAuth={navigateToWorkspace}
-        onNavigateToApp={navigateToWorkspace}
-      />
-
-      <Faq openIndex={openFaqIndex} setOpenIndex={setOpenFaqIndex} />
 
       <Cta
         isAuthenticated={isSignedInAccount}

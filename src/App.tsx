@@ -12,18 +12,22 @@ import { useAuthUser, useUserSlug } from './features/auth/useProfile'
 import { VerifyEmailScreen } from './features/auth/VerifyEmailScreen'
 import { PricingModal } from './features/billing/PricingModal'
 import { Analyse } from './features/dashboard'
-import { Landing } from './features/landing'
+import { FeaturesPage, Landing, PricingPage } from './features/landing'
 import { Article, Insights } from './features/posts'
+import { SourcesPage } from './features/sources'
 
 /**
  * The route table.
  *
  * Clean pathname URLs:
- *   /landing               the front page
- *   /:username/app         Analyse — the signed-in home (also /app)
+ *   /                      the home page
+ *   /features              capabilities, comparison & privacy architecture
+ *   /sources               open research sources & ready-to-query CSV files
+ *   /pricing               plans, quotas & FAQ
+ *   /posts                 published insights index
+ *   /posts/:slug           one published insight
+ *   /:username/app         Analyse — the signed-in dashboard (also /app)
  *   /:username/workspace   the chat workspace (also /workspace)
- *   /insights              the published insights index
- *   /insights/:slug        one published insight
  *   /login /signup /verify
  */
 
@@ -78,7 +82,11 @@ export function AppRoutes() {
     <>
       <UserUrlSync />
       <Routes>
-        <Route path={ROUTES.landing} element={<Landing />} />
+        <Route path={ROUTES.home} element={<Landing />} />
+        <Route path="/landing" element={<Navigate to={ROUTES.home} />} />
+        <Route path={ROUTES.features} element={<FeaturesPage />} />
+        <Route path={ROUTES.sources} element={<SourcesPage />} />
+        <Route path={ROUTES.pricing} element={<PricingPage />} />
         <Route path={ROUTES.dashboard} element={dashboardElement} />
         <Route path={ROUTES.userDashboard} element={dashboardElement} />
         <Route path={ROUTES.workspace} element={workspaceElement} />
@@ -90,7 +98,7 @@ export function AppRoutes() {
         <Route path={ROUTES.signIn} element={<AuthScreen initialMode="signin" />} />
         <Route path={ROUTES.signUp} element={<AuthScreen initialMode="signup" />} />
         <Route path={ROUTES.verify} element={<VerifyEmailScreen />} />
-        <Route path={ROUTES.notFound} element={<Navigate to={ROUTES.landing} />} />
+        <Route path={ROUTES.notFound} element={<Navigate to={ROUTES.home} />} />
       </Routes>
     </>
   )

@@ -5,7 +5,6 @@ import { signOutAccount } from '../../core/supabase/signOut'
 import { useAuthUser, useProfile, useUserSlug } from '../auth/useProfile'
 import { BackTop } from '../common/BackTop'
 import {
-  ArrowRightIcon,
   PanelRightIcon,
   SidebarIcon,
   TrashIcon,
@@ -65,6 +64,11 @@ export function Header({
   const isDashboard = variant === 'dashboard'
   const isPage = variant === 'page'
   const isLanding = path === ROUTES.landing || path === '/'
+  const isAuth =
+    path === ROUTES.signIn ||
+    path === ROUTES.signUp ||
+    path.startsWith('/login') ||
+    path.startsWith('/signup')
   const canClearChat = isWorkspace && Boolean(session?.activeSession) && (session?.messages.length ?? 0) > 0
 
   const [scrolled, setScrolled] = useState(false)
@@ -99,7 +103,7 @@ export function Header({
         ) : null}
 
         {!isWorkspace ? (
-          <Brand to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />
+          <Brand compact to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />
         ) : null}
 
         {isDashboard && onToggleSidebar ? (
@@ -114,23 +118,17 @@ export function Header({
           </span>
         ) : null}
 
-        {!isWorkspace && !isDashboard ? <Nav isAuthenticated={isSignedIn} /> : null}
-
         {!online ? <span className="offline-pill">Offline</span> : null}
       </div>
 
+      {!isWorkspace && !isDashboard ? (
+        <div className="app-header-center">
+          <Nav isAuthenticated={isSignedIn} />
+        </div>
+      ) : null}
+
       <div className="app-header-right">
-        {isPage ? <HeaderSearch /> : null}
-        {isPage && (!isLanding || isSignedIn) ? (
-          <button
-            type="button"
-            className="header-workspace-cta"
-            onClick={() => navigate(workspaceTarget)}
-          >
-            <span>{isSignedIn ? 'Workspace' : 'Analyze Free'}</span>
-            <ArrowRightIcon size={13} />
-          </button>
-        ) : null}
+        {isPage && !isLanding && !isAuth ? <HeaderSearch /> : null}
         {canClearChat && actions ? (
           <IconButton label="Clear chat history" onClick={actions.requestClearChat}>
             <TrashIcon size={16} />

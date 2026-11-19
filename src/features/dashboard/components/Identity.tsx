@@ -44,10 +44,8 @@ export function Identity({
           <h2 className="dash-identity-name">{name}</h2>
           {email ? <p className="dash-identity-email">{email}</p> : null}
           <div className="dash-badges">
-            {role ? (
-              <span className={`dash-badge ${role === 'admin' ? 'is-admin' : ''}`}>
-                {role === 'admin' ? 'Administrator' : 'Member'}
-              </span>
+            {role && role !== 'admin' ? (
+              <span className="dash-badge">Member</span>
             ) : null}
             {tier ? <span className="dash-badge">{tier}</span> : null}
             {degraded ? (

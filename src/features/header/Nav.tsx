@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
 import { Link, useRouter } from '../../core/router'
 import { ROUTES } from '../../core/router/paths'
 
 /**
- * Top navigation for public pages (front page and posts).
- * Includes smooth-scroll section links and Posts.
+ * Top navigation for public pages.
+ *
+ * Uses real multi-page routes (`/`, `/features`, `/sources`, `/pricing`, `/posts`)
+ * so clicking any item opens its dedicated page cleanly via the router.
  */
 
 export interface NavProps {
@@ -12,78 +13,44 @@ export interface NavProps {
   isAuthenticated?: boolean
 }
 
-const SECTION_LINKS = [
-  { id: 'demo', label: 'Demo' },
-  { id: 'features', label: 'Features' },
-  { id: 'privacy', label: 'Privacy' },
-  { id: 'pricing', label: 'Pricing' },
-  { id: 'faq', label: 'FAQ' },
+const NAV_PAGES = [
+  { to: ROUTES.home, label: 'Home', match: (p: string) => p === '/' || p === '/landing' },
+  { to: ROUTES.features, label: 'Features', match: (p: string) => p === '/features' },
+  {
+    to: ROUTES.sources,
+    label: 'Sources',
+    match: (p: string) => p === '/sources' || p.startsWith('/sources/'),
+  },
+  { to: ROUTES.pricing, label: 'Pricing', match: (p: string) => p === '/pricing' },
+  {
+    to: ROUTES.posts,
+    label: 'Posts',
+    match: (p: string) =>
+      p === '/posts' ||
+      p.startsWith('/posts/') ||
+      p === '/insights' ||
+      p.startsWith('/insights/'),
+  },
 ] as const
 
 export function Nav(_props: NavProps) {
-  const { path, navigate } = useRouter()
-  const isLanding = path === ROUTES.landing || path === '/'
-  const [activeSection, setActiveSection] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!isLanding) {
-      setActiveSection(null)
-      return
-    }
-    const updateActive = () => {
-      const triggerY = Math.min(220, window.innerHeight * 0.32)
-      let current: string | null = null
-      for (const sec of SECTION_LINKS) {
-        const el = document.getElementById(sec.id)
-        if (!el) continue
-        const rect = el.getBoundingClientRect()
-        if (rect.top <= triggerY && rect.bottom > 80) {
-          current = sec.id
-        }
-      }
-      setActiveSection(current)
-    }
-    updateActive()
-    window.addEventListener('scroll', updateActive, { passive: true })
-    return () => window.removeEventListener('scroll', updateActive)
-  }, [isLanding])
-
-  const scrollToSection = (sectionId: string) => {
-    setActiveSection(sectionId)
-    if (isLanding) {
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
-    }
-    navigate(ROUTES.landing)
-    window.setTimeout(() => {
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 80)
-  }
-
-  const isPostsActive =
-    path === ROUTES.posts ||
-    path.startsWith('/posts/') ||
-    path === ROUTES.insights ||
-    path.startsWith('/insights/')
+  const { path } = useRouter()
 
   return (
-    <nav className="header-nav" aria-label="Product">
-      {SECTION_LINKS.map((sec) => (
-        <button
-          key={sec.id}
-          type="button"
-          className={`header-nav-link ${isLanding && activeSection === sec.id ? 'is-active' : ''}`}
-          onClick={() => scrollToSection(sec.id)}
-        >
-          {sec.label}
-        </button>
-      ))}
-      <Link
-        to={ROUTES.posts}
-        className={`header-nav-link ${isPostsActive ? 'is-active' : ''}`}
-      >
-        Posts
-      </Link>
+    <nav className="header-nav" aria-label="Main navigation">
+      {NAV_PAGES.map((item) => {
+        const active = item.match(path)
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            className={`header-nav-link ${active ? 'is-active' : ''}`}
+            aria-current={active ? 'page' : undefined}
+          >
+            <span className="header-nav-link-text">{item.label}</span>
+          </Link>
+        )
+      })}
     </nav>
   )
 }

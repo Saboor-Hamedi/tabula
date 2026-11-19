@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useProfile } from '../auth/useProfile'
+import { useAuthUser, useProfile } from '../auth/useProfile'
 import { CheckIcon, MoonIcon, SunIcon, UserIcon } from '../common/Icons'
 import { useTheme } from '../common/useTheme'
 
@@ -31,6 +31,7 @@ export function Account({
   onOpenWorkspace,
 }: AccountProps) {
   const profile = useProfile()
+  const user = useAuthUser()
   const { theme, toggleTheme } = useTheme()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -69,8 +70,14 @@ export function Account({
     )
   }
 
-  const name = profile?.display_name ?? email ?? 'Member'
+  const name =
+    profile?.display_name ??
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.name ??
+    email ??
+    'Member'
   const initial = name.trim().charAt(0).toUpperCase() || 'M'
+  const avatarUrl = profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null
 
   return (
     <div className="header-account" ref={menuRef}>
@@ -82,8 +89,8 @@ export function Account({
         aria-haspopup="menu"
         title={email ?? name}
       >
-        {profile?.avatar_url ? (
-          <img className="header-account-avatar" src={profile.avatar_url} alt="" />
+        {avatarUrl ? (
+          <img className="header-account-avatar" src={avatarUrl} alt="" />
         ) : (
           <span className="header-account-avatar is-fallback" aria-hidden>
             {initial}

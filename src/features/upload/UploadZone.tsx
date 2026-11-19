@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { ACCEPTED_EXTENSIONS } from '../../core/constants'
 import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
 import {
@@ -21,6 +21,29 @@ export function UploadZone() {
 
   const busy = upload.phase === 'reading' || upload.phase === 'ingesting'
   const trialExpired = Boolean(usage?.trialExpired)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const pending = sessionStorage.getItem('tabula:pending-sample')
+    if (!pending) return
+    sessionStorage.removeItem('tabula:pending-sample')
+    const [fileUrl, fileName] = pending.split('::')
+    if (!fileUrl || !fileName) return
+    const loadPending = async () => {
+      setSampleLoading(true)
+      try {
+        const response = await fetch(fileUrl)
+        if (!response.ok) return
+        const blob = await response.blob()
+        await uploadFile(new File([blob], fileName, { type: 'text/csv' }))
+      } catch (err) {
+        console.error('Failed to load pending sample:', err)
+      } finally {
+        setSampleLoading(false)
+      }
+    }
+    void loadPending()
+  }, [uploadFile])
 
   const loadSample = async () => {
     if (trialExpired) {

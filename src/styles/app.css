@@ -6031,28 +6031,35 @@ button.chip-action:disabled {
 .header-account-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 2px 8px 2px 4px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
   background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
+  outline: none;
   transition: all var(--transition);
 }
 
-.header-account-btn:hover {
+.header-account-btn:hover,
+.header-account-btn.is-open,
+.header-account-btn:focus,
+.header-account-btn:focus-visible {
   background: var(--surface-hover);
-  border-color: var(--accent);
+  border: none;
+  outline: none;
 }
 
 .header-account-avatar {
-  width: 20px;
-  height: 20px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: var(--accent);
-  color: #ffffff;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text);
   font-size: 11px;
   font-weight: 700;
   display: grid;
@@ -7237,8 +7244,8 @@ button.chip-action:disabled {
 [data-theme='dark'] .app-shell.is-workspace-shell .sidebar,
 [data-theme='dark'] .app-shell.is-workspace-shell .app-main,
 [data-theme='dark'] .app-shell.is-workspace-shell .inspector {
-  background: #181818;
-  border-color: #282828;
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .app-shell.is-workspace-shell .resize-handle {
@@ -7476,9 +7483,11 @@ button.chip-action:disabled {
 
 .auth-v2-page {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .auth-v2-main {
@@ -7487,8 +7496,8 @@ button.chip-action:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px 48px;
-  overflow: hidden;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .auth-v2-grid-bg {
@@ -7508,66 +7517,70 @@ button.chip-action:disabled {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 400px;
-  padding: 28px 26px 22px;
-  border-radius: 20px;
+  max-width: 380px;
+  padding: 24px 24px 20px;
+  border-radius: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: 0 22px 54px -24px rgba(13, 27, 25, 0.22);
+  box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.25);
+  transition: all 200ms ease;
 }
 
 @media (max-width: 440px) {
   .auth-v2-card {
-    padding: 22px 18px 18px;
-    border-radius: 16px;
+    padding: 18px 16px 16px;
+    border-radius: 14px;
   }
 }
 
 .auth-v2-head {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .auth-v2-logo {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
-  margin: 0 auto 12px;
+  margin: 0 auto 8px;
+  display: block;
 }
 
 .auth-v2-title {
-  margin: 0 0 5px;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.028em;
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
   color: var(--text);
+  line-height: 1.25;
 }
 
 .auth-v2-sub {
   margin: 0;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .auth-v2-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 11px;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .auth-v2-tab {
-  height: 34px;
+  height: 32px;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
@@ -7580,28 +7593,28 @@ button.chip-action:disabled {
 .auth-v2-tab.is-active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .auth-v2-social {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .auth-v2-social-btn {
   width: 100%;
-  height: 40px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  border-radius: 10px;
+  gap: 8px;
+  border-radius: 9px;
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease;
@@ -7616,8 +7629,11 @@ button.chip-action:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 6px 0 2px;
-  font-size: 11.5px;
+  margin: 10px 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
 }
 
@@ -7633,10 +7649,10 @@ button.chip-action:disabled {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  margin-bottom: 14px;
-  font-size: 12.5px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  margin-bottom: 12px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -7658,13 +7674,13 @@ button.chip-action:disabled {
 .auth-v2-form {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 10px;
 }
 
 .auth-v2-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .auth-v2-label-row {
@@ -7674,32 +7690,32 @@ button.chip-action:disabled {
 }
 
 .auth-v2-label {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 650;
   color: var(--text-secondary);
 }
 
 .auth-v2-input {
   width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border-radius: 10px;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 8px;
   border: 1px solid var(--border-strong);
   background: var(--surface-2);
   color: var(--text);
-  font-size: 14px;
+  font-size: 13.5px;
   outline: none;
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
 .auth-v2-input.is-pwd {
-  padding-right: 38px;
+  padding-right: 36px;
 }
 
 .auth-v2-input:focus {
   background: var(--surface);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .auth-v2-pwd-wrap {
@@ -7710,11 +7726,11 @@ button.chip-action:disabled {
 
 .auth-v2-pwd-toggle {
   position: absolute;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
   border: none;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
   display: inline-flex;
@@ -7731,17 +7747,17 @@ button.chip-action:disabled {
 .auth-v2-submit {
   margin-top: 4px;
   width: 100%;
-  height: 42px;
+  height: 38px;
   border-radius: var(--radius-full);
   border: none;
   background: var(--accent);
   color: var(--accent-contrast);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   cursor: pointer;
   transition: background 160ms ease, transform 160ms ease;
 }
@@ -7757,7 +7773,7 @@ button.chip-action:disabled {
 }
 
 .auth-v2-aux {
-  margin-top: 14px;
+  margin-top: 10px;
   text-align: center;
 }
 
@@ -7768,7 +7784,7 @@ button.chip-action:disabled {
   background: none;
   border: none;
   padding: 0;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   cursor: pointer;
@@ -7779,14 +7795,14 @@ button.chip-action:disabled {
 }
 
 .auth-v2-foot {
-  margin-top: 18px;
-  padding-top: 14px;
+  margin-top: 14px;
+  padding-top: 11px;
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 

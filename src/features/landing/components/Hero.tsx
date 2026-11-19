@@ -1,5 +1,6 @@
 import { ArrowRightIcon, ChevronDownIcon } from '../../common/Icons'
 import { HeroPixelField } from '../../common/HeroPixelField'
+import { HeroSearch } from './HeroSearch'
 
 /**
  * The hero.
@@ -33,7 +34,9 @@ export function Hero({
       </div>
 
       <div className="landing-container landing-hero-inner">
-        <h1 className="landing-hero-title hero-anim hero-anim-1">
+        <HeroSearch />
+
+        <h1 className="landing-hero-title hero-anim hero-anim-2">
           Ask your spreadsheets
           <span className="landing-hero-serif">anything.</span>
         </h1>

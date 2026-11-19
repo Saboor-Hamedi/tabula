@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from '../../../core/router'
+import { useQuery, useRouter } from '../../../core/router'
 import { ROUTES, userPath } from '../../../core/router/paths'
 import {
   loadPersistedWorkspace,
@@ -36,6 +36,7 @@ import {
 import { Insights } from '../components/Insights'
 import { Members } from '../components/Members'
 import { Metric } from '../components/Metric'
+import { ResearchSources, type ReadyDatasetFile } from '../../sources'
 import {
   listDeletedAccounts,
   listMembers,
@@ -59,7 +60,7 @@ const EXIT_REASONS = [
  * - Administrator accounts are strictly protected from self-deletion (both UI & DB)
  */
 
-type DashSection = 'overview' | 'members' | 'stories' | 'account'
+type DashSection = 'overview' | 'sources' | 'members' | 'stories' | 'account'
 type MemberFilter = 'all' | 'subscribers' | 'trialing' | 'admins'
 
 interface LocalDatasetItem {
@@ -95,8 +96,27 @@ export function Analyse() {
   const isAdmin = useIsAdmin()
   const userSlug = useUserSlug()
   const displayName = useDisplayName()
+  const query = useQuery()
+  const urlSection = query.get('section') as DashSection | null
 
-  const [section, setSection] = useState<DashSection>('overview')
+  const [section, setSection] = useState<DashSection>(() => {
+    if (
+      urlSection &&
+      ['overview', 'sources', 'members', 'stories', 'account'].includes(urlSection)
+    ) {
+      return urlSection
+    }
+    return 'overview'
+  })
+
+  useEffect(() => {
+    if (
+      urlSection &&
+      ['overview', 'sources', 'members', 'stories', 'account'].includes(urlSection)
+    ) {
+      setSection(urlSection)
+    }
+  }, [urlSection])
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all')
   const [stats, setStats] = useState<WorkspaceStats | null>(null)
   const { usage } = useUsageStatus()
@@ -313,6 +333,15 @@ export function Analyse() {
     navigate(userPath('/workspace', userSlug))
   }
 
+  const handleLoadSampleDataset = async (file: ReadyDatasetFile) => {
+    try {
+      sessionStorage.setItem('tabula:pending-sample', `${file.fileUrl}::${file.fileName}`)
+      navigate(userPath('/workspace', userSlug))
+    } catch {
+      window.open(file.fileUrl, '_blank')
+    }
+  }
+
   const handleSaveName = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!user?.id) return
@@ -358,21 +387,20 @@ export function Analyse() {
   const avatarUrl = profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null
   const initial = displayName.trim().length > 0 ? displayName.trim().slice(0, 1).toUpperCase() : '?'
 
-  const planLabel = isAdmin
-    ? 'Administrator'
-    : usage?.trialExpired
-      ? 'Trial Ended'
-      : quotaExhausted
-        ? 'Limit Reached'
-        : usage?.status === 'trialing' && usage?.tier === 'free'
-          ? `Free Trial · ${usage.trialDaysRemaining ?? 0}d left`
-          : (profile?.tier ?? 'Free').toUpperCase()
+  const planLabel = usage?.trialExpired
+    ? 'Trial Ended'
+    : quotaExhausted
+      ? 'Limit Reached'
+      : usage?.status === 'trialing' && usage?.tier === 'free'
+        ? `Free Trial · ${usage.trialDaysRemaining ?? 0}d left`
+        : (profile?.tier ?? 'Pro').toUpperCase()
 
   const activeSection: DashSection =
     !isAdmin && (section === 'members' || section === 'stories') ? 'overview' : section
 
   const navItems: { id: DashSection; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: <ActivityIcon size={14} /> },
+    { id: 'sources', label: 'Research Sources', icon: <DatabaseIcon size={14} /> },
     ...(isAdmin
       ? [
           {
@@ -423,7 +451,7 @@ export function Analyse() {
               <div className="dash-sidebar-identity">
                 <span className="dash-sidebar-name">{displayName}</span>
                 <span className="dash-sidebar-role">
-                  {isAdmin ? 'Administrator' : planLabel}
+                  {profile?.tier ? profile.tier.toUpperCase() : 'MEMBER'}
                 </span>
               </div>
             </div>
@@ -484,18 +512,20 @@ export function Analyse() {
             <div className="dash-hero-copy">
               <div className="dash-hero-eyebrow-row">
                 <span className="dash-eyebrow">
-                  {activeSection === 'overview' && (isAdmin ? 'Admin Console' : 'Dashboard')}
-                  {activeSection === 'members' && 'Admin · Directory'}
-                  {activeSection === 'stories' && 'Admin · Editorial'}
+                  {activeSection === 'overview' && 'Dashboard'}
+                  {activeSection === 'sources' && 'Open Research & Datasets'}
+                  {activeSection === 'members' && 'Directory'}
+                  {activeSection === 'stories' && 'Editorial'}
                   {activeSection === 'account' && 'Account & Security'}
                 </span>
-                <span className={`dash-status-pill ${isAdmin ? 'is-admin' : ''}`}>
-                  {planLabel}
-                </span>
+                {!isAdmin ? (
+                  <span className="dash-status-pill">{planLabel}</span>
+                ) : null}
               </div>
               <h1 className="dash-title">
                 {activeSection === 'overview' &&
                   (user ? `Welcome back, ${displayName.split(' ')[0]}` : 'Your Workspace')}
+                {activeSection === 'sources' && 'Research Sources & Open Data'}
                 {activeSection === 'members' && 'Members & Subscriptions'}
                 {activeSection === 'stories' && 'Published'}
                 {activeSection === 'account' && 'Profile, Preferences & Security'}
@@ -505,6 +535,8 @@ export function Analyse() {
                   (isAdmin
                     ? 'Monitor members, active plans, and your local spreadsheets in one place.'
                     : 'Pick up where you left off and manage your workspace.')}
+                {activeSection === 'sources' &&
+                  'Discover free open scientific repositories like Kaggle and Hugging Face, or analyze benchmark workbooks directly in Tabula.'}
                 {activeSection === 'members' &&
                   'Filter accounts by plan, trial status, or administrator role.'}
                 {activeSection === 'stories' &&
@@ -581,8 +613,10 @@ export function Analyse() {
             </div>
           ) : null}
 
-          {/* SECTION: OVERVIEW */}
-          {activeSection === 'overview' && (
+          {/* Dynamic Content Pane with Smooth View Transition */}
+          <div key={activeSection} className="dash-section-pane">
+            {/* SECTION: OVERVIEW */}
+            {activeSection === 'overview' && (
             <>
               <section className="dash-metrics-strip" aria-label="Overview metrics">
                 {isAdmin ? (
@@ -826,6 +860,11 @@ export function Analyse() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* SECTION: SOURCES */}
+          {activeSection === 'sources' && (
+            <ResearchSources onLoadDatasetFile={handleLoadSampleDataset} />
           )}
 
           {/* SECTION: MEMBERS (ADMIN ONLY) */}
@@ -1147,6 +1186,7 @@ export function Analyse() {
               </div>
             </div>
           )}
+          </div>
         </main>
       </div>
     </div>

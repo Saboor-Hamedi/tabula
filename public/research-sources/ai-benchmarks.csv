@@ -1,0 +1,16 @@
+Model_Name,Creator,Release_Year,Parameters_Billion,MMLU_Score_Pct,Context_Window_Tokens,Weights_Type,License
+Gemini 1.5 Pro,Google DeepMind,2024,350,85.9,2000000,Proprietary,Commercial API
+Llama 3.3 70B,Meta AI,2024,70,88.6,128000,Open Weights,Llama 3.3 Community
+Claude 3.5 Sonnet,Anthropic,2024,200,88.7,200000,Proprietary,Commercial API
+GPT-4o,OpenAI,2024,220,88.7,128000,Proprietary,Commercial API
+Mistral Large 2,Mistral AI,2024,123,84.0,128000,Open Weights,Mistral Research License
+Qwen 2.5 72B,Alibaba Cloud,2024,72,86.1,128000,Open Weights,Apache 2.0
+DeepSeek V3,DeepSeek AI,2024,671,88.5,128000,Open Weights,MIT License
+Phi-3.5 Medium,Microsoft,2024,14,78.2,128000,Open Weights,MIT License
+Gemma 2 27B,Google,2024,27,75.2,8192,Open Weights,Gemma Terms of Use
+Llama 3 8B,Meta AI,2024,8,66.6,8192,Open Weights,Llama 3 Community
+Command R+,Cohere,2024,104,75.7,128000,Open Weights,CC-BY-NC 4.0
+StarCoder 2 15B,BigCode / ServiceNow,2024,15,64.2,16384,Open Weights,BigCode OpenRAIL-M
+DBRX Instruct,Databricks,2024,132,73.7,32768,Open Weights,Databricks Open Model
+Yi 1.5 34B,01.AI,2024,34,81.9,4096,Open Weights,Apache 2.0
+Falcon 2 11B,TII UAE,2024,11,62.8,8192,Open Weights,Apache 2.0
