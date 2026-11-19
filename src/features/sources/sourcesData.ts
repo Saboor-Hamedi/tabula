@@ -58,7 +58,7 @@ export const RESEARCH_REPOSITORIES: ResearchRepository[] = [
       'Authoritative empirical research and global datasets on world poverty, carbon emissions, energy transition, disease mortality, and education.',
     url: 'https://ourworldindata.org/',
     datasetCount: '3,000+ Metrics',
-    formats: ['CSV', 'JSON', 'Interactive'],
+    formats: ['CSV', 'JSON', 'API'],
     tags: ['Climate', 'Global Health', 'Energy', 'Poverty', 'Empirical'],
     badge: 'Peer-Reviewed Data',
     licenseType: 'Creative Commons CC-BY 4.0',

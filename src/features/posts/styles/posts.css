@@ -573,6 +573,12 @@ a.post-tag:hover {
   padding: 24px 20px 72px;
 }
 
+@media (max-width: 640px) {
+  .post-article {
+    padding: 16px 5px 56px;
+  }
+}
+
 .post-article-topbar {
   display: flex;
   align-items: center;
@@ -844,7 +850,7 @@ a.post-tag:hover {
   border: 1px solid var(--border);
 }
 
-/* Mermaid diagrams in posts: pure image display, no header, no background box */
+/* Mermaid diagrams in posts: slim transparent header with text-color highlights, no background box */
 .post-body {
   counter-reset: post-figure;
 }
@@ -859,7 +865,55 @@ a.post-tag:hover {
   padding: 0 !important;
 }
 
-.post-body .mermaid-wrapper-header,
+.post-body .mermaid-wrapper-header {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0 6px !important;
+  margin-bottom: 10px;
+  background: transparent !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+
+.post-body .mermaid-wrapper-header .mermaid-tabs {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: 10px;
+}
+
+.post-body .mermaid-wrapper-header .mermaid-tab,
+.post-body .mermaid-wrapper-header .tool-btn {
+  height: 22px !important;
+  padding: 0 4px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  transition: color 140ms ease;
+}
+
+.post-body .mermaid-wrapper-header .mermaid-tab:hover,
+.post-body .mermaid-wrapper-header .tool-btn:hover {
+  background: transparent !important;
+  color: var(--text) !important;
+}
+
+.post-body .mermaid-wrapper-header .mermaid-tab.is-active {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--accent) !important;
+  font-weight: 700;
+}
+
 .post-body .mermaid-image-hint {
   display: none !important;
 }

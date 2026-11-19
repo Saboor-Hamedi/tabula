@@ -13,7 +13,7 @@ export interface NavProps {
   isAuthenticated?: boolean
 }
 
-const NAV_PAGES = [
+export const NAV_PAGES = [
   { to: ROUTES.home, label: 'Home', match: (p: string) => p === '/' || p === '/landing' },
   { to: ROUTES.features, label: 'Features', match: (p: string) => p === '/features' },
   {
