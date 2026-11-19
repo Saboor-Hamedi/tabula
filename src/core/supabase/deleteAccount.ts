@@ -1,17 +1,25 @@
 import { clearPersistedWorkspace } from '../storage/persistence'
 import { supabase } from './client'
 
+export interface DeleteAccountFeedback {
+  reason?: string | null
+  note?: string | null
+}
+
 /**
  * Permanently deletes the currently signed-in user's account via the
- * `public.delete_my_account()` Supabase RPC, wipes local workspace data,
- * and signs out cleanly.
+ * `public.delete_my_account()` Supabase RPC (with optional exit feedback),
+ * wipes local workspace data, and signs out cleanly.
  */
-export async function deleteMyAccount(): Promise<void> {
+export async function deleteMyAccount(feedback?: DeleteAccountFeedback): Promise<void> {
   if (!supabase) {
     throw new Error('Account deletion requires a configured Supabase project.')
   }
 
-  const { error } = await supabase.rpc('delete_my_account')
+  const p_reason = feedback?.reason?.trim() || null
+  const p_note = feedback?.note?.trim() || null
+
+  const { error } = await supabase.rpc('delete_my_account', { p_reason, p_note })
   if (error) {
     throw new Error(error.message || 'Could not delete account.')
   }

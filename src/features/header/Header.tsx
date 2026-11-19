@@ -5,6 +5,7 @@ import { signOutAccount } from '../../core/supabase/signOut'
 import { useAuthUser, useProfile, useUserSlug } from '../auth/useProfile'
 import { BackTop } from '../common/BackTop'
 import {
+  ArrowRightIcon,
   PanelRightIcon,
   SidebarIcon,
   TrashIcon,
@@ -67,6 +68,9 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [isPage])
 
+  const isSignedIn = Boolean(user && !user.is_anonymous)
+  const workspaceTarget = isSignedIn ? userPath('/workspace', userSlug) : ROUTES.workspace
+
   return (
     <>
     <header
@@ -88,7 +92,7 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
         {!isWorkspace ? (
           <>
             <Brand to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />
-            {!isDashboard ? <Nav isAuthenticated={Boolean(user)} /> : null}
+            {!isDashboard ? <Nav isAuthenticated={isSignedIn} /> : null}
           </>
         ) : null}
 
@@ -97,6 +101,16 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
 
       <div className="app-header-right">
         {isPage ? <HeaderSearch /> : null}
+        {isPage ? (
+          <button
+            type="button"
+            className="header-workspace-cta"
+            onClick={() => navigate(workspaceTarget)}
+          >
+            <span>{isSignedIn ? 'Workspace' : 'Analyze Free'}</span>
+            <ArrowRightIcon size={13} />
+          </button>
+        ) : null}
         {canClearChat && actions ? (
           <IconButton label="Clear chat history" onClick={actions.requestClearChat}>
             <TrashIcon size={16} />
@@ -119,13 +133,13 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
 
         {!isWorkspace ? (
           <Account
-            isAuthenticated={Boolean(user)}
+            isAuthenticated={isSignedIn}
             email={user?.email ?? profile?.email ?? null}
             showWorkspaceLink={!isDashboard}
             onSignIn={onSignIn ?? (() => navigate(ROUTES.signIn))}
             onSignUp={onSignUp ?? (() => navigate(ROUTES.signUp))}
             onSignOut={() => void signOutAccount()}
-            onOpenWorkspace={() => navigate(userPath('/workspace', userSlug))}
+            onOpenWorkspace={() => navigate(workspaceTarget)}
           />
         ) : null}
       </div>

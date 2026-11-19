@@ -49,7 +49,7 @@ export function Hero({
             className="landing-cta-btn landing-cta-primary landing-cta-lg landing-cta-sheen"
             onClick={() => (isAuthenticated ? onNavigateToApp() : onNavigateToAuth('signup'))}
           >
-            <span>{isAuthenticated ? 'Open Workspace' : 'Start Free Trial'}</span>
+            <span>{isAuthenticated ? 'Open Workspace' : 'Analyze Free Now'}</span>
             <ArrowRightIcon size={16} />
           </button>
 
@@ -64,7 +64,7 @@ export function Hero({
         </div>
 
         <p className="landing-hero-footnote hero-anim hero-anim-4">
-          7-day free trial &nbsp;·&nbsp; No credit card required &nbsp;·&nbsp; Works offline
+          No sign-up needed to try &nbsp;·&nbsp; Drop a file &amp; start immediately &nbsp;·&nbsp; Works offline
         </p>
       </div>
 

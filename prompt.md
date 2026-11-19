@@ -1,24 +1,62 @@
-Traceback (most recent call last):
-File "/lib/python3.12/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc
-return self.\_engine.get_loc(casted_key)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "index.pyx", line 167, in pandas.\_libs.index.IndexEngine.get_loc
-File "index.pyx", line 196, in pandas.\_libs.index.IndexEngine.get_loc
-File "pandas/\_libs/hashtable_class_helper.pxi", line 7081, in pandas.\_libs.hashtable.PyObjectHashTable.get_item
-File "pandas/\_libs/hashtable_class_helper.pxi", line 7089, in pandas.\_libs.hashtable.PyObjectHashTable.get_item
-KeyError: 0
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-File "<exec>", line 603, in **tabula_run**
-File "<input>", line 72, in <module>
-File "<exec>", line 437, in \_safe_df_getitem
-File "/lib/python3.12/site-packages/pandas/core/frame.py", line 4102, in **getitem**
-indexer = self.columns.get_loc(key)
-^^^^^^^^^^^^^^^^^^^^^^^^^
-File "/lib/python3.12/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
-raise KeyError(key) from err
-KeyError: 0
+abdul-saboor-hamedi/app:1 Uncaught (in promise) Error: Cannot read properties of undefined (reading 'length')
+iaxbixtmymalzhryhazz.supabase.co/functions/v1/deepseek-proxy/chat/completions:1 Failed to load resource: the server responded with a status of 401 ()
+workspace:1 Uncaught (in promise) Error: Cannot read properties of undefined (reading 'length')
+iaxbixtmymalzhryhazz.supabase.co/functions/v1/deepseek-proxy/chat/completions:1 Failed to load resource: the server responded with a status of 401 ()
+iaxbixtmymalzhryhazz.supabase.co/functions/v1/deepseek-proxy/chat/completions:1 Failed to load resource: the server responded with a status of 401 ()
+client:1012 [vite] hot updated: /src/features/dashboard/pages/Analyse.tsx
+client:1012 [vite] hot updated: /src/App.tsx
+2client:1012 [vite] hot updated: /src/features/dashboard/pages/Analyse.tsx
+3client:1012 [vite] hot updated: /src/features/dashboard/pages/Analyse.tsx
 \_\_
-There is a new error, so you can fix that one. I want it like this: when I say "generate an executive summary" or "make a report," it should be able to write a summary about the data, then generate the results on the table or the figures, then talk about it, then generate another piece of data, then talk about it in conclusion. Right now, it generates the figure, then on top of that figure is the bottom, and the report is keep writing above the figures, which is a little bit inconsistent by standard. Also, make sure that it never throws errors, especially on production. It should not show users technical terms as well, like Python or SQL or DuckDB, because we treat users as people that have no knowledge of computers, which is why we developed this app for them to understand the data more properly. Just keep going, make sure that the code is robust.
+i we need something following help me:
+
+### What Happens If You Delete It from Supabase
+
+1. **If you delete the `DEEPSEEK_API_KEY` secret only:**
+   - File uploads, Excel view, and local data inspection still work, **but every AI chat/analysis request fails immediately with HTTP `503`** (`"DEEPSEEK_API_KEY secret is not configured."` in [index.ts](file:///b:/react/tabula/supabase/functions/deepseek-proxy/index.ts#L106-L108)).
+2. **If you delete the `deepseek-proxy` Edge Function itself:**
+   - Every AI request fails with a `404` / unreachable error (`"Could not reach the deepseek-proxy Supabase Edge Function..."` in [client.ts](file:///b:/react/tabula/src/core/deepseek/client.ts#L83-L85)).
+
+---
+
+### How to Restore & Run It Again on CLI
+
+#### Case A: You only deleted the `DEEPSEEK_API_KEY` secret
+
+Just re-add the secret from your project root (`b:\react\tabula`):
+
+```bash
+npx supabase secrets set DEEPSEEK_API_KEY=sk-your-deepseek-key
+```
+
+#### Case B: You deleted the Edge Function (or want a full redeploy)
+
+Run these in `b:\react\tabula`:
+
+```bash
+# 1. Log in and link your Supabase project (skip if already linked)
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+
+# 2. Set the DeepSeek API key secret
+npx supabase secrets set DEEPSEEK_API_KEY=sk-your-deepseek-key
+
+# 3. Deploy the Edge Function
+npx supabase functions deploy deepseek-proxy --no-verify-jwt
+```
+
+#### Verify It Is Live
+
+```bash
+npx supabase secrets list
+npx supabase functions list
+```
+
+#### Optional: Run Locally via CLI for Testing
+
+1. Put `DEEPSEEK_API_KEY=sk-your-deepseek-key` in `supabase/.env` (never commit this file).
+2. Start the local function server:
+
+```bash
+npx supabase functions serve deepseek-proxy --no-verify-jwt --env-file supabase/.env
+```

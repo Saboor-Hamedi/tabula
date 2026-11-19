@@ -28,7 +28,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const loading = useAuthLoading()
   if (isOpenAccess()) return <>{children}</>
   if (loading) return <Boot />
-  if (!user) return <Navigate to={ROUTES.signIn} />
+  if (!user || user.is_anonymous) return <Navigate to={ROUTES.signIn} />
   return <>{children}</>
 }
 
@@ -43,7 +43,7 @@ export function RequireVerified({ children }: { children: ReactNode }) {
   const loading = useAuthLoading()
   if (isOpenAccess()) return <>{children}</>
   if (loading) return <Boot />
-  if (!user) return <Navigate to={ROUTES.signIn} />
+  if (!user || user.is_anonymous) return <Navigate to={ROUTES.signIn} />
   if (!user.email || user.email_confirmed_at) return <>{children}</>
   return <Navigate to={ROUTES.verify} />
 }

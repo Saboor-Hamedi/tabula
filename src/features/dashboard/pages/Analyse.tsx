@@ -36,7 +36,20 @@ import {
 import { Insights } from '../components/Insights'
 import { Members } from '../components/Members'
 import { Metric } from '../components/Metric'
-import { listMembers, type Member } from '../api'
+import {
+  listDeletedAccounts,
+  listMembers,
+  type DeletedAccountEntry,
+  type Member,
+} from '../api'
+
+const EXIT_REASONS = [
+  'Just testing',
+  'Too expensive',
+  'Missing a feature',
+  'Found another tool',
+  'Other',
+] as const
 
 /**
  * Analyse — Unified Sidebar Dashboard for Admins & Members.
@@ -88,6 +101,7 @@ export function Analyse() {
   const [stats, setStats] = useState<WorkspaceStats | null>(null)
   const { usage } = useUsageStatus()
   const [members, setMembers] = useState<Member[]>([])
+  const [deletedAccounts, setDeletedAccounts] = useState<DeletedAccountEntry[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
   const [schemaMissing, setSchemaMissing] = useState(false)
@@ -100,8 +114,10 @@ export function Analyse() {
   const [nameError, setNameError] = useState<string | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(readInitialTheme)
 
-  // Non-admin self-service account deletion state
+  // Non-admin self-service account deletion state (with optional feedback)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleteReason, setDeleteReason] = useState<string>('')
+  const [deleteNote, setDeleteNote] = useState<string>('')
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -160,9 +176,10 @@ export function Analyse() {
     const loadAdmin = async () => {
       setMembersLoading(true)
       try {
-        const rows = await listMembers()
+        const [rows, deletions] = await Promise.all([listMembers(), listDeletedAccounts()])
         if (!active) return
         setMembers(rows)
+        setDeletedAccounts(deletions)
         setAdminError(null)
         setSchemaMissing(false)
       } catch (loadError) {
@@ -274,7 +291,10 @@ export function Analyse() {
     setDeletingAccount(true)
     setDeleteError(null)
     try {
-      await deleteMyAccount()
+      await deleteMyAccount({
+        reason: deleteReason || null,
+        note: deleteNote || null,
+      })
       navigate(ROUTES.landing, { replace: true })
     } catch (err) {
       setDeleteError(
@@ -653,49 +673,94 @@ export function Analyse() {
 
           {/* SECTION: MEMBERS (ADMIN ONLY) */}
           {section === 'members' && isAdmin && (
-            <section className="dash-panel">
-              <header className="dash-panel-head">
-                <div>
-                  <h2 className="dash-section-title">Member Directory</h2>
-                  <span className="dash-panel-note">
-                    Live sign-ins, trial windows, and subscription status.
-                  </span>
-                </div>
+            <div className="dash-admin-stack">
+              <section className="dash-panel">
+                <header className="dash-panel-head">
+                  <div>
+                    <h2 className="dash-section-title">Member Directory</h2>
+                    <span className="dash-panel-note">
+                      Live sign-ins, trial windows, and subscription status.
+                    </span>
+                  </div>
 
-                <div className="dash-filter-pills" role="tablist" aria-label="Filter members">
-                  {(
-                    [
-                      ['all', `All (${overview.users})`],
-                      ['subscribers', `Paid (${overview.subscribers})`],
-                      ['trialing', `Trial (${overview.trialing})`],
-                      ['admins', `Admins (${overview.admins})`],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      role="tab"
-                      aria-selected={memberFilter === key}
-                      className={`dash-filter-pill ${memberFilter === key ? 'is-active' : ''}`}
-                      onClick={() => setMemberFilter(key)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </header>
+                  <div className="dash-filter-pills" role="tablist" aria-label="Filter members">
+                    {(
+                      [
+                        ['all', `All (${overview.users})`],
+                        ['subscribers', `Paid (${overview.subscribers})`],
+                        ['trialing', `Trial (${overview.trialing})`],
+                        ['admins', `Admins (${overview.admins})`],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        aria-selected={memberFilter === key}
+                        className={`dash-filter-pill ${memberFilter === key ? 'is-active' : ''}`}
+                        onClick={() => setMemberFilter(key)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </header>
 
-              {adminError ? (
-                <p className="publish-error" style={{ padding: '12px 18px' }}>
-                  {adminError}
-                  {schemaMissing
-                    ? ' Apply features/migration/migration.sql to your project to enable it.'
-                    : ''}
-                </p>
-              ) : null}
+                {adminError ? (
+                  <p className="publish-error" style={{ padding: '12px 18px' }}>
+                    {adminError}
+                    {schemaMissing
+                      ? ' Apply features/migration/migration.sql to your project to enable it.'
+                      : ''}
+                  </p>
+                ) : null}
 
-              <Members members={filteredMembers} loading={membersLoading} />
-            </section>
+                <Members members={filteredMembers} loading={membersLoading} />
+              </section>
+
+              {/* Deleted Accounts & Optional Exit Feedback */}
+              <section className="dash-panel">
+                <header className="dash-panel-head">
+                  <div>
+                    <h2 className="dash-section-title">Deleted Accounts &amp; Feedback</h2>
+                    <span className="dash-panel-note">
+                      Users who deleted their account and any optional feedback they left.
+                    </span>
+                  </div>
+                  <span className="dash-count-pill">{deletedAccounts.length}</span>
+                </header>
+
+                {deletedAccounts.length === 0 ? (
+                  <div className="dash-table-empty">No deleted accounts recorded yet.</div>
+                ) : (
+                  <ul className="dash-deletions-list">
+                    {deletedAccounts.map((entry) => (
+                      <li key={entry.id} className="dash-deletion-row">
+                        <div className="dash-deletion-top">
+                          <div className="dash-deletion-user">
+                            <strong>{entry.display_name || entry.email || 'Former user'}</strong>
+                            {entry.email ? <span>{entry.email}</span> : null}
+                          </div>
+                          <div className="dash-deletion-meta">
+                            {entry.reason ? (
+                              <span className="dash-deletion-reason">{entry.reason}</span>
+                            ) : null}
+                            <span className="dash-deletion-date">
+                              {new Date(entry.deleted_at).toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                        {entry.note ? <p className="dash-deletion-note">“{entry.note}”</p> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
           )}
 
           {/* SECTION: PUBLISHED STORIES (ADMIN ONLY) */}
@@ -863,6 +928,36 @@ export function Analyse() {
                             Confirm permanent deletion of <strong>{email ?? displayName}</strong>?
                           </span>
                         </p>
+
+                        <div className="dash-exit-feedback">
+                          <span className="dash-exit-label">
+                            Quick feedback? <em>(optional)</em>
+                          </span>
+                          <div className="dash-exit-chips">
+                            {EXIT_REASONS.map((reason) => (
+                              <button
+                                key={reason}
+                                type="button"
+                                className={`dash-exit-chip ${deleteReason === reason ? 'is-active' : ''}`}
+                                onClick={() =>
+                                  setDeleteReason((prev) => (prev === reason ? '' : reason))
+                                }
+                              >
+                                {reason}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            className="dash-input dash-exit-input"
+                            value={deleteNote}
+                            onChange={(e) => setDeleteNote(e.target.value)}
+                            placeholder="Anything we could improve? (optional)"
+                            maxLength={500}
+                            disabled={deletingAccount}
+                          />
+                        </div>
+
                         {deleteError ? (
                           <p className="dash-field-feedback is-error">{deleteError}</p>
                         ) : null}

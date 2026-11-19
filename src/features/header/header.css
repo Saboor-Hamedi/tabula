@@ -555,6 +555,40 @@
   }
 }
 
+/* ---------- Direct Workspace CTA ---------- */
+
+.header-workspace-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.header-workspace-cta:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 420px) {
+  .header-workspace-cta {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+}
+
 /* ---------- Account ---------- */
 
 .header-account {

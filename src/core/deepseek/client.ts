@@ -8,10 +8,11 @@ import {
 } from '../supabase/usage'
 import type { ModelId } from '../types'
 
-export type BillingBlockReason = 'trial-expired' | 'quota-exceeded'
+export type BillingBlockReason = 'trial-expired' | 'quota-exceeded' | 'guest-limit'
 
 export class BillingBlockError extends Error {
   readonly reason: BillingBlockReason
+  readonly isRetryable = false
 
   constructor(reason: BillingBlockReason, message: string) {
     super(message)
@@ -36,10 +37,15 @@ export function getBillingBlockReason(error: unknown): BillingBlockReason | null
       cause?: unknown
       errors?: unknown[]
     }
-    if (candidate.reason === 'quota-exceeded' || candidate.reason === 'trial-expired') {
+    if (
+      candidate.reason === 'quota-exceeded' ||
+      candidate.reason === 'trial-expired' ||
+      candidate.reason === 'guest-limit'
+    ) {
       return candidate.reason
     }
     if (typeof candidate.responseBody === 'string') {
+      if (candidate.responseBody.includes('GUEST_LIMIT_REACHED')) return 'guest-limit'
       if (candidate.responseBody.includes('QUOTA_EXCEEDED')) return 'quota-exceeded'
       if (candidate.responseBody.includes('TRIAL_EXPIRED')) return 'trial-expired'
     }
@@ -54,34 +60,61 @@ export function getBillingBlockReason(error: unknown): BillingBlockReason | null
   return null
 }
 
+const GUEST_ID_KEY = 'tabula_guest_id'
+
+function getOrCreateGuestId(): string {
+  try {
+    const existing = localStorage.getItem(GUEST_ID_KEY)
+    if (existing && /^[0-9a-f-]{36}$/i.test(existing)) return existing
+    const created =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : '00000000-0000-4000-8000-000000000000'
+    localStorage.setItem(GUEST_ID_KEY, created)
+    return created
+  } catch {
+    return '00000000-0000-4000-8000-000000000000'
+  }
+}
+
 async function managedProxyFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
   const headers = new Headers(init?.headers)
 
-  // Replace the SDK's placeholder key header with the signed-in user's session JWT
-  // so the Supabase Edge Function (`deepseek-proxy`) verifies the user and applies
-  // the DEEPSEEK_API_KEY Edge Function Secret.
+  // Replace the SDK's placeholder key header with the signed-in user's session JWT,
+  // or attach a stable guest ID header for no-login trial access.
   headers.delete('authorization')
   if (supabaseAnonKey) {
     headers.set('apikey', supabaseAnonKey)
   }
+  let isGuestSession = true
   if (supabase) {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
     if (token) {
       headers.set('authorization', `Bearer ${token}`)
+      isGuestSession = Boolean(data.session?.user?.is_anonymous)
+    } else {
+      headers.set('x-tabula-guest-id', getOrCreateGuestId())
     }
+  } else {
+    headers.set('x-tabula-guest-id', getOrCreateGuestId())
   }
 
   let response: Response
   try {
     response = await fetch(input, { ...init, headers })
-  } catch (networkError) {
-    const detail = networkError instanceof Error ? networkError.message : String(networkError)
-    throw new Error(
-      `Could not reach the deepseek-proxy Supabase Edge Function (${detail}). Make sure it is deployed with: supabase functions deploy deepseek-proxy --no-verify-jwt`,
+  } catch {
+    throw new Error('Could not connect right now. Please check your internet connection and try again.')
+  }
+
+  if (response.status === 401 && isGuestSession) {
+    openPricingModal('guest-limit')
+    throw new BillingBlockError(
+      'guest-limit',
+      'Sign in or create a free account to continue analyzing your spreadsheet.',
     )
   }
 
@@ -93,6 +126,21 @@ async function managedProxyFetch(
 
     if (typeof payload?.tokens_remaining === 'number') {
       setLiveTokensRemaining(payload.tokens_remaining)
+    }
+
+    if (
+      payload?.code === 'GUEST_LIMIT_REACHED' ||
+      (isGuestSession &&
+        (payload?.code === 'QUOTA_EXCEEDED' ||
+          (response.status === 403 && payload?.tokens_remaining === 0)))
+    ) {
+      void refreshUsage()
+      openPricingModal('guest-limit')
+      throw new BillingBlockError(
+        'guest-limit',
+        payload?.error ??
+          'Your free guest tokens are used up. Sign in or create a free account to continue.',
+      )
     }
 
     if (

@@ -1095,8 +1095,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             });
           } else {
             const cleanMessage = /too many requests/i.test(message)
-              ? "Too many requests right now. Please wait a moment and try again."
-              : message;
+              ? 'Too many requests right now. Please wait a moment and try again.'
+              : /unauthorized|missing or invalid authorization|401/i.test(message)
+                ? 'Please sign in to continue analyzing your spreadsheet.'
+                : /failed to fetch|networkerror|could not connect/i.test(message)
+                  ? 'Could not connect right now. Please check your connection and try again.'
+                  : message || 'Something went wrong. Please try again.'
             setMessagesBySession((previous) => {
               const list = previous[sessionId] ?? [];
               return {
@@ -1109,8 +1113,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                         suggestionsPending: false,
                         content:
                           item.content.trim().length > 0
-                            ? `${item.content}\n\n> **Agent error:** ${cleanMessage}`
-                            : `> **Agent error:** ${cleanMessage}`,
+                            ? `${item.content}\n\n${cleanMessage}`
+                            : cleanMessage,
                       }
                     : item,
                 ),

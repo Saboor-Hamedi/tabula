@@ -6,6 +6,7 @@ export interface UsageStatus {
   tier: PricingTier
   status: SubscriptionStatus | string
   isAdmin: boolean
+  isGuest?: boolean
   hasAccess: boolean
   trialEndsAt: string | null
   trialDaysRemaining: number | null
@@ -22,7 +23,7 @@ export interface UsageStatus {
   stripeConfigured: boolean
 }
 
-export type PricingModalReason = 'trial-expired' | 'quota-exceeded' | 'upgrade' | null
+export type PricingModalReason = 'trial-expired' | 'quota-exceeded' | 'guest-limit' | 'upgrade' | null
 
 export interface BillingUiSnapshot {
   usage: UsageStatus | null
@@ -111,7 +112,10 @@ async function fetchLiveBalanceFromSupabase(userId: string): Promise<number | nu
   return Math.max(0, data.tokens_remaining)
 }
 
-async function buildUsageFromSupabaseFallback(userId: string): Promise<UsageStatus | null> {
+async function buildUsageFromSupabaseFallback(
+  userId: string,
+  isGuest: boolean,
+): Promise<UsageStatus | null> {
   if (!supabase) return null
   const [profileRes, subRes, balanceTokens] = await Promise.all([
     supabase.from('profiles').select('role, tier').eq('id', userId).maybeSingle(),
@@ -123,7 +127,7 @@ async function buildUsageFromSupabaseFallback(userId: string): Promise<UsageStat
     fetchLiveBalanceFromSupabase(userId),
   ])
 
-  const isAdmin = profileRes.data?.role === 'admin'
+  const isAdmin = !isGuest && profileRes.data?.role === 'admin'
   const tier = (subRes.data?.tier ?? profileRes.data?.tier ?? 'free') as PricingTier
   const status = (subRes.data?.status ?? 'trialing') as SubscriptionStatus | string
   const trialEndsAt = subRes.data?.trial_ends_at ?? null
@@ -131,10 +135,15 @@ async function buildUsageFromSupabaseFallback(userId: string): Promise<UsageStat
   const trialDaysRemaining =
     trialMsLeft !== null ? Math.max(0, Math.ceil(trialMsLeft / 86_400_000)) : null
   const trialExpired =
-    !isAdmin && tier === 'free' && trialMsLeft !== null && trialMsLeft <= 0
+    !isAdmin && !isGuest && tier === 'free' && trialMsLeft !== null && trialMsLeft <= 0
   const hasAccess = isAdmin || tier !== 'free' || !trialExpired
-  const monthlyLimit =
-    isAdmin || tier === 'enterprise' ? null : tier === 'pro' ? 5_000_000 : 250_000
+  const monthlyLimit = isGuest
+    ? 20_000
+    : isAdmin || tier === 'enterprise'
+      ? null
+      : tier === 'pro'
+        ? 5_000_000
+        : 250_000
   const remainingTokens =
     isAdmin || tier === 'enterprise' ? null : (balanceTokens ?? monthlyLimit)
   const usedTokens =
@@ -146,6 +155,7 @@ async function buildUsageFromSupabaseFallback(userId: string): Promise<UsageStat
     tier,
     status,
     isAdmin,
+    isGuest,
     hasAccess,
     trialEndsAt,
     trialDaysRemaining,
@@ -174,6 +184,7 @@ export async function refreshUsage(): Promise<UsageStatus | null> {
       const session = data.session
       const token = session?.access_token
       const userId = session?.user?.id
+      const isGuest = Boolean(session?.user?.is_anonymous)
       if (!token || !userId) {
         clearUsageState()
         return null
@@ -188,9 +199,12 @@ export async function refreshUsage(): Promise<UsageStatus | null> {
 
       let usage: UsageStatus | null = null
       if (apiRes && apiRes.ok) {
-        usage = (await apiRes.json()) as UsageStatus
+        usage = { ...((await apiRes.json()) as UsageStatus), isGuest }
+        if (isGuest) {
+          usage.monthlyLimit = 20_000
+        }
       } else {
-        usage = await buildUsageFromSupabaseFallback(userId)
+        usage = await buildUsageFromSupabaseFallback(userId, isGuest)
       }
 
       if (!usage) {

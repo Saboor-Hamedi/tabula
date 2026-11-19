@@ -191,14 +191,26 @@
 }
 
 .dash-filter-pills {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dash-filter-pills::-webkit-scrollbar {
+  display: none;
 }
 
 .dash-filter-pill {
+  flex-shrink: 0;
+  white-space: nowrap;
   height: 30px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -218,6 +230,131 @@
   background: var(--accent);
   color: var(--accent-contrast);
   border-color: var(--accent);
+}
+
+/* Optional Exit Feedback & Admin Deletions Log */
+.dash-exit-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-exit-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.dash-exit-label em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.dash-exit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dash-exit-chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.dash-exit-chip:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.dash-exit-chip.is-active {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+
+.dash-exit-input {
+  height: 36px;
+  font-size: 13px;
+  background: var(--surface);
+}
+
+.dash-deletions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dash-deletion-row {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash-deletion-row:last-child {
+  border-bottom: none;
+}
+
+.dash-deletion-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dash-deletion-user {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.dash-deletion-user strong {
+  color: var(--text);
+}
+
+.dash-deletion-user span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dash-deletion-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-deletion-reason {
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dash-deletion-date {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dash-deletion-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .dash-security-card {

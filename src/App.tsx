@@ -29,8 +29,9 @@ import { Article, Insights } from './features/posts'
 
 function Workspace() {
   const user = useAuthUser()
+
   return (
-    <SessionProvider key={user?.id ?? 'anon'}>
+    <SessionProvider key={user?.id ?? 'guest'}>
       <AppShell />
     </SessionProvider>
   )
@@ -39,10 +40,11 @@ function Workspace() {
 /** Keeps the signed-in user's username slug reflected cleanly in `/<username>/app` and `/<username>/workspace`. */
 function UserUrlSync() {
   const { path, query, navigate } = useRouter()
+  const user = useAuthUser()
   const userSlug = useUserSlug()
 
   useEffect(() => {
-    if (!userSlug) return
+    if (!userSlug || user?.is_anonymous) return
     const search = query.toString()
     const suffix = search ? `?${search}` : ''
 
@@ -56,7 +58,7 @@ function UserUrlSync() {
     if (path === ROUTES.workspace || (workMatch && workMatch.username !== userSlug)) {
       navigate(`${userPath('/workspace', userSlug)}${suffix}`, { replace: true })
     }
-  }, [path, query, userSlug, navigate])
+  }, [path, query, userSlug, user?.is_anonymous, navigate])
 
   return null
 }
@@ -70,13 +72,7 @@ export function AppRoutes() {
     </RequireAuth>
   )
 
-  const workspaceElement = (
-    <RequireAuth>
-      <RequireVerified>
-        <Workspace />
-      </RequireVerified>
-    </RequireAuth>
-  )
+  const workspaceElement = <Workspace />
 
   return (
     <>

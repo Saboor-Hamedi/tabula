@@ -43,6 +43,32 @@ interface SubscriptionRow {
   created_at: string
 }
 
+export interface DeletedAccountEntry {
+  id: number
+  email: string | null
+  display_name: string | null
+  tier: string | null
+  reason: string | null
+  note: string | null
+  deleted_at: string
+}
+
+/** Recent deleted accounts with optional exit feedback (admin-only). */
+export async function listDeletedAccounts(): Promise<DeletedAccountEntry[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('account_deletions')
+    .select('id, email, display_name, tier, reason, note, deleted_at')
+    .order('deleted_at', { ascending: false })
+    .limit(50)
+
+  if (error) {
+    return []
+  }
+
+  return (data ?? []) as DeletedAccountEntry[]
+}
+
 /** Every member, newest first, with their latest subscription. */
 export async function listMembers(): Promise<Member[]> {
   if (!supabase) throw new AdminError('Supabase is not configured.')

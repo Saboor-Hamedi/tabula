@@ -20,20 +20,23 @@ export function UsageQuotaCard() {
   }
   if (!usage) return null
 
-  const isPro = usage.tier === 'pro' || usage.tier === 'enterprise'
+  const isGuest = Boolean(usage.isGuest)
+  const isPro = !isGuest && (usage.tier === 'pro' || usage.tier === 'enterprise')
   const limit = usage.monthlyLimit
   const pct =
     limit && limit > 0 ? Math.min(100, Math.round((usage.usedTokens / limit) * 100)) : 0
   const barTone =
     usage.trialExpired || pct >= 95 ? 'is-danger' : pct >= 80 ? 'is-warn' : ''
 
-  const badgeLabel = usage.isAdmin
-    ? 'Admin · Unlimited'
-    : isPro
-      ? 'Pro Plan'
-      : usage.trialExpired
-        ? 'Trial Ended'
-        : `Trial · ${usage.trialDaysRemaining ?? 0}d left`
+  const badgeLabel = isGuest
+    ? 'Guest Trial'
+    : usage.isAdmin
+      ? 'Admin · Unlimited'
+      : isPro
+        ? 'Pro Plan'
+        : usage.trialExpired
+          ? 'Trial Ended'
+          : `Trial · ${usage.trialDaysRemaining ?? 0}d left`
 
   return (
     <div
@@ -50,7 +53,15 @@ export function UsageQuotaCard() {
           <span>{badgeLabel}</span>
         </span>
 
-        {!usage.isAdmin && !isPro ? (
+        {isGuest ? (
+          <button
+            type="button"
+            className="quota-upgrade-link"
+            onClick={() => openPricingModal('guest-limit')}
+          >
+            Sign up free
+          </button>
+        ) : !usage.isAdmin && !isPro ? (
           <button
             type="button"
             className="quota-upgrade-link"

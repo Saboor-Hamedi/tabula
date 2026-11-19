@@ -169,15 +169,41 @@ $$;
 grant execute on function public.search_published_posts(text, text, int, int) to anon, authenticated;
 
 -- ==============================================================================
+-- Account Deletion Feedback Log (Admin-Readable Only)
+-- Stores optional exit feedback when a user deletes their account.
+-- ==============================================================================
+create table if not exists public.account_deletions (
+  id bigserial primary key,
+  user_id uuid,
+  email text,
+  display_name text,
+  tier text,
+  reason text,
+  note text,
+  deleted_at timestamptz not null default timezone('utc'::text, now())
+);
+
+alter table public.account_deletions enable row level security;
+
+drop policy if exists "Admins can view account deletions" on public.account_deletions;
+create policy "Admins can view account deletions"
+  on public.account_deletions
+  for select
+  using (public.is_admin());
+
+-- ==============================================================================
 -- Self-Service Account Deletion & Admin Security Hardening
 -- 1. Permanently deletes the signed-in non-admin user's account and cascades to
 --    profiles, subscriptions, and usage_ledger.
--- 2. Strictly blocks administrators from deleting their own account (42501).
--- 3. Prevents admins from accidentally demoting themselves and locks down
---    sensitive profile columns (role, tier, email) from client-side tampering.
+-- 2. Records optional exit feedback in public.account_deletions for admins.
+-- 3. Strictly blocks administrators from deleting their own account (42501).
 -- Run this directly in the Supabase Dashboard -> SQL Editor.
 -- ==============================================================================
-create or replace function public.delete_my_account()
+drop function if exists public.delete_my_account();
+create or replace function public.delete_my_account(
+  p_reason text default null,
+  p_note text default null
+)
 returns void
 language plpgsql
 security definer
@@ -185,23 +211,31 @@ set search_path = public, auth
 as $$
 declare
   v_uid uuid := auth.uid();
-  v_is_admin boolean := false;
+  v_profile record;
 begin
   if v_uid is null then
     raise exception 'Not authenticated' using errcode = '28000';
   end if;
 
-  select exists (
-    select 1
-    from public.profiles p
-    where p.id = v_uid
-      and p.role = 'admin'
-  ) into v_is_admin;
+  select id, email, display_name, tier::text as tier, role::text as role
+  into v_profile
+  from public.profiles
+  where id = v_uid;
 
-  if v_is_admin then
+  if v_profile.role = 'admin' then
     raise exception 'Administrator accounts cannot be self-deleted.'
       using errcode = '42501';
   end if;
+
+  insert into public.account_deletions (user_id, email, display_name, tier, reason, note)
+  values (
+    v_uid,
+    v_profile.email,
+    v_profile.display_name,
+    v_profile.tier,
+    nullif(left(trim(coalesce(p_reason, '')), 120), ''),
+    nullif(left(trim(coalesce(p_note, '')), 500), '')
+  );
 
   if to_regclass('public.posts') is not null then
     delete from public.posts where author_id = v_uid;
@@ -211,8 +245,8 @@ begin
 end;
 $$;
 
-revoke all on function public.delete_my_account() from public, anon;
-grant execute on function public.delete_my_account() to authenticated;
+revoke all on function public.delete_my_account(text, text) from public, anon;
+grant execute on function public.delete_my_account(text, text) to authenticated;
 
 -- Prevent self-escalation and accidental admin self-demotion
 create or replace function public.guard_profile_role()
@@ -250,3 +284,93 @@ create trigger guard_profile_role
 
 revoke update on public.profiles from authenticated;
 grant update (display_name, avatar_url) on public.profiles to authenticated;
+
+-- ==============================================================================
+-- Anonymous Guest Trial Support (Try Without Login -> Login When Out of Tokens)
+-- Make sure "Allow anonymous sign-ins" is enabled in:
+-- Supabase Dashboard -> Authentication -> Providers -> Anonymous Sign-Ins
+-- ==============================================================================
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := timezone('utc'::text, now());
+  v_trial_end timestamptz := timezone('utc'::text, now()) + interval '7 days';
+  v_is_anon boolean := coalesce(new.is_anonymous, false);
+  v_email text := coalesce(new.email, 'guest-' || left(new.id::text, 8) || '@guest.local');
+  v_name text := case
+    when v_is_anon then 'Guest'
+    else coalesce(
+      new.raw_user_meta_data->>'full_name',
+      new.raw_user_meta_data->>'name',
+      split_part(v_email, '@', 1)
+    )
+  end;
+  v_initial_tokens int := case when v_is_anon then 20000 else 250000 end;
+begin
+  insert into public.profiles (id, email, display_name, avatar_url, tier)
+  values (
+    new.id,
+    v_email,
+    v_name,
+    coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture'),
+    'free'
+  )
+  on conflict (id) do nothing;
+
+  insert into public.subscriptions (
+    user_id,
+    tier,
+    status,
+    trial_ends_at,
+    current_period_start,
+    current_period_end
+  )
+  values (
+    new.id,
+    'free',
+    'trialing',
+    v_trial_end,
+    v_now,
+    v_trial_end
+  )
+  on conflict do nothing;
+
+  if to_regclass('public.user_balances') is not null then
+    insert into public.user_balances (user_id, tokens_remaining)
+    values (new.id, v_initial_tokens)
+    on conflict (user_id) do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+-- ==============================================================================
+-- No-Login Guest Token Balances (works even without Anonymous Sign-Ins enabled)
+-- Accessed strictly via service_role inside the deepseek-proxy Edge Function.
+-- ==============================================================================
+create table if not exists public.guest_balances (
+  guest_id uuid primary key,
+  tokens_remaining int not null default 20000 check (tokens_remaining >= 0),
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+alter table public.guest_balances enable row level security;
+revoke all on table public.guest_balances from anon, authenticated;
+
+-- Server-side salted SHA-256 IP daily limit so clearing localStorage/cookies
+-- or opening Incognito windows cannot reset free guest tokens.
+create table if not exists public.guest_ip_limits (
+  ip_hash text primary key,
+  tokens_remaining int not null default 25000 check (tokens_remaining >= 0),
+  window_started_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+alter table public.guest_ip_limits enable row level security;
+revoke all on table public.guest_ip_limits from anon, authenticated;

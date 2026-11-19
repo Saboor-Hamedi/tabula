@@ -5,7 +5,8 @@ function getCorsHeaders(req: Request): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
-      requestedHeaders || 'authorization, x-client-info, apikey, content-type, user-agent',
+      requestedHeaders ||
+      'authorization, x-client-info, apikey, content-type, user-agent, x-tabula-guest-id',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
   }
@@ -18,6 +19,31 @@ const ALLOWED_MODELS = new Set([
   'deepseek-chat',
   'deepseek-reasoner',
 ])
+const GUEST_ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-chat'])
+const GUEST_ID_TOKEN_LIMIT = 20_000
+const GUEST_IP_DAILY_TOKEN_LIMIT = 25_000
+const GUEST_WINDOW_MS = 24 * 60 * 60 * 1000
+
+function getClientIp(req: Request): string {
+  const cfIp = req.headers.get('cf-connecting-ip')?.trim()
+  if (cfIp) return cfIp
+  const realIp = req.headers.get('x-real-ip')?.trim()
+  if (realIp) return realIp
+  const xff = req.headers.get('x-forwarded-for')
+  if (xff) {
+    const first = xff.split(',')[0]?.trim()
+    if (first) return first
+  }
+  return 'unknown'
+}
+
+async function hashClientIp(ip: string, salt: string): Promise<string> {
+  const data = new TextEncoder().encode(`${ip}|${salt}`)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
 
 function jsonResponse(req: Request, body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -108,53 +134,145 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return jsonResponse(req, { error: 'Missing or invalid Authorization header.' }, 401)
-  }
+  const guestHeader = (req.headers.get('x-tabula-guest-id') ?? '').trim()
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  // 1. Verify the caller's Supabase JWT to get their authenticated user_id.
-  const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabaseUserClient.auth.getUser()
-
-  if (authError || !user) {
-    return jsonResponse(req, { error: 'Unauthorized: invalid or expired session.' }, 401)
-  }
-
-  // 2. Check user_balances using the service_role client.
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const { data: balanceRow, error: balanceError } = await supabaseAdmin
-    .from('user_balances')
-    .select('tokens_remaining')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  let userId: string | null = null
+  let guestId: string | null = null
+  let guestIpHash: string | null = null
+  let guestIpRemaining = GUEST_IP_DAILY_TOKEN_LIMIT
+  let isGuest = false
+  let tokensRemaining = 0
 
-  if (balanceError) {
-    return jsonResponse(req, { error: 'Failed to check token balance.' }, 500)
-  }
+  if (authHeader.startsWith('Bearer ')) {
+    // 1a. Verify signed-in user JWT.
+    const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
-  let tokensRemaining = balanceRow?.tokens_remaining ?? 250000
-  if (!balanceRow) {
-    await supabaseAdmin
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUserClient.auth.getUser()
+
+    if (authError || !user) {
+      return jsonResponse(req, { error: 'Unauthorized: invalid or expired session.' }, 401)
+    }
+
+    userId = user.id
+    isGuest = Boolean((user as { is_anonymous?: boolean }).is_anonymous)
+    const defaultTokens = isGuest ? GUEST_ID_TOKEN_LIMIT : 250_000
+
+    const { data: balanceRow, error: balanceError } = await supabaseAdmin
       .from('user_balances')
-      .upsert({ user_id: user.id, tokens_remaining: 250000 }, { onConflict: 'user_id' })
+      .select('tokens_remaining')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (balanceError) {
+      return jsonResponse(req, { error: 'Failed to check token balance.' }, 500)
+    }
+
+    tokensRemaining = balanceRow?.tokens_remaining ?? defaultTokens
+    if (!balanceRow) {
+      await supabaseAdmin
+        .from('user_balances')
+        .upsert({ user_id: user.id, tokens_remaining: defaultTokens }, { onConflict: 'user_id' })
+    }
+  } else if (UUID_RE.test(guestHeader)) {
+    // 1b. No-login guest trial: enforce BOTH guest_id balance AND server-side IP-hash daily cap
+    // so clearing localStorage, cookies, or using Incognito cannot reset free guest tokens.
+    guestId = guestHeader
+    isGuest = true
+
+    const clientIp = getClientIp(req)
+    guestIpHash = await hashClientIp(clientIp, supabaseServiceRoleKey.slice(0, 32))
+
+    const [guestRes, ipRes] = await Promise.all([
+      supabaseAdmin
+        .from('guest_balances')
+        .select('tokens_remaining')
+        .eq('guest_id', guestId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('guest_ip_limits')
+        .select('tokens_remaining, window_started_at')
+        .eq('ip_hash', guestIpHash)
+        .maybeSingle(),
+    ])
+
+    if (guestRes.error || ipRes.error) {
+      return jsonResponse(
+        req,
+        {
+          error: 'Sign in or create a free account to continue.',
+          code: 'GUEST_LIMIT_REACHED',
+          tokens_remaining: 0,
+        },
+        403,
+      )
+    }
+
+    const nowIso = new Date().toISOString()
+    const idRemaining = guestRes.data?.tokens_remaining ?? GUEST_ID_TOKEN_LIMIT
+
+    const ipWindowExpired =
+      !ipRes.data?.window_started_at ||
+      Date.now() - Date.parse(ipRes.data.window_started_at) >= GUEST_WINDOW_MS
+
+    if (!ipRes.data || ipWindowExpired) {
+      guestIpRemaining = GUEST_IP_DAILY_TOKEN_LIMIT
+    } else {
+      guestIpRemaining = ipRes.data.tokens_remaining
+    }
+
+    // Do not block the DeepSeek call with initial upserts; persist in background.
+    const initWrites: Promise<unknown>[] = []
+    if (!guestRes.data) {
+      initWrites.push(
+        supabaseAdmin
+          .from('guest_balances')
+          .upsert(
+            { guest_id: guestId, tokens_remaining: GUEST_ID_TOKEN_LIMIT, updated_at: nowIso },
+            { onConflict: 'guest_id' },
+          ),
+      )
+    }
+    if (!ipRes.data || ipWindowExpired) {
+      initWrites.push(
+        supabaseAdmin.from('guest_ip_limits').upsert(
+          {
+            ip_hash: guestIpHash,
+            tokens_remaining: GUEST_IP_DAILY_TOKEN_LIMIT,
+            window_started_at: nowIso,
+            updated_at: nowIso,
+          },
+          { onConflict: 'ip_hash' },
+        ),
+      )
+    }
+    if (initWrites.length > 0) {
+      void Promise.all(initWrites).catch(() => undefined)
+    }
+
+    tokensRemaining = Math.min(idRemaining, guestIpRemaining)
+  } else {
+    return jsonResponse(req, { error: 'Missing or invalid Authorization header.' }, 401)
   }
 
   if (tokensRemaining <= 0) {
     return jsonResponse(
       req,
       {
-        error: 'You have run out of tokens.',
-        code: 'QUOTA_EXCEEDED',
+        error: isGuest
+          ? 'Your free guest tokens are used up. Sign in or create a free account to continue.'
+          : 'You have run out of tokens.',
+        code: isGuest ? 'GUEST_LIMIT_REACHED' : 'QUOTA_EXCEEDED',
         tokens_remaining: 0,
       },
       403,
@@ -169,15 +287,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse(req, { error: 'Invalid JSON request body.' }, 400)
   }
 
-  const model = typeof payload.model === 'string' ? payload.model : 'deepseek-v4-flash'
+  let model = typeof payload.model === 'string' ? payload.model : 'deepseek-v4-flash'
   if (!ALLOWED_MODELS.has(model)) {
     return jsonResponse(req, { error: `Unsupported model: ${model}` }, 400)
   }
+  if (isGuest && !GUEST_ALLOWED_MODELS.has(model)) {
+    model = 'deepseek-v4-flash'
+  }
 
   const isStreaming = payload.stream === true
+  const requestedMaxTokens =
+    typeof payload.max_tokens === 'number' && Number.isFinite(payload.max_tokens)
+      ? Math.max(1, Math.floor(payload.max_tokens))
+      : undefined
   const upstreamPayload: Record<string, unknown> = {
     ...payload,
     model,
+    ...(isGuest
+      ? {
+          max_tokens: Math.min(requestedMaxTokens ?? 2048, 2048),
+          thinking: { type: 'disabled' },
+        }
+      : {}),
     ...(isStreaming
       ? {
           stream_options: {
@@ -213,8 +344,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const deductTokens = async (usedTokens: number): Promise<number> => {
     if (usedTokens <= 0) return tokensRemaining
+    if (guestId) {
+      const nowIso = new Date().toISOString()
+      const clampedId = Math.max(0, tokensRemaining - usedTokens)
+      const clampedIp = Math.max(0, guestIpRemaining - usedTokens)
+      await Promise.all([
+        supabaseAdmin
+          .from('guest_balances')
+          .upsert(
+            { guest_id: guestId, tokens_remaining: clampedId, updated_at: nowIso },
+            { onConflict: 'guest_id' },
+          ),
+        guestIpHash
+          ? supabaseAdmin
+              .from('guest_ip_limits')
+              .upsert(
+                { ip_hash: guestIpHash, tokens_remaining: clampedIp, updated_at: nowIso },
+                { onConflict: 'ip_hash' },
+              )
+          : Promise.resolve(),
+      ])
+      return Math.min(clampedId, clampedIp)
+    }
+    if (!userId) return tokensRemaining
     const { data: updated, error: rpcError } = await supabaseAdmin.rpc('deduct_user_tokens', {
-      p_user_id: user.id,
+      p_user_id: userId,
       p_tokens: usedTokens,
     })
     if (!rpcError && typeof updated === 'number') {
@@ -224,7 +378,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     await supabaseAdmin
       .from('user_balances')
       .update({ tokens_remaining: clamped })
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
     return clamped
   }
 

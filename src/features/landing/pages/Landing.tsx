@@ -82,12 +82,14 @@ export function Landing() {
     element?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const isSignedInAccount = Boolean(user && !user.is_anonymous)
+
   const navigateToAuth = (mode: 'signin' | 'signup' = 'signin') => {
     navigate(mode === 'signup' ? ROUTES.signUp : ROUTES.signIn)
   }
 
   const navigateToWorkspace = () => {
-    navigate(user ? userPath('/workspace', userSlug) : ROUTES.signUp)
+    navigate(isSignedInAccount ? userPath('/workspace', userSlug) : ROUTES.workspace)
   }
 
   return (
@@ -99,8 +101,8 @@ export function Landing() {
       />
 
       <Hero
-        isAuthenticated={Boolean(user)}
-        onNavigateToAuth={navigateToAuth}
+        isAuthenticated={isSignedInAccount}
+        onNavigateToAuth={navigateToWorkspace}
         onNavigateToApp={navigateToWorkspace}
         scrollTo={scrollTo}
       />
@@ -108,8 +110,8 @@ export function Landing() {
       <Demo
         activeScenario={activeScenario}
         setActiveScenario={setActiveScenario}
-        isAuthenticated={Boolean(user)}
-        onNavigateToAuth={navigateToAuth}
+        isAuthenticated={isSignedInAccount}
+        onNavigateToAuth={navigateToWorkspace}
         onNavigateToApp={navigateToWorkspace}
       />
 
@@ -122,16 +124,16 @@ export function Landing() {
       <Comparison />
 
       <Pricing
-        isAuthenticated={Boolean(user)}
-        onNavigateToAuth={navigateToAuth}
+        isAuthenticated={isSignedInAccount}
+        onNavigateToAuth={navigateToWorkspace}
         onNavigateToApp={navigateToWorkspace}
       />
 
       <Faq openIndex={openFaqIndex} setOpenIndex={setOpenFaqIndex} />
 
       <Cta
-        isAuthenticated={Boolean(user)}
-        onNavigateToAuth={navigateToAuth}
+        isAuthenticated={isSignedInAccount}
+        onNavigateToAuth={navigateToWorkspace}
         onNavigateToApp={navigateToWorkspace}
       />
 
