@@ -58,14 +58,14 @@ export function PricingModal() {
         >
           <div className="pricing-modal-head">
             <div>
-              <span className="pricing-modal-kicker">Guest Trial</span>
+              <span className="pricing-modal-kicker">Plans &amp; Billing</span>
               <h2 id="pricing-modal-title" className="pricing-modal-title">
-                {exhausted ? 'Your free guest tokens are used up' : 'Create a free account'}
+                {exhausted ? 'Your trial tokens are finished' : 'Upgrade your workspace'}
               </h2>
               <p className="pricing-modal-subtitle">
                 {exhausted
-                  ? 'Sign in or create a free account to unlock 250,000 tokens and a full 7-day trial — no credit card required.'
-                  : 'Create a free account to unlock 250,000 tokens and keep analyzing your spreadsheets privately.'}
+                  ? 'Upgrade to Pro Analyst to unlock 5,000,000 monthly tokens, or create a free account to continue.'
+                  : 'Upgrade to Pro Analyst to unlock 5,000,000 monthly tokens and unlimited spreadsheet analysis.'}
               </p>
             </div>
             <IconButton label="Close" size="sm" onClick={closePricingModal}>
@@ -94,7 +94,7 @@ export function PricingModal() {
                 navigate(ROUTES.signUp)
               }}
             >
-              <span>Create Free Account</span>
+              <span>Upgrade to Lumina Tabula Pro</span>
               <ArrowRightIcon size={14} />
             </button>
             <button

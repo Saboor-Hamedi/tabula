@@ -22,6 +22,7 @@ export function Composer() {
   const { usage } = useUsageStatus()
   const [value, setValue] = useComposerDraft()
 
+  const isGuest = Boolean(usage?.isGuest)
   const trialExpired = Boolean(usage?.trialExpired)
   const quotaExhausted = Boolean(
     usage &&
@@ -33,7 +34,7 @@ export function Composer() {
   const blockedReason = trialExpired
     ? 'trial-expired'
     : quotaExhausted
-      ? 'quota-exceeded'
+      ? (isGuest ? 'guest-limit' : 'quota-exceeded')
       : null
   const disabled = !activeSession || !dbReady || blockedReason !== null
 
@@ -160,7 +161,7 @@ export function Composer() {
           disabled={disabled}
           streaming={isStreaming}
           placeholder={
-            blockedReason === 'quota-exceeded'
+            blockedReason === 'quota-exceeded' || blockedReason === 'guest-limit'
               ? 'Trial tokens finished — upgrade to Lumina Tabula Pro to continue…'
               : blockedReason === 'trial-expired'
                 ? 'Trial ended — upgrade to Lumina Tabula Pro to ask questions…'

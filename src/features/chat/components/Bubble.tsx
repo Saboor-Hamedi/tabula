@@ -166,11 +166,7 @@ export const Bubble = memo(function Bubble({
             className="btn btn-primary btn-small"
             onClick={() => openPricingModal(message.upgradeReason!)}
           >
-            <span>
-              {message.upgradeReason === 'guest-limit'
-                ? 'Create Free Account'
-                : 'Upgrade to Lumina Tabula Pro'}
-            </span>
+            <span>Upgrade to Lumina Tabula Pro</span>
             <ArrowRightIcon size={13} />
           </button>
         </div>

@@ -1073,23 +1073,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             getBillingBlockReason(error) ??
             (/too many requests/i.test(message) && isQuotaExhausted()
               ? 'quota-exceeded'
-              : null);
+              : /403|guest.?limit|out of token/i.test(message)
+                ? 'guest-limit'
+                : null);
           if (inferredReason) {
             openPricingModal(inferredReason);
+            const upgradeNotice =
+              inferredReason === 'trial-expired'
+                ? 'Your 7-day free trial has ended. Upgrade to Lumina Tabula Pro to continue.'
+                : 'You have used all trial tokens. Upgrade to Lumina Tabula Pro to continue.';
+
             setMessagesBySession((previous) => {
               const list = previous[sessionId] ?? [];
               return {
                 ...previous,
-                [sessionId]: list.flatMap((item) => {
-                  if (item.id !== assistantId) return [item];
-                  if (item.content.trim().length === 0) return [];
-                  return [
-                    {
-                      ...item,
-                      suggestionsPending: false,
-                      upgradeReason: inferredReason,
-                    },
-                  ];
+                [sessionId]: list.map((item) => {
+                  if (item.id !== assistantId) return item;
+                  return {
+                    ...item,
+                    error: true,
+                    suggestionsPending: false,
+                    upgradeReason: inferredReason,
+                    content:
+                      item.content.trim().length > 0
+                        ? `${item.content}\n\n${upgradeNotice}`
+                        : upgradeNotice,
+                  };
                 }),
               };
             });

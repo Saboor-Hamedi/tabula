@@ -44,8 +44,11 @@ export function getBillingBlockReason(error: unknown): BillingBlockReason | null
     ) {
       return candidate.reason
     }
+    if (candidate.statusCode === 403 || candidate.statusCode === 402) {
+      return candidate.statusCode === 402 ? 'trial-expired' : 'guest-limit'
+    }
     if (typeof candidate.responseBody === 'string') {
-      if (candidate.responseBody.includes('GUEST_LIMIT_REACHED')) return 'guest-limit'
+      if (candidate.responseBody.includes('GUEST_LIMIT_REACHED') || candidate.responseBody.includes('guest')) return 'guest-limit'
       if (candidate.responseBody.includes('QUOTA_EXCEEDED')) return 'quota-exceeded'
       if (candidate.responseBody.includes('TRIAL_EXPIRED')) return 'trial-expired'
     }
@@ -130,16 +133,15 @@ async function managedProxyFetch(
 
     if (
       payload?.code === 'GUEST_LIMIT_REACHED' ||
-      (isGuestSession &&
-        (payload?.code === 'QUOTA_EXCEEDED' ||
-          (response.status === 403 && payload?.tokens_remaining === 0)))
+      (isGuestSession && (response.status === 403 || payload?.code === 'QUOTA_EXCEEDED')) ||
+      (response.status === 403 && /guest/i.test(payload?.error ?? ''))
     ) {
       void refreshUsage()
       openPricingModal('guest-limit')
       throw new BillingBlockError(
         'guest-limit',
         payload?.error ??
-          'Your free guest tokens are used up. Sign in or create a free account to continue.',
+          'You have used all trial tokens. Upgrade to Lumina Tabula Pro to continue.',
       )
     }
 
@@ -156,12 +158,22 @@ async function managedProxyFetch(
       )
     }
 
-    if (response.status === 402) {
+    if (response.status === 402 || payload?.code === 'TRIAL_EXPIRED') {
       void refreshUsage()
       openPricingModal('trial-expired')
       throw new BillingBlockError(
         'trial-expired',
         payload?.error ?? 'Your 7-day free trial has ended.',
+      )
+    }
+
+    if (response.status === 403) {
+      void refreshUsage()
+      const reason: BillingBlockReason = isGuestSession ? 'guest-limit' : 'quota-exceeded'
+      openPricingModal(reason)
+      throw new BillingBlockError(
+        reason,
+        payload?.error ?? 'You have used all trial tokens. Upgrade to Lumina Tabula Pro to continue.',
       )
     }
 
