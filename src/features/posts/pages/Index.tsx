@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useRouter } from '../../../core/router'
-import { ROUTES } from '../../../core/router/paths'
+import { postPath, ROUTES } from '../../../core/router/paths'
+import { useIsAdmin } from '../../auth/useProfile'
 import { HeroPixelField } from '../../common/HeroPixelField'
+import { PlusIcon } from '../../common/Icons'
 import { Header } from '../../header/Header'
+import { Footer } from '../../landing/components/Footer'
 import { Feed } from '../components/Feed'
+import { PostEditModal } from '../components/PostEditModal'
 
 /**
  * The public Posts index (`/posts`).
@@ -21,10 +25,12 @@ export interface InsightsProps {
 
 export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProps) {
   const { navigate } = useRouter()
+  const isAdmin = useIsAdmin()
   const query = useQuery()
   const urlTag = query.get('tag')
   const urlSearch = query.get('q')?.trim() ?? ''
   const [tag, setTag] = useState<string | null>(initialTag ?? urlTag)
+  const [creatingPost, setCreatingPost] = useState(false)
 
   useEffect(() => {
     setTag(initialTag ?? urlTag)
@@ -43,21 +49,33 @@ export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProp
             Published analyses from the Lumina Tabula workspace — every table, chart, and diagram
             preserved as it was produced.
           </p>
-          {tag ? (
-            <div style={{ marginTop: 18 }}>
-              <button
-                type="button"
-                className="btn btn-small btn-ghost"
-                onClick={() => setTag(null)}
-              >
-                Tag: “{tag}” ×
-              </button>
+          {isAdmin || tag ? (
+            <div style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  className="btn btn-small btn-primary"
+                  onClick={() => setCreatingPost(true)}
+                >
+                  <PlusIcon size={12} />
+                  <span>Create Post</span>
+                </button>
+              ) : null}
+              {tag ? (
+                <button
+                  type="button"
+                  className="btn btn-small btn-ghost"
+                  onClick={() => setTag(null)}
+                >
+                  Tag: “{tag}” ×
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
       </section>
 
-      <main className="insights-body">
+      <main className="insights-body" style={{ flex: 1 }}>
         <div className="shell-container">
           <Feed
             limit={12}
@@ -71,6 +89,18 @@ export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProp
           />
         </div>
       </main>
+
+      {creatingPost && isAdmin ? (
+        <PostEditModal
+          mode="create"
+          onClose={() => setCreatingPost(false)}
+          onCreated={(created) => {
+            navigate(postPath(created.slug))
+          }}
+        />
+      ) : null}
+
+      <Footer />
     </div>
   )
 }

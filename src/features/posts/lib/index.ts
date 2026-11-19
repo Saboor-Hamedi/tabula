@@ -3,6 +3,7 @@
  */
 
 export {
+  blocksToMarkdown,
   buildDraftFromAnswer,
   buildSlug,
   countWords,
@@ -13,6 +14,7 @@ export {
   findFirstImage,
   normalizeTags,
   parseBlocks,
+  resolveFullPostTitle,
   stripMarkdown,
   toDraftImage,
   truncate,

@@ -141,7 +141,7 @@ export function HeroSearch() {
               setActiveIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1))
             }
           }}
-          placeholder="Search published analyses, stories, or topics…"
+          placeholder="Search published stories & analyses…"
           aria-label="Search published stories and topics"
           autoComplete="off"
           spellCheck={false}

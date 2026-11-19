@@ -3,11 +3,11 @@ import { Link } from '../../../core/router'
 import { ROUTES, postPath } from '../../../core/router/paths'
 import { formatCount } from '../../../core/utils/format'
 import type { Post, PostStatus } from '../../../core/supabase/types'
-import { CheckIcon, ExternalIcon, SearchIcon, TrashIcon } from '../../common/Icons'
+import { CheckIcon, ExternalIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../../common/Icons'
 import { IconButton } from '../../common/IconButton'
 import { Pagination } from '../../common/Pagination'
 import { useIsAdmin } from '../../auth/useProfile'
-import { deletePost, listAllPosts, setPostStatus } from '../../posts'
+import { deletePost, listAllPosts, PostEditModal, setPostStatus } from '../../posts'
 
 type StatusFilter = 'all' | PostStatus
 
@@ -36,6 +36,9 @@ export function Insights() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(8)
+  const [editingPost, setEditingPost] = useState<Post | null>(null)
+  const [creatingPost, setCreatingPost] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -126,10 +129,10 @@ export function Insights() {
   }
 
   const remove = async (post: Post) => {
-    if (!window.confirm(`Delete “${post.title}”? This cannot be undone.`)) return
     setBusyId(post.id)
     try {
       await deletePost(post.id)
+      setConfirmDeleteId(null)
       await load()
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'The delete failed.')
@@ -146,13 +149,23 @@ export function Insights() {
         <div className="dash-panel-titles">
           <h2 className="dash-section-title">Posts</h2>
           <span className="dash-panel-note">
-            Organize, publish, archive, and review all workspace posts.
+            Create, update, publish, and organize all workspace posts.
           </span>
         </div>
-        <Link className="dash-panel-link" to={ROUTES.posts}>
-          View public posts
-          <ExternalIcon size={12} />
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            className="btn btn-small btn-primary"
+            onClick={() => setCreatingPost(true)}
+          >
+            <PlusIcon size={12} />
+            <span>Create Post</span>
+          </button>
+          <Link className="dash-panel-link" to={ROUTES.posts}>
+            View public posts
+            <ExternalIcon size={12} />
+          </Link>
+        </div>
       </header>
 
       <div className="dash-table-tools dash-posts-tools">
@@ -242,6 +255,16 @@ export function Insights() {
                 </div>
 
                 <div className="dash-insight-actions">
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    disabled={busyId === post.id}
+                    onClick={() => setEditingPost(post)}
+                    title="Update post content"
+                  >
+                    <PencilIcon size={12} />
+                    <span>Update</span>
+                  </button>
                   {post.status === 'published' ? (
                     <button
                       type="button"
@@ -265,13 +288,34 @@ export function Insights() {
                   <Link className="btn btn-small" to={postPath(post.slug)}>
                     View
                   </Link>
-                  <IconButton
-                    label="Delete post"
-                    size="sm"
-                    onClick={() => void remove(post)}
-                  >
-                    <TrashIcon size={14} />
-                  </IconButton>
+                  {confirmDeleteId === post.id ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-small btn-danger"
+                        disabled={busyId === post.id}
+                        onClick={() => void remove(post)}
+                      >
+                        {busyId === post.id ? 'Deleting…' : 'Confirm'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-small"
+                        disabled={busyId === post.id}
+                        onClick={() => setConfirmDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <IconButton
+                      label="Delete post"
+                      size="sm"
+                      onClick={() => setConfirmDeleteId(post.id)}
+                    >
+                      <TrashIcon size={14} />
+                    </IconButton>
+                  )}
                 </div>
               </li>
             ))}
@@ -288,6 +332,31 @@ export function Insights() {
           />
         </>
       )}
+
+      {editingPost ? (
+        <PostEditModal
+          mode="update"
+          post={editingPost}
+          onClose={() => setEditingPost(null)}
+          onUpdated={(updated) => {
+            setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+          }}
+          onDelete={async (postToDelete) => {
+            await remove(postToDelete)
+            setEditingPost(null)
+          }}
+        />
+      ) : null}
+
+      {creatingPost ? (
+        <PostEditModal
+          mode="create"
+          onClose={() => setCreatingPost(false)}
+          onCreated={(created) => {
+            setPosts((prev) => [created, ...prev])
+          }}
+        />
+      ) : null}
     </section>
   )
 }

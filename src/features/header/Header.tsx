@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from '../../core/router'
 import { ROUTES, userPath } from '../../core/router/paths'
 import { signOutAccount } from '../../core/supabase/signOut'
@@ -17,7 +17,6 @@ import {
 } from '../session/sessionContext'
 import { Account } from './Account'
 import { Brand } from './Brand'
-import { HeaderSearch } from './HeaderSearch'
 import { Nav } from './Nav'
 
 /**
@@ -31,6 +30,9 @@ import { Nav } from './Nav'
  * Workspace. Insights belongs to administrators, and the published sections
  * are public.
  */
+
+/** When true, a persistent parent `<Header variant="page" />` is already mounted above `<Routes>`. */
+export const PublicHeaderProvidedContext = createContext(false)
 
 export interface HeaderProps {
   /**
@@ -52,7 +54,8 @@ export function Header({
   onSignIn,
   onSignUp,
 }: HeaderProps) {
-  const { navigate, path } = useRouter()
+  const parentPublicHeaderProvided = useContext(PublicHeaderProvidedContext)
+  const { navigate } = useRouter()
   const session = useContext(SessionStateContext)
   const actions = useContext(SessionActionsContext)
   const user = useAuthUser()
@@ -63,23 +66,21 @@ export function Header({
   const isWorkspace = variant === 'workspace'
   const isDashboard = variant === 'dashboard'
   const isPage = variant === 'page'
-  const isLanding = path === ROUTES.landing || path === '/'
-  const isAuth =
-    path === ROUTES.signIn ||
-    path === ROUTES.signUp ||
-    path.startsWith('/login') ||
-    path.startsWith('/signup')
   const canClearChat = isWorkspace && Boolean(session?.activeSession) && (session?.messages.length ?? 0) > 0
 
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    if (!isPage) return
+    if (!isPage || parentPublicHeaderProvided) return
     const onScroll = () => setScrolled(window.scrollY > 12)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [isPage])
+  }, [isPage, parentPublicHeaderProvided])
+
+  if (isPage && parentPublicHeaderProvided) {
+    return null
+  }
 
   const isSignedIn = Boolean(user && !user.is_anonymous)
   const workspaceTarget = isSignedIn ? userPath('/workspace', userSlug) : ROUTES.workspace
@@ -128,7 +129,6 @@ export function Header({
       ) : null}
 
       <div className="app-header-right">
-        {isPage && !isLanding && !isAuth ? <HeaderSearch /> : null}
         {canClearChat && actions ? (
           <IconButton label="Clear chat history" onClick={actions.requestClearChat}>
             <TrashIcon size={16} />

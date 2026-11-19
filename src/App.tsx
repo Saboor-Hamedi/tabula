@@ -12,6 +12,7 @@ import { useAuthUser, useUserSlug } from './features/auth/useProfile'
 import { VerifyEmailScreen } from './features/auth/VerifyEmailScreen'
 import { PricingModal } from './features/billing/PricingModal'
 import { Analyse } from './features/dashboard'
+import { Header, PublicHeaderProvidedContext } from './features/header/Header'
 import { FeaturesPage, Landing, PricingPage } from './features/landing'
 import { Article, Insights } from './features/posts'
 import { SourcesPage } from './features/sources'
@@ -38,6 +39,21 @@ function Workspace() {
     <SessionProvider key={user?.id ?? 'guest'}>
       <AppShell />
     </SessionProvider>
+  )
+}
+
+function isPublicMarketingOrPostsRoute(path: string): boolean {
+  return (
+    path === '/' ||
+    path === '/landing' ||
+    path === ROUTES.features ||
+    path === ROUTES.sources ||
+    path.startsWith('/sources/') ||
+    path === ROUTES.pricing ||
+    path === ROUTES.posts ||
+    path.startsWith('/posts/') ||
+    path === ROUTES.insights ||
+    path.startsWith('/insights/')
   )
 }
 
@@ -68,6 +84,9 @@ function UserUrlSync() {
 }
 
 export function AppRoutes() {
+  const { path } = useRouter()
+  const isPublicPage = isPublicMarketingOrPostsRoute(path)
+
   const dashboardElement = (
     <RequireAuth>
       <RequireVerified>
@@ -81,25 +100,30 @@ export function AppRoutes() {
   return (
     <>
       <UserUrlSync />
-      <Routes>
-        <Route path={ROUTES.home} element={<Landing />} />
-        <Route path="/landing" element={<Navigate to={ROUTES.home} />} />
-        <Route path={ROUTES.features} element={<FeaturesPage />} />
-        <Route path={ROUTES.sources} element={<SourcesPage />} />
-        <Route path={ROUTES.pricing} element={<PricingPage />} />
-        <Route path={ROUTES.dashboard} element={dashboardElement} />
-        <Route path={ROUTES.userDashboard} element={dashboardElement} />
-        <Route path={ROUTES.workspace} element={workspaceElement} />
-        <Route path={ROUTES.userWorkspace} element={workspaceElement} />
-        <Route path={ROUTES.posts} element={<Insights />} />
-        <Route path={ROUTES.post} element={<Article />} />
-        <Route path={ROUTES.insights} element={<Insights />} />
-        <Route path={ROUTES.insight} element={<Article />} />
-        <Route path={ROUTES.signIn} element={<AuthScreen initialMode="signin" />} />
-        <Route path={ROUTES.signUp} element={<AuthScreen initialMode="signup" />} />
-        <Route path={ROUTES.verify} element={<VerifyEmailScreen />} />
-        <Route path={ROUTES.notFound} element={<Navigate to={ROUTES.home} />} />
-      </Routes>
+      {isPublicPage ? <Header variant="page" /> : null}
+      <PublicHeaderProvidedContext.Provider value={isPublicPage}>
+        <div key={isPublicPage ? path : 'app-shell'} className={isPublicPage ? 'public-route-stage' : undefined}>
+          <Routes>
+            <Route path={ROUTES.home} element={<Landing />} />
+            <Route path="/landing" element={<Navigate to={ROUTES.home} />} />
+            <Route path={ROUTES.features} element={<FeaturesPage />} />
+            <Route path={ROUTES.sources} element={<SourcesPage />} />
+            <Route path={ROUTES.pricing} element={<PricingPage />} />
+            <Route path={ROUTES.dashboard} element={dashboardElement} />
+            <Route path={ROUTES.userDashboard} element={dashboardElement} />
+            <Route path={ROUTES.workspace} element={workspaceElement} />
+            <Route path={ROUTES.userWorkspace} element={workspaceElement} />
+            <Route path={ROUTES.posts} element={<Insights />} />
+            <Route path={ROUTES.post} element={<Article />} />
+            <Route path={ROUTES.insights} element={<Insights />} />
+            <Route path={ROUTES.insight} element={<Article />} />
+            <Route path={ROUTES.signIn} element={<AuthScreen initialMode="signin" />} />
+            <Route path={ROUTES.signUp} element={<AuthScreen initialMode="signup" />} />
+            <Route path={ROUTES.verify} element={<VerifyEmailScreen />} />
+            <Route path={ROUTES.notFound} element={<Navigate to={ROUTES.home} />} />
+          </Routes>
+        </div>
+      </PublicHeaderProvidedContext.Provider>
     </>
   )
 }

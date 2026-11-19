@@ -5,8 +5,17 @@ import type { Post, PostImage } from '../../../core/supabase/types'
 import { isSupabaseConfigured } from '../../../core/supabase/client'
 import { formatCount } from '../../../core/utils/format'
 import { useIsAdmin } from '../../auth/useProfile'
-import { ArrowLeftIcon, CheckIcon, CopyIcon, EyeIcon, ShareIcon } from '../../common/Icons'
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  CopyIcon,
+  EyeIcon,
+  PencilIcon,
+  ShareIcon,
+  TrashIcon,
+} from '../../common/Icons'
 import { Header } from '../../header/Header'
+import { Footer } from '../../landing/components/Footer'
 import {
   deletePost,
   fetchPostBySlug,
@@ -14,6 +23,8 @@ import {
   setPostStatus,
 } from '../api'
 import { Content } from '../components/Content'
+import { PostEditModal } from '../components/PostEditModal'
+import { resolveFullPostTitle } from '../lib'
 
 /**
  * A published insight, read the way an article should read.
@@ -44,6 +55,8 @@ export function Article() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [adminBusy, setAdminBusy] = useState<'status' | 'delete' | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -178,9 +191,8 @@ export function Article() {
     }
   }, [post, isAdmin, adminBusy])
 
-  const handleDelete = useCallback(async () => {
+  const handlePerformDelete = useCallback(async () => {
     if (!post || !isAdmin || adminBusy) return
-    if (!window.confirm(`Delete "${post.title}" permanently?`)) return
     setAdminBusy('delete')
     try {
       await deletePost(post.id)
@@ -192,6 +204,7 @@ export function Article() {
           : 'Could not delete the post.',
       )
       setAdminBusy(null)
+      setConfirmingDelete(false)
     }
   }, [post, isAdmin, adminBusy, navigate])
 
@@ -201,59 +214,6 @@ export function Article() {
 
       <article className="post-page">
         <div className="post-article">
-          <div className="post-article-topbar">
-            <Link className="post-back" to={ROUTES.posts}>
-              <ArrowLeftIcon size={14} />
-              <span>All posts</span>
-            </Link>
-            {post ? (
-              <div className="post-article-actions">
-                {isAdmin ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn-small"
-                      disabled={adminBusy !== null}
-                      onClick={() => void handleToggleStatus()}
-                    >
-                      <span>
-                        {adminBusy === 'status'
-                          ? 'Saving…'
-                          : post.status === 'published'
-                            ? 'Unpublish'
-                            : 'Publish'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-small btn-danger"
-                      disabled={adminBusy !== null}
-                      onClick={() => void handleDelete()}
-                    >
-                      <span>{adminBusy === 'delete' ? 'Deleting…' : 'Delete'}</span>
-                    </button>
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  className="btn btn-small"
-                  onClick={() => void handleShare()}
-                >
-                  <ShareIcon size={13} />
-                  <span>Share</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-small"
-                  onClick={() => void handleCopyLink()}
-                >
-                  {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-                  <span>{copied ? 'Link copied' : 'Copy link'}</span>
-                </button>
-              </div>
-            ) : null}
-          </div>
-
           {loading ? (
             <div className="post-article-skeleton">
               <div className="post-skeleton-line is-title" />
@@ -271,7 +231,103 @@ export function Article() {
             </div>
           ) : (
             <>
-              <header className="post-article-header">
+              <header
+                className={`post-article-header ${post.cover_image_url ? 'has-cover-img' : ''}`}
+                style={
+                  post.cover_image_url
+                    ? {
+                        backgroundImage: `linear-gradient(180deg, rgba(10, 14, 18, 0.62) 0%, rgba(10, 14, 18, 0.86) 100%), url(${post.cover_image_url})`,
+                      }
+                    : undefined
+                }
+              >
+                <div className="post-article-topbar">
+                  <Link className="post-back" to={ROUTES.posts}>
+                    <ArrowLeftIcon size={14} />
+                    <span>All posts</span>
+                  </Link>
+
+                  <div className="post-article-actions">
+                    {isAdmin ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-small post-banner-action-btn"
+                          disabled={adminBusy !== null}
+                          onClick={() => setEditing(true)}
+                          title="Update post content"
+                        >
+                          <PencilIcon size={13} />
+                          <span>Update</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-small post-banner-action-btn"
+                          disabled={adminBusy !== null}
+                          onClick={() => void handleToggleStatus()}
+                        >
+                          <span>
+                            {adminBusy === 'status'
+                              ? 'Saving…'
+                              : post.status === 'published'
+                                ? 'Unpublish'
+                                : 'Publish'}
+                          </span>
+                        </button>
+                        {confirmingDelete ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-small btn-danger"
+                              disabled={adminBusy !== null}
+                              onClick={() => void handlePerformDelete()}
+                            >
+                              <span>{adminBusy === 'delete' ? 'Removing…' : 'Confirm'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-small post-banner-action-btn"
+                              disabled={adminBusy !== null}
+                              onClick={() => setConfirmingDelete(false)}
+                            >
+                              <span>Cancel</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-small btn-danger post-banner-icon-btn"
+                            disabled={adminBusy !== null}
+                            onClick={() => setConfirmingDelete(true)}
+                            aria-label="Delete post"
+                            title="Delete post"
+                          >
+                            <TrashIcon size={14} />
+                          </button>
+                        )}
+                      </>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn btn-small post-banner-action-btn post-banner-icon-btn"
+                      onClick={() => void handleShare()}
+                      aria-label="Share post"
+                      title="Share post"
+                    >
+                      <ShareIcon size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-small post-banner-action-btn post-banner-icon-btn"
+                      onClick={() => void handleCopyLink()}
+                      aria-label={copied ? 'Link copied' : 'Copy link'}
+                      title={copied ? 'Link copied' : 'Copy link'}
+                    >
+                      {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                    </button>
+                  </div>
+                </div>
+
                 {post.tags.length > 0 ? (
                   <div className="post-card-tags">
                     {post.tags.map((tag) => (
@@ -286,46 +342,42 @@ export function Article() {
                   </div>
                 ) : null}
 
-                <h1 className="post-article-title">{post.title}</h1>
+                <h1 className="post-article-title">{resolveFullPostTitle(post)}</h1>
                 {post.subtitle ? (
                   <p className="post-article-subtitle">{post.subtitle}</p>
                 ) : null}
-                {post.excerpt ? <p className="post-article-excerpt">{post.excerpt}</p> : null}
 
-                <div className="post-article-meta">
-                  <div className="post-card-byline">
+                <div className="post-fb-header-row">
+                  <div className="post-fb-author-group">
                     {post.author_avatar_url ? (
-                      <img className="post-avatar" src={post.author_avatar_url} alt="" />
+                      <img className="post-avatar post-avatar-lg" src={post.author_avatar_url} alt="" />
                     ) : (
-                      <span className="post-avatar is-fallback" aria-hidden>
+                      <span className="post-avatar post-avatar-lg is-fallback" aria-hidden>
                         {(post.author_name ?? 'T').slice(0, 1).toUpperCase()}
                       </span>
                     )}
-                    <span className="post-card-author">{post.author_name ?? 'Lumina Tabula'}</span>
-                    <span className="post-dot" aria-hidden>
-                      ·
-                    </span>
-                    <span className="post-card-date">{formatDate(post.published_at)}</span>
-                  </div>
-
-                  <div className="post-card-meta">
-                    <span className="post-chip">
-                      <EyeIcon size={12} />
-                      {formatCount(post.view_count)} views
-                    </span>
-                    <span className="post-chip">{post.reading_time_minutes} min read</span>
+                    <div className="post-fb-author-stack">
+                      <span className="post-fb-author-name">
+                        {post.author_name ?? 'Lumina Tabula'}
+                      </span>
+                      <div className="post-fb-date-row">
+                        <span className="post-card-date">{formatDate(post.published_at)}</span>
+                        <span className="post-dot" aria-hidden>
+                          ·
+                        </span>
+                        <span>{post.reading_time_minutes} min read</span>
+                        <span className="post-dot" aria-hidden>
+                          ·
+                        </span>
+                        <span className="post-fb-views">
+                          <EyeIcon size={12} />
+                          <span>{formatCount(post.view_count)} views</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </header>
-
-              {post.cover_image_url ? (
-                <figure className="post-article-cover">
-                  <img src={post.cover_image_url} alt="" />
-                  {post.cover_caption ? (
-                    <figcaption>{post.cover_caption}</figcaption>
-                  ) : null}
-                </figure>
-              ) : null}
 
               <Content blocks={post.blocks} images={images} />
 
@@ -333,10 +385,22 @@ export function Article() {
                 <span>Made with Lumina Tabula — private data workbench.</span>
                 <Link to={ROUTES.posts}>Browse all posts</Link>
               </footer>
+
+              {editing && isAdmin ? (
+                <PostEditModal
+                  post={post}
+                  onClose={() => setEditing(false)}
+                  onUpdated={(updated) => setPost(updated)}
+                  onDelete={async () => {
+                    await handlePerformDelete()
+                  }}
+                />
+              ) : null}
             </>
           )}
         </div>
       </article>
+      <Footer />
     </div>
   )
 }

@@ -5,7 +5,15 @@ import type {
   PostStatus,
   PostSummary,
 } from '../../../core/supabase/types'
-import { buildSlug, type DraftImage, type PostDraft } from '../lib/compose'
+import {
+  buildSlug,
+  deriveExcerpt,
+  estimateReadingTime,
+  normalizeTags,
+  parseBlocks,
+  type DraftImage,
+  type PostDraft,
+} from '../lib/compose'
 
 /**
  * Data access for published insights.
@@ -265,6 +273,71 @@ export async function setPostStatus(
     .eq('id', postId)
 
   if (error) throw new PostError(error.message, error)
+}
+
+export interface UpdatePostInput {
+  title: string
+  subtitle?: string | null
+  excerpt?: string
+  content: string
+  coverImageUrl?: string | null
+  coverCaption?: string | null
+  tags?: string[]
+  status?: PostStatus
+}
+
+/** Updates an existing post's title, subtitle, content, blocks, tags, and status. Administrators only. */
+export async function updatePost(
+  postId: string,
+  input: UpdatePostInput,
+): Promise<Post> {
+  const client = requireClient()
+  const cleanContent = input.content ?? ''
+  const blocks = parseBlocks(cleanContent)
+  const excerpt =
+    typeof input.excerpt === 'string' && input.excerpt.trim().length > 0
+      ? input.excerpt.trim()
+      : deriveExcerpt(cleanContent)
+  const tags = normalizeTags(input.tags ?? [])
+  const readingTimeMinutes = estimateReadingTime(cleanContent)
+
+  const payload: Record<string, unknown> = {
+    title: input.title.trim() || 'Untitled insight',
+    subtitle: input.subtitle?.trim() || null,
+    excerpt,
+    content: cleanContent,
+    blocks,
+    tags,
+    reading_time_minutes: readingTimeMinutes,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.coverImageUrl !== undefined) {
+    payload.cover_image_url = input.coverImageUrl
+  }
+  if (input.coverCaption !== undefined) {
+    payload.cover_caption = input.coverCaption
+  }
+  if (input.status) {
+    payload.status = input.status
+  }
+
+  const { data, error } = await client
+    .from(POSTS)
+    .update(payload)
+    .eq('id', postId)
+    .select('*')
+    .single()
+
+  if (error) {
+    const denied = error.code === '42501' || /row-level security/i.test(error.message)
+    throw new PostError(
+      denied ? 'Only administrators can update posts.' : error.message,
+      error,
+    )
+  }
+
+  return data as Post
 }
 
 /** Deletes a post. Its gallery rows cascade away with it. */

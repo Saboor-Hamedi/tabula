@@ -107,26 +107,9 @@ export const Card = memo(function Card({ post, featured = false }: CardProps) {
         </div>
       )}
 
-      <div className="post-card-body">
-        {post.tags.length > 0 ? (
-          <div className="post-card-tags">
-            {post.tags.slice(0, 3).map((tag) => (
-              <span className="post-tag" key={tag}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        <h3 className="post-card-title" title={post.title}>
-          {post.title}
-        </h3>
-
-        {post.subtitle ? <p className="post-card-subtitle">{post.subtitle}</p> : null}
-        {post.excerpt ? <p className="post-card-excerpt">{post.excerpt}</p> : null}
-
-        <div className="post-card-foot">
-          <div className="post-card-byline">
+      <div className="post-card-header-band">
+        <div className="post-fb-header-row">
+          <div className="post-fb-author-group">
             {post.author_avatar_url ? (
               <img
                 className="post-avatar"
@@ -139,11 +122,10 @@ export const Card = memo(function Card({ post, featured = false }: CardProps) {
                 {(post.author_name ?? 'T').slice(0, 1).toUpperCase()}
               </span>
             )}
-            <span className="post-card-author">{post.author_name ?? 'Lumina Tabula'}</span>
-            <span className="post-dot" aria-hidden>
-              ·
-            </span>
-            <span className="post-card-date">{formatDate(post.published_at)}</span>
+            <div className="post-fb-author-stack">
+              <span className="post-card-author">{post.author_name ?? 'Lumina Tabula'}</span>
+              <span className="post-card-date">{formatDate(post.published_at)}</span>
+            </div>
           </div>
 
           <div className="post-card-meta">
@@ -151,11 +133,34 @@ export const Card = memo(function Card({ post, featured = false }: CardProps) {
               <EyeIcon size={12} />
               {formatCount(post.view_count)}
             </span>
-            <span className="post-card-cta">
-              <span>Read</span>
-              <ArrowRightIcon size={12} />
-            </span>
           </div>
+        </div>
+
+        <h3 className="post-card-title" title={post.title}>
+          {post.title}
+        </h3>
+      </div>
+
+      <div className="post-card-body">
+        {post.tags.length > 0 ? (
+          <div className="post-card-tags">
+            {post.tags.slice(0, 3).map((tag) => (
+              <span className="post-tag" key={tag}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {post.subtitle ? <p className="post-card-subtitle">{post.subtitle}</p> : null}
+        {post.excerpt ? <p className="post-card-excerpt">{post.excerpt}</p> : null}
+
+        <div className="post-card-foot">
+          <span className="post-card-date">{post.reading_time_minutes} min read</span>
+          <span className="post-card-cta">
+            <span>Read post</span>
+            <ArrowRightIcon size={12} />
+          </span>
         </div>
       </div>
     </Link>

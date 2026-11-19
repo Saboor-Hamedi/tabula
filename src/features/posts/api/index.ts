@@ -12,10 +12,12 @@ export {
   listPublishedPostsPage,
   publishPost,
   setPostStatus,
+  updatePost,
   uploadPostImage,
   PostError,
   type FeedOptions,
   type FeedPage,
   type PostDetail,
   type PublishInput,
+  type UpdatePostInput,
 } from './client'

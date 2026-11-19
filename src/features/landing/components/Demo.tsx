@@ -72,11 +72,18 @@ export function Demo({
         {/* Editorial Studio Window */}
         <div className="demo-studio-frame" data-reveal>
           <div className="demo-studio-bar">
-            <div className="demo-studio-file">
-              <SheetIcon size={14} />
-              <span className="demo-studio-filename">{activeScenario.fileType}</span>
-              <span className="demo-studio-sep">·</span>
-              <span className="demo-studio-meta">{activeScenario.rows}</span>
+            <div className="demo-studio-left-header">
+              <div className="demo-window-dots" aria-hidden="true">
+                <span className="demo-dot is-close" />
+                <span className="demo-dot is-min" />
+                <span className="demo-dot is-max" />
+              </div>
+              <div className="demo-studio-file">
+                <SheetIcon size={14} />
+                <span className="demo-studio-filename">{activeScenario.fileType}</span>
+                <span className="demo-studio-sep">·</span>
+                <span className="demo-studio-meta">{activeScenario.rows}</span>
+              </div>
             </div>
 
             <div className="demo-studio-controls">

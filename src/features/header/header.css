@@ -15,6 +15,7 @@
   padding: 0 var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
   min-width: 0;
   position: relative;
   /* Above the sidebar and the inspector, so the account menu is never
@@ -200,9 +201,9 @@
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-family: inherit;
+  font-family: var(--font-sans);
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 550;
   letter-spacing: -0.01em;
   text-decoration: none;
   white-space: nowrap;
@@ -246,7 +247,8 @@
 .header-nav-link.is-active {
   color: var(--text);
   background: transparent;
-  font-weight: 600;
+  font-weight: 550;
+  text-shadow: 0 0 0.25px currentColor;
 }
 
 .header-nav-link.is-active::after {

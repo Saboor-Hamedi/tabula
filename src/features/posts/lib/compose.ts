@@ -32,7 +32,7 @@ export interface PostDraft {
 /** Average silent reading speed, in words per minute. */
 const WORDS_PER_MINUTE = 220
 
-const TITLE_MAX = 90
+const TITLE_MAX = 240
 const EXCERPT_MAX = 240
 
 /** Removes markdown decoration so a line can be used as plain prose. */
@@ -218,4 +218,71 @@ export function toDraftImage(image: PostImage): DraftImage {
     altText: image.alt_text,
     caption: image.caption,
   }
+}
+
+/** Reconstructs editable Markdown from stored blocks when raw content is missing. */
+export function blocksToMarkdown(
+  blocks: PostBlock[] | null | undefined,
+  fallbackContent?: string | null,
+): string {
+  if (fallbackContent && fallbackContent.trim().length > 0) {
+    return fallbackContent
+  }
+  if (!Array.isArray(blocks) || blocks.length === 0) return ''
+  return blocks
+    .map((block) => {
+      if (block.type === 'markdown') return block.content
+      if (block.type === 'mermaid') return `\`\`\`mermaid\n${block.code.trim()}\n\`\`\``
+      if (block.type === 'table') {
+        const headers = block.headers ?? []
+        const sep = headers.map(() => '---')
+        const rows = block.rows ?? []
+        const lines = [
+          `| ${headers.join(' | ')} |`,
+          `| ${sep.join(' | ')} |`,
+          ...rows.map((r) => `| ${r.join(' | ')} |`),
+        ]
+        return lines.join('\n')
+      }
+      if (block.type === 'chart') {
+        return `\`\`\`chart\n${JSON.stringify(block.chart, null, 2)}\n\`\`\``
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+/**
+ * Ensures the full, untruncated title is displayed on the single post view,
+ * recovering the full heading from content/blocks if an older saved title
+ * was truncated with an ellipsis (`…`).
+ */
+export function resolveFullPostTitle(post: {
+  title: string
+  content?: string | null
+  blocks?: PostBlock[] | null
+}): string {
+  const rawTitle = (post.title ?? '').trim()
+  if (!rawTitle.endsWith('…') && !rawTitle.endsWith('...')) {
+    return rawTitle || 'Untitled insight'
+  }
+  const prefix = rawTitle.replace(/(?:…|\.{3})+$/, '').trim()
+  const md = blocksToMarkdown(post.blocks, post.content)
+  if (!md) return rawTitle
+  const heading = /^\s{0,3}#{1,3}\s+(.+)$/m.exec(md)
+  if (heading) {
+    const fullHeading = stripMarkdown(heading[1])
+    if (fullHeading.toLowerCase().startsWith(prefix.toLowerCase())) {
+      return fullHeading
+    }
+  }
+  const firstBlock = md
+    .split(/\n\s*\n/)
+    .map((b) => stripMarkdown(b))
+    .find((b) => b.length > 0 && !/^```/.test(b.trim()))
+  if (firstBlock && firstBlock.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return firstBlock
+  }
+  return rawTitle
 }
