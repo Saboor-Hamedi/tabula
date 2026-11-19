@@ -116,11 +116,29 @@ export function Analyse() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true
     try {
-      return localStorage.getItem('tabula:dash-sidebar') !== 'closed'
+      const saved = localStorage.getItem('tabula:dash-sidebar')
+      if (window.innerWidth <= 786) {
+        return saved === 'open'
+      }
+      return saved !== 'closed'
     } catch {
-      return true
+      return typeof window !== 'undefined' ? window.innerWidth > 786 : true
     }
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 786px)')
+    const handleMedia = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setSidebarOpen(false)
+      }
+    }
+    if (mq.addEventListener) {
+      mq.addEventListener('change', handleMedia)
+      return () => mq.removeEventListener('change', handleMedia)
+    }
+  }, [])
 
   const handleToggleSidebar = () => {
     setSidebarOpen((prev) => {
@@ -130,6 +148,17 @@ export function Analyse() {
       } catch {}
       return next
     })
+  }
+
+  const handleSelectSection = (next: DashSection) => {
+    if (!isAdmin && (next === 'members' || next === 'stories')) {
+      setSection('overview')
+      return
+    }
+    setSection(next)
+    if (typeof window !== 'undefined' && window.innerWidth <= 786) {
+      setSidebarOpen(false)
+    }
   }
 
   // Non-admin self-service account deletion state (with optional feedback)
@@ -218,13 +247,14 @@ export function Analyse() {
   }, [isAdmin])
 
   const overview = useMemo(() => {
+    if (!isAdmin) return { users: 0, admins: 0, subscribers: 0, trialing: 0 }
     const subscribers = members.filter(
       (m) => m.subscription_status === 'active' && (m.tier === 'pro' || m.tier === 'enterprise'),
     ).length
     const trialing = members.filter((m) => m.subscription_status === 'trialing').length
     const admins = members.filter((m) => m.role === 'admin').length
     return { users: members.length, admins, subscribers, trialing }
-  }, [members])
+  }, [members, isAdmin])
 
   const filteredDatasets = useMemo(() => {
     const list = stats?.items ?? []
@@ -338,6 +368,9 @@ export function Analyse() {
           ? `Free Trial · ${usage.trialDaysRemaining ?? 0}d left`
           : (profile?.tier ?? 'Free').toUpperCase()
 
+  const activeSection: DashSection =
+    !isAdmin && (section === 'members' || section === 'stories') ? 'overview' : section
+
   const navItems: { id: DashSection; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: <ActivityIcon size={14} /> },
     ...(isAdmin
@@ -350,7 +383,7 @@ export function Analyse() {
           },
           {
             id: 'stories' as const,
-            label: 'Published Stories',
+            label: 'Published',
             icon: <FileIcon size={14} />,
           },
         ]
@@ -367,6 +400,15 @@ export function Analyse() {
       />
 
       <div className={`dash-shell ${sidebarOpen ? 'is-sidebar-open' : 'is-sidebar-collapsed'}`}>
+        {/* Backdrop overlay on tablet/mobile <= 786px */}
+        {sidebarOpen ? (
+          <div
+            className="dash-sidebar-backdrop"
+            onClick={handleToggleSidebar}
+            aria-hidden="true"
+          />
+        ) : null}
+
         {/* Unified Dashboard Sidebar */}
         <aside className="dash-sidebar" aria-label="Dashboard navigation">
           <div className="dash-sidebar-profile">
@@ -392,8 +434,8 @@ export function Analyse() {
               <button
                 key={item.id}
                 type="button"
-                className={`dash-nav-item ${section === item.id ? 'is-active' : ''}`}
-                onClick={() => setSection(item.id)}
+                className={`dash-nav-item ${activeSection === item.id ? 'is-active' : ''}`}
+                onClick={() => handleSelectSection(item.id)}
               >
                 <span className="dash-nav-icon">{item.icon}</span>
                 <span className="dash-nav-label">{item.label}</span>
@@ -408,7 +450,12 @@ export function Analyse() {
             <button
               type="button"
               className="dash-btn dash-btn-primary dash-sidebar-cta"
-              onClick={() => void handleOpenDataset()}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth <= 786) {
+                  setSidebarOpen(false)
+                }
+                void handleOpenDataset()
+              }}
             >
               <span>Open Workspace</span>
               <ArrowRightIcon size={12} />
@@ -417,7 +464,12 @@ export function Analyse() {
             <button
               type="button"
               className="dash-sidebar-link"
-              onClick={() => navigate(ROUTES.landing)}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth <= 786) {
+                  setSidebarOpen(false)
+                }
+                navigate(ROUTES.landing)
+              }}
             >
               <GlobeIcon size={12} />
               <span>View Public Site</span>
@@ -432,32 +484,32 @@ export function Analyse() {
             <div className="dash-hero-copy">
               <div className="dash-hero-eyebrow-row">
                 <span className="dash-eyebrow">
-                  {section === 'overview' && (isAdmin ? 'Admin Console' : 'Dashboard')}
-                  {section === 'members' && 'Admin · Directory'}
-                  {section === 'stories' && 'Admin · Editorial'}
-                  {section === 'account' && 'Account & Security'}
+                  {activeSection === 'overview' && (isAdmin ? 'Admin Console' : 'Dashboard')}
+                  {activeSection === 'members' && 'Admin · Directory'}
+                  {activeSection === 'stories' && 'Admin · Editorial'}
+                  {activeSection === 'account' && 'Account & Security'}
                 </span>
                 <span className={`dash-status-pill ${isAdmin ? 'is-admin' : ''}`}>
                   {planLabel}
                 </span>
               </div>
               <h1 className="dash-title">
-                {section === 'overview' &&
+                {activeSection === 'overview' &&
                   (user ? `Welcome back, ${displayName.split(' ')[0]}` : 'Your Workspace')}
-                {section === 'members' && 'Members & Subscriptions'}
-                {section === 'stories' && 'Published Stories'}
-                {section === 'account' && 'Profile, Preferences & Security'}
+                {activeSection === 'members' && 'Members & Subscriptions'}
+                {activeSection === 'stories' && 'Published'}
+                {activeSection === 'account' && 'Profile, Preferences & Security'}
               </h1>
               <p className="dash-subtitle">
-                {section === 'overview' &&
+                {activeSection === 'overview' &&
                   (isAdmin
                     ? 'Monitor members, active plans, and your local spreadsheets in one place.'
                     : 'Pick up where you left off and manage your workspace.')}
-                {section === 'members' &&
+                {activeSection === 'members' &&
                   'Filter accounts by plan, trial status, or administrator role.'}
-                {section === 'stories' &&
+                {activeSection === 'stories' &&
                   'Review, edit, or unpublish stories shared from your workspace.'}
-                {section === 'account' &&
+                {activeSection === 'account' &&
                   'Manage your profile details, theme, and account security.'}
               </p>
             </div>
@@ -530,7 +582,7 @@ export function Analyse() {
           ) : null}
 
           {/* SECTION: OVERVIEW */}
-          {section === 'overview' && (
+          {activeSection === 'overview' && (
             <>
               <section className="dash-metrics-strip" aria-label="Overview metrics">
                 {isAdmin ? (
@@ -777,7 +829,7 @@ export function Analyse() {
           )}
 
           {/* SECTION: MEMBERS (ADMIN ONLY) */}
-          {section === 'members' && isAdmin && (
+          {activeSection === 'members' && isAdmin && (
             <div className="dash-admin-stack">
               <section className="dash-panel">
                 <header className="dash-panel-head">
@@ -869,10 +921,10 @@ export function Analyse() {
           )}
 
           {/* SECTION: PUBLISHED STORIES (ADMIN ONLY) */}
-          {section === 'stories' && isAdmin && <Insights />}
+          {activeSection === 'stories' && isAdmin && <Insights />}
 
           {/* SECTION: ACCOUNT & SECURITY */}
-          {section === 'account' && (
+          {activeSection === 'account' && (
             <div className="dash-account-grid">
               <section className="dash-card">
                 <div className="dash-profile-header">

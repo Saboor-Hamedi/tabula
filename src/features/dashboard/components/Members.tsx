@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatCount } from '../../../core/utils/format'
 import { SearchIcon } from '../../common/Icons'
 import { Pagination } from '../../common/Pagination'
+import { useIsAdmin } from '../../auth/useProfile'
 import type { Member } from '../api'
 
 /**
@@ -59,6 +60,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export function Members({ members, loading = false }: MembersProps) {
+  const isAdmin = useIsAdmin()
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -84,6 +86,8 @@ export function Members({ members, loading = false }: MembersProps) {
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
+  if (!isAdmin) return null
+
   if (loading) {
     return (
       <div className="dash-table-wrap">
@@ -101,7 +105,7 @@ export function Members({ members, loading = false }: MembersProps) {
   }
 
   return (
-    <div className="dash-table-wrap">
+    <div className="dash-members-section">
       <div className="dash-table-tools">
         <div className="dash-table-search">
           <SearchIcon size={13} />
@@ -118,64 +122,66 @@ export function Members({ members, loading = false }: MembersProps) {
         </span>
       </div>
 
-      <table className="dash-table">
-        <thead>
-          <tr>
-            <th scope="col">Member</th>
-            <th scope="col">Plan</th>
-            <th scope="col">Status</th>
-            <th scope="col">Started</th>
-            <th scope="col">Ends</th>
-            <th scope="col">Last login</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pagedMembers.map((member) => {
-            const plan = PLAN_LABEL[member.tier ?? 'free'] ?? member.tier ?? 'Free'
-            const status = member.subscription_status
-              ? (STATUS_LABEL[member.subscription_status] ?? member.subscription_status)
-              : '—'
-            return (
-              <tr key={member.id}>
-                <td className="dash-cell-member">
-                  {member.avatar_url ? (
-                    <img className="dash-cell-avatar" src={member.avatar_url} alt="" />
-                  ) : (
-                    <span className="dash-cell-avatar is-fallback" aria-hidden>
-                      {(member.display_name ?? member.email ?? '?')
-                        .charAt(0)
-                        .toUpperCase()}
+      <div className="dash-table-wrap">
+        <table className="dash-table">
+          <thead>
+            <tr>
+              <th scope="col">Member</th>
+              <th scope="col">Plan</th>
+              <th scope="col">Status</th>
+              <th scope="col">Started</th>
+              <th scope="col">Ends</th>
+              <th scope="col">Last login</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pagedMembers.map((member) => {
+              const plan = PLAN_LABEL[member.tier ?? 'free'] ?? member.tier ?? 'Free'
+              const status = member.subscription_status
+                ? (STATUS_LABEL[member.subscription_status] ?? member.subscription_status)
+                : '—'
+              return (
+                <tr key={member.id}>
+                  <td className="dash-cell-member">
+                    {member.avatar_url ? (
+                      <img className="dash-cell-avatar" src={member.avatar_url} alt="" />
+                    ) : (
+                      <span className="dash-cell-avatar is-fallback" aria-hidden>
+                        {(member.display_name ?? member.email ?? '?')
+                          .charAt(0)
+                          .toUpperCase()}
+                      </span>
+                    )}
+                    <span className="dash-cell-member-text">
+                      <span className="dash-cell-name">
+                        {member.display_name ?? member.email?.split('@')[0] ?? 'Member'}
+                      </span>
+                      <span className="dash-cell-email">{member.email}</span>
                     </span>
-                  )}
-                  <span className="dash-cell-member-text">
-                    <span className="dash-cell-name">
-                      {member.display_name ?? member.email?.split('@')[0] ?? 'Member'}
-                    </span>
-                    <span className="dash-cell-email">{member.email}</span>
-                  </span>
-                  {member.role === 'admin' ? (
-                    <span className="dash-role">Admin</span>
-                  ) : null}
-                </td>
-                <td>
-                  <span className={`dash-plan is-${member.tier ?? 'free'}`}>{plan}</span>
-                </td>
-                <td className="dash-cell-status">{status}</td>
-                <td className="dash-cell-date">{formatDate(member.current_period_start)}</td>
-                <td className="dash-cell-date">
-                  {formatDate(member.current_period_end)}
-                  {member.cancel_at_period_end ? (
-                    <span className="dash-flag">Cancels</span>
-                  ) : null}
-                </td>
-                <td className="dash-cell-date" title={formatDate(member.last_sign_in_at)}>
-                  {relativeTime(member.last_sign_in_at)}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                    {member.role === 'admin' ? (
+                      <span className="dash-role">Admin</span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <span className={`dash-plan is-${member.tier ?? 'free'}`}>{plan}</span>
+                  </td>
+                  <td className="dash-cell-status">{status}</td>
+                  <td className="dash-cell-date">{formatDate(member.current_period_start)}</td>
+                  <td className="dash-cell-date">
+                    {formatDate(member.current_period_end)}
+                    {member.cancel_at_period_end ? (
+                      <span className="dash-flag">Cancels</span>
+                    ) : null}
+                  </td>
+                  <td className="dash-cell-date" title={formatDate(member.last_sign_in_at)}>
+                    {relativeTime(member.last_sign_in_at)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <Pagination
         page={safePage}

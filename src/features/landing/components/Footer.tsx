@@ -51,7 +51,7 @@ export function Footer() {
                 </button>
               ))}
               <Link className="footer-link" to={ROUTES.posts}>
-                Published Stories
+                Published
               </Link>
             </div>
 

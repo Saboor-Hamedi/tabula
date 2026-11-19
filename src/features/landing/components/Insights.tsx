@@ -40,7 +40,7 @@ export function Insights() {
       <div className="landing-container">
         <div className="landing-masthead" data-reveal>
           <div className="landing-masthead-left">
-            <span className="landing-kicker">Published Stories</span>
+            <span className="landing-kicker">Published</span>
             <h2 className="landing-section-title">
               From the <span className="landing-serif-italic">Workspace.</span>
             </h2>

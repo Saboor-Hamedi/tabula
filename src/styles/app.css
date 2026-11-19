@@ -7106,7 +7106,7 @@ button.chip-action:disabled {
 }
 
 [data-theme='dark'] .app-shell.is-workspace-shell {
-  background: #131315;
+  background: #101010;
 }
 
 .app-shell.is-workspace-shell .app-header.is-workspace {
@@ -7176,8 +7176,8 @@ button.chip-action:disabled {
 }
 
 [data-theme='dark'] .workspace-action-btn {
-  background: #1B1B1E;
-  border-color: #29292E;
+  background: #181818;
+  border-color: #282828;
 }
 
 .workspace-action-btn:hover {
@@ -7237,8 +7237,8 @@ button.chip-action:disabled {
 [data-theme='dark'] .app-shell.is-workspace-shell .sidebar,
 [data-theme='dark'] .app-shell.is-workspace-shell .app-main,
 [data-theme='dark'] .app-shell.is-workspace-shell .inspector {
-  background: #1B1B1E;
-  border-color: #29292E;
+  background: #181818;
+  border-color: #282828;
 }
 
 .app-shell.is-workspace-shell .resize-handle {
@@ -7423,8 +7423,8 @@ button.chip-action:disabled {
   }
 
   [data-theme='dark'] .workspace-mobile-nav-track {
-    background: #1B1B1E;
-    border-color: #29292E;
+    background: #181818;
+    border-color: #282828;
   }
 
   .workspace-mobile-tab {

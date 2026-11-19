@@ -6,6 +6,7 @@ import type { Post, PostStatus } from '../../../core/supabase/types'
 import { CheckIcon, ExternalIcon, SearchIcon, TrashIcon } from '../../common/Icons'
 import { IconButton } from '../../common/IconButton'
 import { Pagination } from '../../common/Pagination'
+import { useIsAdmin } from '../../auth/useProfile'
 import { deletePost, listAllPosts, setPostStatus } from '../../posts'
 
 type StatusFilter = 'all' | PostStatus
@@ -26,6 +27,7 @@ function formatShortDate(value: string | null): string {
  * and pagination.
  */
 export function Insights() {
+  const isAdmin = useIsAdmin()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +52,10 @@ export function Insights() {
   }, [])
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLoading(false)
+      return
+    }
     let active = true
 
     const initial = async () => {
@@ -71,7 +77,7 @@ export function Insights() {
     return () => {
       active = false
     }
-  }, [])
+  }, [isAdmin])
 
   const counts = useMemo(() => {
     let published = 0
@@ -131,6 +137,8 @@ export function Insights() {
       setBusyId(null)
     }
   }
+
+  if (!isAdmin) return null
 
   return (
     <section className="dash-panel">

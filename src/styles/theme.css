@@ -86,18 +86,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0b0d10;
-    --surface: #12151a;
-    --surface-2: #171b21;
-    --surface-3: #1e232b;
-    --surface-hover: #1b2028;
+    --bg: #101010;
+    --surface: #181818;
+    --surface-2: #202020;
+    --surface-3: #282828;
+    --surface-hover: #242424;
 
-    --border: #232830;
-    --border-strong: #333a45;
+    --border: #282828;
+    --border-strong: #383838;
 
-    --text: #e8eaee;
-    --text-secondary: #a6adba;
-    --text-muted: #767e8c;
+    --text: #ededed;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
 
     --accent: #2dd4bf;
     --accent-hover: #5eead4;
@@ -111,30 +111,30 @@
     --warning: #fbbf24;
     --warning-soft: rgba(251, 191, 36, 0.12);
 
-    --code-bg: #0e1116;
-    --code-border: #232830;
+    --code-bg: #141414;
+    --code-border: #282828;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.6);
-    --shadow-lg: 0 20px 52px -16px rgba(0, 0, 0, 0.8);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.65);
+    --shadow-lg: 0 20px 52px -16px rgba(0, 0, 0, 0.85);
   }
 }
 
 :root[data-theme='dark'],
 [data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0b0d10;
-  --surface: #12151a;
-  --surface-2: #171b21;
-  --surface-3: #1e232b;
-  --surface-hover: #1b2028;
+  --bg: #101010;
+  --surface: #181818;
+  --surface-2: #202020;
+  --surface-3: #282828;
+  --surface-hover: #242424;
 
-  --border: #232830;
-  --border-strong: #333a45;
+  --border: #282828;
+  --border-strong: #383838;
 
-  --text: #e8eaee;
-  --text-secondary: #a6adba;
-  --text-muted: #767e8c;
+  --text: #ededed;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
 
   --accent: #2dd4bf;
   --accent-hover: #5eead4;
@@ -148,12 +148,12 @@
   --warning: #fbbf24;
   --warning-soft: rgba(251, 191, 36, 0.12);
 
-  --code-bg: #0e1116;
-  --code-border: #232830;
+  --code-bg: #141414;
+  --code-border: #282828;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 20px 52px -16px rgba(0, 0, 0, 0.8);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.65);
+  --shadow-lg: 0 20px 52px -16px rgba(0, 0, 0, 0.85);
 }
 
 :root[data-theme='light'],

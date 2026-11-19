@@ -15,10 +15,11 @@ export interface BrandProps {
   compact?: boolean
 }
 
-export function Brand({ to = ROUTES.dashboard }: BrandProps) {
+export function Brand({ to = ROUTES.dashboard, compact = false }: BrandProps) {
   return (
-    <Link className="header-brand" to={to} aria-label="Lumina Tabula home">
+    <Link className={`header-brand ${compact ? 'is-compact' : ''}`} to={to} aria-label="Lumina Tabula home">
       <img src={logoUrl} alt="Lumina Tabula" className="header-brand-logo" />
+      {!compact && <span className="header-brand-name">Lumina Tabula</span>}
     </Link>
   )
 }

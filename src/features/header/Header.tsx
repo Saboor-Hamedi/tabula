@@ -53,7 +53,7 @@ export function Header({
   onSignIn,
   onSignUp,
 }: HeaderProps) {
-  const { navigate } = useRouter()
+  const { navigate, path } = useRouter()
   const session = useContext(SessionStateContext)
   const actions = useContext(SessionActionsContext)
   const user = useAuthUser()
@@ -64,6 +64,7 @@ export function Header({
   const isWorkspace = variant === 'workspace'
   const isDashboard = variant === 'dashboard'
   const isPage = variant === 'page'
+  const isLanding = path === ROUTES.landing || path === '/'
   const canClearChat = isWorkspace && Boolean(session?.activeSession) && (session?.messages.length ?? 0) > 0
 
   const [scrolled, setScrolled] = useState(false)
@@ -97,6 +98,10 @@ export function Header({
           </span>
         ) : null}
 
+        {!isWorkspace ? (
+          <Brand to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />
+        ) : null}
+
         {isDashboard && onToggleSidebar ? (
           <span className="dashboard-header-toggle">
             <IconButton
@@ -109,19 +114,14 @@ export function Header({
           </span>
         ) : null}
 
-        {!isWorkspace ? (
-          <>
-            <Brand to={isDashboard ? userPath('/app', userSlug) : ROUTES.landing} />
-            {!isDashboard ? <Nav isAuthenticated={isSignedIn} /> : null}
-          </>
-        ) : null}
+        {!isWorkspace && !isDashboard ? <Nav isAuthenticated={isSignedIn} /> : null}
 
         {!online ? <span className="offline-pill">Offline</span> : null}
       </div>
 
       <div className="app-header-right">
         {isPage ? <HeaderSearch /> : null}
-        {isPage ? (
+        {isPage && (!isLanding || isSignedIn) ? (
           <button
             type="button"
             className="header-workspace-cta"
