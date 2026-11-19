@@ -1,4 +1,4 @@
-import { ArrowRightIcon, ChevronDownIcon } from '../../common/Icons'
+import { ArrowRightIcon, ChevronDownIcon, SparklesIcon } from '../../common/Icons'
 import { HeroPixelField } from '../../common/HeroPixelField'
 import { HeroSearch } from './HeroSearch'
 
@@ -24,6 +24,15 @@ export function Hero({
   onNavigateToApp,
   scrollTo,
 }: HeroProps) {
+  const handleLaunchInstantDemo = () => {
+    try {
+      sessionStorage.setItem('tabula:pending-sample', '/orders.csv::orders.csv')
+    } catch {
+      // ignore
+    }
+    onNavigateToApp()
+  }
+
   return (
     <section className="landing-hero">
       <div className="hero-ledger-grid" aria-hidden="true" />
@@ -58,6 +67,16 @@ export function Hero({
 
           <button
             type="button"
+            className="landing-cta-btn landing-cta-secondary landing-cta-lg"
+            onClick={handleLaunchInstantDemo}
+            title="Load sample dataset instantly into the in-browser workspace"
+          >
+            <SparklesIcon size={15} />
+            <span>Try 1-Click Demo</span>
+          </button>
+
+          <button
+            type="button"
             className="landing-hero-text-link"
             onClick={() => scrollTo?.('demo')}
           >
@@ -67,7 +86,7 @@ export function Hero({
         </div>
 
         <p className="landing-hero-footnote hero-anim hero-anim-4">
-          No sign-up needed to try &nbsp;·&nbsp; Drop a file &amp; start immediately &nbsp;·&nbsp; Works offline
+          No sign-up required &nbsp;·&nbsp; 100% in-browser DuckDB WebAssembly &nbsp;·&nbsp; Zero files uploaded
         </p>
       </div>
 
