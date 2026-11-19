@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from '../../../core/router'
 import { ROUTES, userPath } from '../../../core/router/paths'
 import { useAuthUser, useUserSlug } from '../../auth/useProfile'
@@ -18,8 +18,8 @@ import { Pricing } from '../components/Pricing'
 /**
  * The front page.
  *
- * Uses the same unified `<Header />` as Insights and Articles, and keeps
- * landing sections isolated from Dashboard and Workspace.
+ * Uses the same unified `<Header />` as Insights and Articles, and drives
+ * smooth scroll-reveal motion across every section and post card.
  */
 export function Landing() {
   const { navigate } = useRouter()
@@ -27,6 +27,55 @@ export function Landing() {
   const userSlug = useUserSlug()
   const [activeScenario, setActiveScenario] = useState<DemoScenario>(DEMO_SCENARIOS[0])
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
+  const pageRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const root = pageRef.current
+    if (!root) return
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const revealSelector = '[data-reveal], .post-card'
+
+    if (reducedMotion || typeof IntersectionObserver === 'undefined') {
+      root.querySelectorAll<HTMLElement>(revealSelector).forEach((el) => {
+        el.classList.add('is-visible')
+      })
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            observer.unobserve(entry.target)
+          }
+        }
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -32px 0px' },
+    )
+
+    const observeAll = () => {
+      root.querySelectorAll<HTMLElement>(revealSelector).forEach((el, index) => {
+        if (el.classList.contains('is-visible')) return
+        if (el.classList.contains('post-card') && !el.dataset.delay) {
+          el.dataset.delay = String((index % 3) + 1)
+        }
+        observer.observe(el)
+      })
+    }
+
+    observeAll()
+
+    // Watch for async-loaded posts appearing in the feed
+    const mutation = new MutationObserver(() => observeAll())
+    mutation.observe(root, { childList: true, subtree: true })
+
+    return () => {
+      observer.disconnect()
+      mutation.disconnect()
+    }
+  }, [])
 
   const scrollTo = (id: string) => {
     const element = document.getElementById(id)
@@ -42,7 +91,7 @@ export function Landing() {
   }
 
   return (
-    <div className="landing-page">
+    <div ref={pageRef} className="landing-page">
       <Header
         variant="page"
         onSignIn={() => navigateToAuth('signin')}

@@ -3,15 +3,13 @@ import { ROUTES } from '../../../core/router/paths'
 import logoUrl from '../../../assets/logo.png'
 
 /**
- * The footer.
- *
- * The navigation column scrolls to the section it names, so the links keep
- * working after the page becomes a set of routes.
+ * Editorial Footer.
  */
 
 const SECTION_LINKS: { label: string; section: string }[] = [
-  { label: 'Demo', section: 'demo' },
+  { label: 'Showcase', section: 'demo' },
   { label: 'Privacy', section: 'privacy' },
+  { label: 'Capabilities', section: 'features' },
   { label: 'Pricing', section: 'pricing' },
   { label: 'FAQ', section: 'faq' },
 ]
@@ -30,10 +28,12 @@ export function Footer() {
         <div className="landing-footer-top">
           <div className="landing-footer-brand">
             <Link className="landing-brand" to={ROUTES.landing} aria-label="Lumina Tabula home">
-              <img src={logoUrl} alt="Lumina Tabula" className="landing-brand-logo" />
+              <img src={logoUrl} alt="" className="landing-brand-logo" />
+              <span className="landing-brand-name">Lumina Tabula</span>
             </Link>
             <p className="landing-footer-tagline">
-              The private data analysis tool where files never leave your computer.
+              Private spreadsheet analysis where your Excel and CSV files never leave your
+              computer.
             </p>
           </div>
 
@@ -50,6 +50,9 @@ export function Footer() {
                   {link.label}
                 </button>
               ))}
+              <Link className="footer-link" to={ROUTES.posts}>
+                Published Stories
+              </Link>
             </div>
 
             <div className="footer-col">
@@ -66,6 +69,10 @@ export function Footer() {
         <div className="landing-footer-bottom">
           <div className="footer-copy">
             © {new Date().getFullYear()} Lumina Tabula. Your data stays with you.
+          </div>
+          <div className="footer-status">
+            <span className="footer-status-dot" aria-hidden="true" />
+            <span>100% Private · Runs on your device</span>
           </div>
         </div>
       </div>

@@ -1,47 +1,78 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from '../../../core/router'
-import { userPath } from '../../../core/router/paths'
-import { loadPersistedWorkspace } from '../../../core/storage/persistence'
+import { ROUTES, userPath } from '../../../core/router/paths'
+import {
+  loadPersistedWorkspace,
+  saveActiveSessionId,
+} from '../../../core/storage/persistence'
 import { formatCount } from '../../../core/utils/format'
 import { isSupabaseConfigured } from '../../../core/supabase/client'
+import { deleteMyAccount, updateDisplayName } from '../../../core/supabase/deleteAccount'
 import { openPricingModal, useUsageStatus } from '../../../core/supabase/usage'
 import { useAuthUser, useIsAdmin, useProfile, useUserSlug } from '../../auth/useProfile'
 import { useDisplayName } from '../../auth/display'
 import { Header } from '../../header/Header'
 import {
-  ArrowLeftIcon,
+  ActivityIcon,
+  AlertIcon,
+  ArrowRightIcon,
   BarChartIcon,
+  CheckIcon,
+  CloseIcon,
   DatabaseIcon,
+  FileIcon,
   GlobeIcon,
   LockIcon,
+  MoonIcon,
+  SearchIcon,
+  SettingsIcon,
+  SheetIcon,
+  ShieldCheckIcon,
+  SunIcon,
+  TrashIcon,
+  UserIcon,
   ZapIcon,
 } from '../../common/Icons'
-import { Identity } from '../components/Identity'
 import { Insights } from '../components/Insights'
 import { Members } from '../components/Members'
 import { Metric } from '../components/Metric'
 import { listMembers, type Member } from '../api'
 
 /**
- * Analyse — the signed-in home.
+ * Analyse — Unified Sidebar Dashboard for Admins & Members.
  *
- * A member sees their identity and their own activity. An administrator
- * additionally sees the member list with their subscription windows, and
- * the controls over everything published.
- *
- * Every state is honest: no account, no profile row, no project and a failed
- * query each get their own message rather than an empty screen.
+ * - Unified left sidebar on desktop + clean horizontal nav bar on phones/tablets
+ * - Admins get dedicated Overview, Members, Published Stories, and Account & Security tabs
+ * - Administrator accounts are strictly protected from self-deletion (both UI & DB)
  */
+
+type DashSection = 'overview' | 'members' | 'stories' | 'account'
+type MemberFilter = 'all' | 'subscribers' | 'trialing' | 'admins'
+
+interface LocalDatasetItem {
+  id: string
+  name: string
+  rows: number
+  questions: number
+  updatedAt: number
+}
 
 interface WorkspaceStats {
   datasets: number
   questions: number
   rows: number
+  items: LocalDatasetItem[]
 }
 
-/** True when the project has not had the administrator policies applied. */
 function isMissingSchema(message: string): boolean {
   return /does not exist|schema cache|not found|PGRST/i.test(message)
+}
+
+function readInitialTheme(): 'light' | 'dark' {
+  if (typeof document === 'undefined') return 'light'
+  const attr = document.documentElement.getAttribute('data-theme')
+  if (attr === 'dark' || attr === 'light') return attr
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 export function Analyse() {
@@ -52,6 +83,8 @@ export function Analyse() {
   const userSlug = useUserSlug()
   const displayName = useDisplayName()
 
+  const [section, setSection] = useState<DashSection>('overview')
+  const [memberFilter, setMemberFilter] = useState<MemberFilter>('all')
   const [stats, setStats] = useState<WorkspaceStats | null>(null)
   const { usage } = useUsageStatus()
   const [members, setMembers] = useState<Member[]>([])
@@ -59,26 +92,58 @@ export function Analyse() {
   const [adminError, setAdminError] = useState<string | null>(null)
   const [schemaMissing, setSchemaMissing] = useState(false)
 
+  // Interactive inputs
+  const [datasetQuery, setDatasetQuery] = useState('')
+  const [nameInput, setNameInput] = useState(displayName)
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameSaved, setNameSaved] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [theme, setTheme] = useState<'light' | 'dark'>(readInitialTheme)
+
+  // Non-admin self-service account deletion state
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setNameInput(displayName)
+  }, [displayName])
+
+  // Ensure non-admins cannot land on admin-only tabs
+  useEffect(() => {
+    if (!isAdmin && (section === 'members' || section === 'stories')) {
+      setSection('overview')
+    }
+  }, [isAdmin, section])
+
   useEffect(() => {
     let active = true
 
     const loadStats = async () => {
       try {
-        const workspace = await loadPersistedWorkspace()
+        const workspace = await loadPersistedWorkspace(user?.id ?? null)
         if (!active) return
-        setStats({
-          datasets: workspace.sessions.length,
-          questions: workspace.sessions.reduce(
-            (total, record) => total + (record.messages?.length ?? 0),
-            0,
-          ),
-          rows: workspace.sessions.reduce((total, record) => {
+        const items: LocalDatasetItem[] = workspace.sessions
+          .map((record) => {
             const table = record.session?.tables?.[0]
-            return total + (table?.rowCount ?? 0)
-          }, 0),
+            return {
+              id: record.session.id,
+              name: record.session.fileName || table?.name || 'Untitled workbook',
+              rows: table?.rowCount ?? 0,
+              questions: record.messages?.length ?? 0,
+              updatedAt: record.session.uploadedAt ?? 0,
+            }
+          })
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+
+        setStats({
+          datasets: items.length,
+          questions: items.reduce((sum, item) => sum + item.questions, 0),
+          rows: items.reduce((sum, item) => sum + item.rows, 0),
+          items,
         })
       } catch {
-        if (active) setStats({ datasets: 0, questions: 0, rows: 0 })
+        if (active) setStats({ datasets: 0, questions: 0, rows: 0, items: [] })
       }
     }
 
@@ -86,7 +151,7 @@ export function Analyse() {
     return () => {
       active = false
     }
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (!isAdmin) return
@@ -119,15 +184,36 @@ export function Analyse() {
 
   const overview = useMemo(() => {
     const subscribers = members.filter(
-      (member) =>
-        member.subscription_status === 'active' &&
-        (member.tier === 'pro' || member.tier === 'enterprise'),
+      (m) => m.subscription_status === 'active' && (m.tier === 'pro' || m.tier === 'enterprise'),
     ).length
-    const admins = members.filter((member) => member.role === 'admin').length
-    return { users: members.length, admins, subscribers }
+    const trialing = members.filter((m) => m.subscription_status === 'trialing').length
+    const admins = members.filter((m) => m.role === 'admin').length
+    return { users: members.length, admins, subscribers, trialing }
   }, [members])
 
-  const degraded = Boolean(user) && !profile
+  const filteredDatasets = useMemo(() => {
+    const list = stats?.items ?? []
+    const term = datasetQuery.trim().toLowerCase()
+    if (!term) return list
+    return list.filter((item) => item.name.toLowerCase().includes(term))
+  }, [stats?.items, datasetQuery])
+
+  const filteredMembers = useMemo(() => {
+    if (memberFilter === 'subscribers') {
+      return members.filter(
+        (m) =>
+          m.subscription_status === 'active' && (m.tier === 'pro' || m.tier === 'enterprise'),
+      )
+    }
+    if (memberFilter === 'trialing') {
+      return members.filter((m) => m.subscription_status === 'trialing')
+    }
+    if (memberFilter === 'admins') {
+      return members.filter((m) => m.role === 'admin')
+    }
+    return members
+  }, [members, memberFilter])
+
   const quotaExhausted = Boolean(
     usage &&
       !usage.isAdmin &&
@@ -136,179 +222,681 @@ export function Analyse() {
       usage.remainingTokens <= 0,
   )
 
+  const usagePct = useMemo(() => {
+    if (!usage || usage.monthlyLimit === null || usage.monthlyLimit <= 0) return 0
+    return Math.min(100, Math.round((usage.usedTokens / usage.monthlyLimit) * 100))
+  }, [usage])
+
+  const applyTheme = (next: 'light' | 'dark') => {
+    setTheme(next)
+    document.documentElement.setAttribute('data-theme', next)
+    try {
+      localStorage.setItem('tabula-theme', next)
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  const handleOpenDataset = async (sessionId?: string) => {
+    if (sessionId) {
+      try {
+        await saveActiveSessionId(sessionId, user?.id ?? null)
+      } catch {
+        // ignore persistence error
+      }
+    }
+    navigate(userPath('/workspace', userSlug))
+  }
+
+  const handleSaveName = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!user?.id) return
+    setNameSaving(true)
+    setNameError(null)
+    setNameSaved(false)
+    try {
+      const updated = await updateDisplayName(user.id, nameInput)
+      setNameInput(updated)
+      setNameSaved(true)
+      window.setTimeout(() => setNameSaved(false), 2600)
+    } catch (err) {
+      setNameError(err instanceof Error ? err.message : 'Could not save display name.')
+    } finally {
+      setNameSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (isAdmin) {
+      setDeleteError('Administrator accounts cannot be self-deleted.')
+      return
+    }
+    setDeletingAccount(true)
+    setDeleteError(null)
+    try {
+      await deleteMyAccount()
+      navigate(ROUTES.landing, { replace: true })
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error
+          ? err.message
+          : 'Could not delete account. Make sure delete_my_account() is added in Supabase.',
+      )
+      setDeletingAccount(false)
+    }
+  }
+
+  const email = user?.email ?? profile?.email ?? null
+  const avatarUrl = profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null
+  const initial = displayName.trim().length > 0 ? displayName.trim().slice(0, 1).toUpperCase() : '?'
+
+  const planLabel = isAdmin
+    ? 'Administrator'
+    : usage?.trialExpired
+      ? 'Trial Ended'
+      : quotaExhausted
+        ? 'Limit Reached'
+        : usage?.status === 'trialing' && usage?.tier === 'free'
+          ? `Free Trial · ${usage.trialDaysRemaining ?? 0}d left`
+          : (profile?.tier ?? 'Free').toUpperCase()
+
+  const navItems: { id: DashSection; label: string; icon: React.ReactNode; badge?: number }[] = [
+    { id: 'overview', label: 'Overview', icon: <ActivityIcon size={15} /> },
+    ...(isAdmin
+      ? [
+          {
+            id: 'members' as const,
+            label: 'Members',
+            icon: <UserIcon size={15} />,
+            badge: overview.users,
+          },
+          {
+            id: 'stories' as const,
+            label: 'Published Stories',
+            icon: <FileIcon size={15} />,
+          },
+        ]
+      : []),
+    { id: 'account', label: 'Account & Security', icon: <SettingsIcon size={15} /> },
+  ]
+
   return (
     <div className="shell-frame">
       <Header variant="dashboard" />
 
-      <main className="dash-page">
-        <header className="dash-hero">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <span className="dash-eyebrow">Dashboard</span>
+      <div className="dash-shell">
+        {/* Unified Dashboard Sidebar */}
+        <aside className="dash-sidebar" aria-label="Dashboard navigation">
+          <div className="dash-sidebar-profile">
+            {avatarUrl ? (
+              <img className="dash-sidebar-avatar" src={avatarUrl} alt="" />
+            ) : (
+              <span className="dash-sidebar-avatar is-fallback" aria-hidden="true">
+                {initial}
+              </span>
+            )}
+            <div className="dash-sidebar-identity">
+              <span className="dash-sidebar-name">{displayName}</span>
+              <span className="dash-sidebar-role">
+                {isAdmin ? 'Administrator' : planLabel}
+              </span>
+            </div>
+          </div>
+
+          <nav className="dash-sidebar-nav">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`dash-nav-item ${section === item.id ? 'is-active' : ''}`}
+                onClick={() => setSection(item.id)}
+              >
+                <span className="dash-nav-icon">{item.icon}</span>
+                <span className="dash-nav-label">{item.label}</span>
+                {typeof item.badge === 'number' && item.badge > 0 ? (
+                  <span className="dash-nav-badge">{formatCount(item.badge)}</span>
+                ) : null}
+              </button>
+            ))}
+          </nav>
+
+          <div className="dash-sidebar-footer">
             <button
               type="button"
-              className="btn btn-ghost btn-small"
-              onClick={() => navigate(userPath('/workspace', userSlug))}
+              className="dash-btn dash-btn-primary dash-sidebar-cta"
+              onClick={() => void handleOpenDataset()}
             >
-              <ArrowLeftIcon size={13} />
-              <span>Back to Workspace</span>
+              <span>Open Workspace</span>
+              <ArrowRightIcon size={14} />
+            </button>
+
+            <button
+              type="button"
+              className="dash-sidebar-link"
+              onClick={() => navigate(ROUTES.landing)}
+            >
+              <GlobeIcon size={14} />
+              <span>View Public Site</span>
             </button>
           </div>
-          <h1 className="dash-title">
-            {user ? `Welcome back, ${displayName.split(' ')[0]}` : 'Analyse your data'}
-          </h1>
-          <p className="dash-subtitle">
-            {isAdmin
-              ? 'Manage members, subscriptions, and all published posts in one place.'
-              : 'Your datasets and your activity on Lumina Tabula.'}
-          </p>
-        </header>
+        </aside>
 
-        {!isSupabaseConfigured ? (
-          <div className="dash-notice">
-            <LockIcon size={14} />
-            <span>
-              No project is configured, so accounts and publishing are unavailable. The workspace
-              still runs entirely on this device.
-            </span>
-          </div>
-        ) : null}
+        {/* Main Content Canvas */}
+        <main className="dash-main">
+          {/* Top Command Header */}
+          <header className="dash-hero-bar">
+            <div className="dash-hero-copy">
+              <div className="dash-hero-eyebrow-row">
+                <span className="dash-eyebrow">
+                  {section === 'overview' && (isAdmin ? 'Admin Console' : 'Dashboard')}
+                  {section === 'members' && 'Admin · Directory'}
+                  {section === 'stories' && 'Admin · Editorial'}
+                  {section === 'account' && 'Account & Security'}
+                </span>
+                <span className={`dash-status-pill ${isAdmin ? 'is-admin' : ''}`}>
+                  {planLabel}
+                </span>
+              </div>
+              <h1 className="dash-title">
+                {section === 'overview' &&
+                  (user ? `Welcome back, ${displayName.split(' ')[0]}` : 'Your Workspace')}
+                {section === 'members' && 'Members & Subscriptions'}
+                {section === 'stories' && 'Published Stories'}
+                {section === 'account' && 'Profile, Preferences & Security'}
+              </h1>
+              <p className="dash-subtitle">
+                {section === 'overview' &&
+                  (isAdmin
+                    ? 'Monitor members, active plans, and your local spreadsheets in one place.'
+                    : 'Pick up where you left off and manage your workspace.')}
+                {section === 'members' &&
+                  'Filter accounts by plan, trial status, or administrator role.'}
+                {section === 'stories' &&
+                  'Review, edit, or unpublish stories shared from your workspace.'}
+                {section === 'account' &&
+                  'Manage your profile details, theme, and account security.'}
+              </p>
+            </div>
 
-        <div className="dash-top">
-          <Identity
-            name={displayName}
-            email={user?.email ?? profile?.email ?? null}
-            avatarUrl={profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null}
-            role={profile?.role ?? null}
-            tier={profile?.tier ?? null}
-            degraded={degraded}
-          />
-
-          <div className="dash-metrics">
-            {isAdmin ? (
-              <>
-                <Metric
-                  label="Members"
-                  value={formatCount(overview.users)}
-                  hint={`${overview.admins} admin${overview.admins === 1 ? '' : 's'}`}
-                  icon={<DatabaseIcon size={14} />}
-                />
-                <Metric
-                  label="Subscribers"
-                  value={formatCount(overview.subscribers)}
-                  icon={<BarChartIcon size={14} />}
-                />
-                <Metric
-                  label="Your datasets"
-                  value={formatCount(stats?.datasets ?? 0)}
-                  icon={<ZapIcon size={14} />}
-                />
-                <Metric
-                  label="Questions asked"
-                  value={formatCount(stats?.questions ?? 0)}
-                  icon={<BarChartIcon size={14} />}
-                />
-              </>
-            ) : (
-              <>
-                <Metric
-                  label="Datasets analysed"
-                  value={formatCount(stats?.datasets ?? 0)}
-                  icon={<DatabaseIcon size={14} />}
-                />
-                <Metric
-                  label="Questions asked"
-                  value={formatCount(stats?.questions ?? 0)}
-                  icon={<ZapIcon size={14} />}
-                />
-                <Metric
-                  label="Tokens spent"
-                  value={formatCount(usage?.usedTokens ?? 0)}
-                  hint={
-                    usage
-                      ? usage.monthlyLimit !== null
-                        ? `${formatCount(usage.monthlyLimit)} monthly limit · ${formatCount(usage.remainingTokens ?? 0)} left`
-                        : 'Unlimited monthly quota'
-                      : undefined
+            <div className="dash-hero-actions">
+              {!isAdmin &&
+              usage &&
+              (usage.tier === 'free' || usage.trialExpired || quotaExhausted) ? (
+                <button
+                  type="button"
+                  className="dash-btn dash-btn-secondary"
+                  onClick={() =>
+                    openPricingModal(
+                      usage.trialExpired
+                        ? 'trial-expired'
+                        : quotaExhausted
+                          ? 'quota-exceeded'
+                          : 'upgrade',
+                    )
                   }
-                  icon={<ZapIcon size={14} />}
-                />
-                <Metric
-                  label="Plan"
-                  value={
-                    usage?.trialExpired
-                      ? 'Trial ended'
-                      : quotaExhausted
-                        ? 'Tokens finished'
-                        : usage?.status === 'trialing' && usage?.tier === 'free'
-                          ? `Trial (${usage.trialDaysRemaining ?? 0}d left)`
-                          : (profile?.tier ?? 'free')
-                  }
-                  hint={
-                    usage
-                      ? `${formatCount(usage.inputTokens)} in · ${formatCount(usage.outputTokens)} out`
-                      : undefined
-                  }
-                  icon={<GlobeIcon size={14} />}
-                />
-              </>
-            )}
-          </div>
-        </div>
+                >
+                  <ZapIcon size={14} />
+                  <span>
+                    {usage.trialExpired || quotaExhausted ? 'Upgrade Now' : 'Upgrade to Pro'}
+                  </span>
+                </button>
+              ) : null}
 
-        {!isAdmin && usage && (usage.trialExpired || quotaExhausted || usage.tier === 'free') ? (
-          <div className="dash-notice" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                className="dash-btn dash-btn-primary"
+                onClick={() => void handleOpenDataset()}
+              >
+                <span>Open Workspace</span>
+                <ArrowRightIcon size={15} />
+              </button>
+            </div>
+          </header>
+
+          {!isSupabaseConfigured ? (
+            <div className="dash-notice">
               <LockIcon size={14} />
               <span>
-                {usage.trialExpired
-                  ? 'Your 7-day free trial has ended. Upgrade with Stripe to resume uploading data and asking Lumina Tabula.'
-                  : quotaExhausted
-                    ? `You have finished your trial tokens (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used). Upgrade to Lumina Tabula Pro to continue.`
-                    : `You have ${usage.trialDaysRemaining ?? 0} day${usage.trialDaysRemaining === 1 ? '' : 's'} left in your free trial (${formatCount(usage.usedTokens)} / ${formatCount(usage.monthlyLimit ?? 250000)} tokens used).`}
+                No project is configured, so accounts and publishing are unavailable. The workspace
+                still runs entirely on this device.
               </span>
-            </span>
-            <button
-              type="button"
-              className="btn btn-primary btn-small"
-              onClick={() =>
-                openPricingModal(
-                  usage.trialExpired
-                    ? 'trial-expired'
-                    : quotaExhausted
-                      ? 'quota-exceeded'
-                      : 'upgrade',
-                )
-              }
-            >
-              {usage.trialExpired || quotaExhausted ? 'Pay with Stripe' : 'Upgrade to Pro'}
-            </button>
-          </div>
-        ) : null}
+            </div>
+          ) : null}
 
-        {isAdmin ? (
-          <>
+          {!isAdmin && usage && (usage.trialExpired || quotaExhausted) ? (
+            <div className="dash-banner-alert">
+              <div className="dash-banner-alert-copy">
+                <AlertIcon size={16} />
+                <span>
+                  {usage.trialExpired
+                    ? 'Your 7-day free trial has ended. Upgrade to continue analyzing spreadsheets.'
+                    : `You have used all ${formatCount(usage.monthlyLimit ?? 250000)} trial tokens. Upgrade to Pro to continue.`}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="dash-btn dash-btn-primary dash-btn-sm"
+                onClick={() =>
+                  openPricingModal(usage.trialExpired ? 'trial-expired' : 'quota-exceeded')
+                }
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+          ) : null}
+
+          {/* SECTION: OVERVIEW */}
+          {section === 'overview' && (
+            <>
+              <section className="dash-metrics-strip" aria-label="Overview metrics">
+                {isAdmin ? (
+                  <>
+                    <Metric
+                      label="Total Members"
+                      value={formatCount(overview.users)}
+                      hint={`${overview.admins} admin${overview.admins === 1 ? '' : 's'}`}
+                      icon={<DatabaseIcon size={15} />}
+                    />
+                    <Metric
+                      label="Paid Subscribers"
+                      value={formatCount(overview.subscribers)}
+                      hint={`${formatCount(overview.trialing)} active trial${overview.trialing === 1 ? '' : 's'}`}
+                      icon={<BarChartIcon size={15} />}
+                    />
+                    <Metric
+                      label="Your Datasets"
+                      value={formatCount(stats?.datasets ?? 0)}
+                      hint={`${formatCount(stats?.rows ?? 0)} rows locally`}
+                      icon={<SheetIcon size={15} />}
+                    />
+                    <Metric
+                      label="Questions Asked"
+                      value={formatCount(stats?.questions ?? 0)}
+                      hint="Saved on this device"
+                      icon={<ZapIcon size={15} />}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Metric
+                      label="Datasets"
+                      value={formatCount(stats?.datasets ?? 0)}
+                      hint={`${formatCount(stats?.rows ?? 0)} total rows`}
+                      icon={<SheetIcon size={15} />}
+                    />
+                    <Metric
+                      label="Questions Asked"
+                      value={formatCount(stats?.questions ?? 0)}
+                      hint="Saved on this device"
+                      icon={<ZapIcon size={15} />}
+                    />
+                    <Metric
+                      label="Usage"
+                      value={
+                        usage?.monthlyLimit !== null
+                          ? `${usagePct}%`
+                          : formatCount(usage?.usedTokens ?? 0)
+                      }
+                      hint={
+                        usage?.monthlyLimit !== null
+                          ? `${formatCount(usage?.remainingTokens ?? 0)} remaining`
+                          : 'Unlimited monthly quota'
+                      }
+                      icon={<BarChartIcon size={15} />}
+                    />
+                    <Metric
+                      label="Current Plan"
+                      value={
+                        usage?.trialExpired
+                          ? 'Ended'
+                          : usage?.status === 'trialing' && usage?.tier === 'free'
+                            ? `${usage.trialDaysRemaining ?? 0}d left`
+                            : (profile?.tier ?? 'Free')
+                      }
+                      hint="100% private on-device"
+                      icon={<GlobeIcon size={15} />}
+                    />
+                  </>
+                )}
+              </section>
+
+              <section className="dash-card dash-datasets-card">
+                <div className="dash-card-head">
+                  <div>
+                    <h2 className="dash-card-title">Your Datasets</h2>
+                    <p className="dash-card-desc">
+                      Spreadsheets stored privately in this browser — never uploaded to any server.
+                    </p>
+                  </div>
+                  <span className="dash-count-pill">{stats?.datasets ?? 0}</span>
+                </div>
+
+                {(stats?.items.length ?? 0) > 0 ? (
+                  <div className="dash-input-search-wrap">
+                    <SearchIcon size={15} />
+                    <input
+                      type="text"
+                      className="dash-input dash-input-search"
+                      value={datasetQuery}
+                      onChange={(e) => setDatasetQuery(e.target.value)}
+                      placeholder="Filter your spreadsheets…"
+                      aria-label="Filter your spreadsheets"
+                    />
+                    {datasetQuery ? (
+                      <button
+                        type="button"
+                        className="dash-input-clear"
+                        onClick={() => setDatasetQuery('')}
+                        aria-label="Clear filter"
+                      >
+                        <CloseIcon size={13} />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {filteredDatasets.length > 0 ? (
+                  <ul className="dash-dataset-list">
+                    {filteredDatasets.map((item) => (
+                      <li key={item.id} className="dash-dataset-row">
+                        <div className="dash-dataset-icon">
+                          <SheetIcon size={16} />
+                        </div>
+                        <div className="dash-dataset-info">
+                          <span className="dash-dataset-name">{item.name}</span>
+                          <span className="dash-dataset-meta">
+                            {formatCount(item.rows)} rows · {formatCount(item.questions)} messages
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="dash-btn dash-btn-ghost dash-btn-sm"
+                          onClick={() => void handleOpenDataset(item.id)}
+                        >
+                          <span>Open</span>
+                          <ArrowRightIcon size={13} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (stats?.items.length ?? 0) > 0 ? (
+                  <div className="dash-empty-box">
+                    <p>No spreadsheets match “{datasetQuery}”.</p>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn-ghost dash-btn-sm"
+                      onClick={() => setDatasetQuery('')}
+                    >
+                      Clear filter
+                    </button>
+                  </div>
+                ) : (
+                  <div className="dash-empty-box">
+                    <div className="dash-empty-icon">
+                      <SheetIcon size={22} />
+                    </div>
+                    <h3>No spreadsheets loaded yet</h3>
+                    <p>Drop an Excel or CSV file into the workspace to start asking questions.</p>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn-primary dash-btn-sm"
+                      onClick={() => void handleOpenDataset()}
+                    >
+                      <span>Open Workspace</span>
+                      <ArrowRightIcon size={13} />
+                    </button>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+
+          {/* SECTION: MEMBERS (ADMIN ONLY) */}
+          {section === 'members' && isAdmin && (
             <section className="dash-panel">
               <header className="dash-panel-head">
-                <h2 className="dash-section-title">Members</h2>
-                <span className="dash-panel-note">
-                  Sign-ins and subscription windows, straight from the database.
-                </span>
+                <div>
+                  <h2 className="dash-section-title">Member Directory</h2>
+                  <span className="dash-panel-note">
+                    Live sign-ins, trial windows, and subscription status.
+                  </span>
+                </div>
+
+                <div className="dash-filter-pills" role="tablist" aria-label="Filter members">
+                  {(
+                    [
+                      ['all', `All (${overview.users})`],
+                      ['subscribers', `Paid (${overview.subscribers})`],
+                      ['trialing', `Trial (${overview.trialing})`],
+                      ['admins', `Admins (${overview.admins})`],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={memberFilter === key}
+                      className={`dash-filter-pill ${memberFilter === key ? 'is-active' : ''}`}
+                      onClick={() => setMemberFilter(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </header>
+
               {adminError ? (
-                <p className="publish-error">
+                <p className="publish-error" style={{ padding: '12px 18px' }}>
                   {adminError}
                   {schemaMissing
                     ? ' Apply features/migration/migration.sql to your project to enable it.'
                     : ''}
                 </p>
               ) : null}
-              <Members members={members} loading={membersLoading} />
-            </section>
 
-            <Insights />
-          </>
-        ) : null}
-      </main>
+              <Members members={filteredMembers} loading={membersLoading} />
+            </section>
+          )}
+
+          {/* SECTION: PUBLISHED STORIES (ADMIN ONLY) */}
+          {section === 'stories' && isAdmin && <Insights />}
+
+          {/* SECTION: ACCOUNT & SECURITY */}
+          {section === 'account' && (
+            <div className="dash-account-grid">
+              <section className="dash-card">
+                <div className="dash-profile-header">
+                  {avatarUrl ? (
+                    <img className="dash-avatar-lg" src={avatarUrl} alt="" />
+                  ) : (
+                    <span className="dash-avatar-lg is-fallback" aria-hidden="true">
+                      {initial}
+                    </span>
+                  )}
+                  <div className="dash-profile-meta">
+                    <h2 className="dash-card-title">{displayName}</h2>
+                    {email ? <p className="dash-profile-email">{email}</p> : null}
+                  </div>
+                </div>
+
+                <form className="dash-form" onSubmit={(e) => void handleSaveName(e)}>
+                  <label className="dash-field">
+                    <span className="dash-label">Display Name</span>
+                    <div className="dash-input-row">
+                      <input
+                        type="text"
+                        className="dash-input"
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        placeholder="Your name"
+                        maxLength={80}
+                        disabled={!isSupabaseConfigured || nameSaving}
+                      />
+                      <button
+                        type="submit"
+                        className="dash-btn dash-btn-primary dash-btn-input"
+                        disabled={
+                          !isSupabaseConfigured ||
+                          nameSaving ||
+                          nameInput.trim().length === 0 ||
+                          nameInput.trim() === displayName.trim()
+                        }
+                      >
+                        {nameSaving ? 'Saving…' : nameSaved ? 'Saved' : 'Save'}
+                      </button>
+                    </div>
+                  </label>
+
+                  {nameSaved ? (
+                    <p className="dash-field-feedback is-success">
+                      <CheckIcon size={13} /> Display name updated.
+                    </p>
+                  ) : null}
+                  {nameError ? <p className="dash-field-feedback is-error">{nameError}</p> : null}
+                </form>
+
+                <div className="dash-divider" />
+
+                <div className="dash-pref-row">
+                  <div>
+                    <span className="dash-label">Appearance</span>
+                    <p className="dash-pref-hint">Choose your preferred workspace theme.</p>
+                  </div>
+                  <div className="dash-segmented" role="group" aria-label="Theme preference">
+                    <button
+                      type="button"
+                      className={`dash-seg-btn ${theme === 'light' ? 'is-active' : ''}`}
+                      onClick={() => applyTheme('light')}
+                    >
+                      <SunIcon size={13} />
+                      <span>Light</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`dash-seg-btn ${theme === 'dark' ? 'is-active' : ''}`}
+                      onClick={() => applyTheme('dark')}
+                    >
+                      <MoonIcon size={13} />
+                      <span>Dark</span>
+                    </button>
+                  </div>
+                </div>
+
+                {!isAdmin && usage && usage.monthlyLimit !== null ? (
+                  <>
+                    <div className="dash-divider" />
+                    <div className="dash-quota-block">
+                      <div className="dash-quota-top">
+                        <span className="dash-label">Plan Usage</span>
+                        <span className="dash-quota-nums">
+                          {formatCount(usage.usedTokens)} / {formatCount(usage.monthlyLimit)}
+                        </span>
+                      </div>
+                      <div className="dash-quota-track">
+                        <div
+                          className={`dash-quota-fill ${usagePct >= 90 ? 'is-danger' : ''}`}
+                          style={{ width: `${usagePct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+              </section>
+
+              {/* Security & Deletion Card */}
+              <div className="dash-side-stack">
+                {isAdmin ? (
+                  <section className="dash-card dash-security-card">
+                    <div className="dash-security-badge">
+                      <ShieldCheckIcon size={15} />
+                      <span>Administrator Protection Active</span>
+                    </div>
+                    <h2 className="dash-card-title">Protected Admin Account</h2>
+                    <p className="dash-card-desc">
+                      For security, administrator accounts cannot be self-deleted or self-demoted
+                      from the dashboard. Role changes and account removal are enforced strictly at
+                      the database level in Supabase.
+                    </p>
+                    <ul className="dash-security-list">
+                      <li>
+                        <CheckIcon size={13} /> Self-deletion blocked in UI &amp; database
+                      </li>
+                      <li>
+                        <CheckIcon size={13} /> Self-demotion blocked by database trigger
+                      </li>
+                      <li>
+                        <CheckIcon size={13} /> Sensitive profile columns locked from tampering
+                      </li>
+                    </ul>
+                  </section>
+                ) : user && isSupabaseConfigured ? (
+                  <section className="dash-card dash-danger-card">
+                    <div className="dash-danger-head">
+                      <h2 className="dash-card-title dash-danger-title">Delete Account</h2>
+                      <p className="dash-card-desc">
+                        Permanently remove your account, profile, and local data. This cannot be
+                        undone.
+                      </p>
+                    </div>
+
+                    {!confirmDeleteOpen ? (
+                      <button
+                        type="button"
+                        className="dash-btn dash-btn-danger-outline"
+                        onClick={() => {
+                          setDeleteError(null)
+                          setConfirmDeleteOpen(true)
+                        }}
+                      >
+                        <TrashIcon size={14} />
+                        <span>Delete my account</span>
+                      </button>
+                    ) : (
+                      <div
+                        className="dash-confirm-box"
+                        role="alertdialog"
+                        aria-label="Confirm account deletion"
+                      >
+                        <p className="dash-confirm-text">
+                          <ShieldCheckIcon size={14} />
+                          <span>
+                            Confirm permanent deletion of <strong>{email ?? displayName}</strong>?
+                          </span>
+                        </p>
+                        {deleteError ? (
+                          <p className="dash-field-feedback is-error">{deleteError}</p>
+                        ) : null}
+                        <div className="dash-confirm-actions">
+                          <button
+                            type="button"
+                            className="dash-btn dash-btn-danger"
+                            disabled={deletingAccount}
+                            onClick={() => void handleDeleteAccount()}
+                          >
+                            <TrashIcon size={14} />
+                            <span>{deletingAccount ? 'Deleting…' : 'Confirm & Delete'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="dash-btn dash-btn-ghost"
+                            disabled={deletingAccount}
+                            onClick={() => {
+                              setConfirmDeleteOpen(false)
+                              setDeleteError(null)
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   )
 }

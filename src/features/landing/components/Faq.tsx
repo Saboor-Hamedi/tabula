@@ -2,9 +2,7 @@ import { ChevronDownIcon } from '../../common/Icons'
 import { FAQS } from '../data'
 
 /**
- * The questions.
- *
- * An accordion with one open panel at a time.
+ * Frequently Asked Questions — Asymmetric Editorial Split.
  */
 
 export interface FaqProps {
@@ -14,33 +12,40 @@ export interface FaqProps {
 
 export function Faq({ openIndex, setOpenIndex }: FaqProps) {
   return (
-<section id="faq" className="landing-section landing-faq-section">
-        <div className="landing-container">
-          <div className="landing-section-header">
-            <span className="landing-subhead">Questions & Answers</span>
-            <h2 className="landing-section-title">Frequently Asked Questions</h2>
+    <section id="faq" className="landing-section landing-faq-section">
+      <div className="landing-container">
+        <div className="faq-editorial-split">
+          <div className="faq-sticky-head" data-reveal>
+            <span className="landing-kicker">06 — Questions</span>
+            <h2 className="landing-section-title">
+              Common <span className="landing-serif-italic">questions.</span>
+            </h2>
+            <p className="faq-sticky-desc">
+              Everything you should know about privacy, file formats, and working offline.
+            </p>
           </div>
 
-          <div className="landing-faq-accordion">
+          <div className="faq-ledger" data-reveal data-delay="2">
             {FAQS.map((faq, idx) => {
               const isOpen = openIndex === idx
               return (
-                <div key={idx} className={`faq-item ${isOpen ? 'is-open' : ''}`}>
+                <div key={faq.q} className={`faq-ledger-item ${isOpen ? 'is-open' : ''}`}>
                   <button
                     type="button"
-                    className="faq-question-btn"
+                    className="faq-ledger-btn"
                     aria-expanded={isOpen}
                     onClick={() => setOpenIndex(isOpen ? null : idx)}
                   >
                     <span>{faq.q}</span>
-                    <ChevronDownIcon size={15} className="faq-chevron" />
+                    <ChevronDownIcon size={17} className="faq-chevron" />
                   </button>
-                  {isOpen && <div className="faq-answer-content">{faq.a}</div>}
+                  {isOpen && <div className="faq-ledger-answer">{faq.a}</div>}
                 </div>
               )
             })}
           </div>
         </div>
-      </section>
+      </div>
+    </section>
   )
 }

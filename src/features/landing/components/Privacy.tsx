@@ -1,82 +1,76 @@
-import { ShieldCheckIcon } from '../../common/Icons'
+import { LockIcon } from '../../common/Icons'
 
 /**
- * The privacy guarantee.
+ * The privacy architecture.
  *
- * The comparison is the argument: a side that uploads, and a side that does
- * not. The icons are the only decoration on the page.
+ * Editorial split: a monumental zero-upload statement on the left paired with
+ * a crisp ruled comparison ledger on the right.
  */
+
+const GUARANTEES = [
+  {
+    num: '01',
+    title: 'Zero bytes uploaded',
+    desc: 'Your Excel and CSV files open directly in browser memory. Nothing is sent to external servers.',
+  },
+  {
+    num: '02',
+    title: 'Vanishes when you close the tab',
+    desc: 'We never keep copies, backups, or hidden logs of your confidential business figures.',
+  },
+  {
+    num: '03',
+    title: 'Built for sensitive teams',
+    desc: 'Safe for finance, legal, HR, and clinical spreadsheets without lengthy IT security reviews.',
+  },
+  {
+    num: '04',
+    title: 'Works offline anywhere',
+    desc: 'Review millions of rows on a flight or behind a corporate firewall with zero lag.',
+  },
+]
 
 export function Privacy() {
   return (
-<section id="privacy" className="landing-section landing-architecture-section">
-        <div className="landing-container">
-          <div className="landing-section-header">
-            <span className="landing-subhead">Privacy Guarantee</span>
-            <h2 className="landing-section-title">Your Data Stays With You. Period.</h2>
-            <p className="landing-section-desc">
-              We engineered Lumina Tabula so that it is physically impossible for us to save, access, or lose your data.
+    <section id="privacy" className="landing-section landing-privacy-section">
+      <div className="landing-container">
+        <div className="privacy-editorial-split">
+          {/* Left: Monumental Statement */}
+          <div className="privacy-statement" data-reveal>
+            <span className="landing-kicker">02 — Privacy by Design</span>
+            <h2 className="privacy-big-title">
+              0 bytes uploaded.
+              <span className="landing-serif-italic"> Ever.</span>
+            </h2>
+            <p className="privacy-lead">
+              Standard cloud tools upload your entire workbook to someone else’s server. Lumina
+              Tabula flips the model — bringing the entire workspace directly onto your computer.
             </p>
+
+            <div className="privacy-flow-strip" aria-label="Data stays on your computer">
+              <span className="privacy-flow-node">Your File</span>
+              <span className="privacy-flow-line" aria-hidden="true" />
+              <span className="privacy-flow-node is-accent">Your Browser</span>
+              <span className="privacy-flow-seal">
+                <LockIcon size={12} /> Stays Local
+              </span>
+            </div>
           </div>
 
-          <div className="landing-architecture-grid">
-            <div className="landing-arch-card arch-legacy">
-              <div className="landing-arch-badge badge-warning">Standard Cloud Tools</div>
-              <h3 className="landing-arch-title">How Traditional Software Works</h3>
-              <ul className="landing-arch-list">
-                <li>
-                  <span className="arch-cross">✕</span> Your confidential spreadsheets are uploaded over the internet
-                </li>
-                <li>
-                  <span className="arch-cross">✕</span> Data is stored on third-party servers and cloud disks
-                </li>
-                <li>
-                  <span className="arch-cross">✕</span> Risk of data breaches, accidental leaks, and employee access
-                </li>
-                <li>
-                  <span className="arch-cross">✕</span> Requires complex legal agreements and security sign-offs
-                </li>
-              </ul>
-            </div>
-
-            <div className="landing-arch-card arch-tabula">
-              <div className="landing-arch-badge badge-success">
-                <ShieldCheckIcon size={13} /> The Lumina Tabula Guarantee
+          {/* Right: Hairline Architectural Ledger */}
+          <div className="privacy-ledger" data-reveal data-delay="2">
+            {GUARANTEES.map((item) => (
+              <div key={item.num} className="privacy-ledger-row">
+                <span className="privacy-ledger-num">{item.num}</span>
+                <div className="privacy-ledger-copy">
+                  <h3>{item.title}</h3>
+                  <p>{item.desc}</p>
+                </div>
               </div>
-              <h3 className="landing-arch-title">Total Local Privacy</h3>
-              <ul className="landing-arch-list">
-                <li>
-                  <span className="arch-check">✓</span>
-                  <div className="arch-item-copy">
-                    <strong className="arch-item-title">0 bytes uploaded</strong>
-                    <span className="arch-item-desc">Files open strictly inside your browser</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="arch-check">✓</span>
-                  <div className="arch-item-copy">
-                    <strong className="arch-item-title">Never saved</strong>
-                    <span className="arch-item-desc">When you close the tab, data vanishes from memory</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="arch-check">✓</span>
-                  <div className="arch-item-copy">
-                    <strong className="arch-item-title">Never stolen</strong>
-                    <span className="arch-item-desc">No server has access to your rows or numbers</span>
-                  </div>
-                </li>
-                <li>
-                  <span className="arch-check">✓</span>
-                  <div className="arch-item-copy">
-                    <strong className="arch-item-title">Full compliance</strong>
-                    <span className="arch-item-desc">Safe for financial and medical records</span>
-                  </div>
-                </li>
-              </ul>
-            </div>
+            ))}
           </div>
         </div>
-      </section>
+      </div>
+    </section>
   )
 }

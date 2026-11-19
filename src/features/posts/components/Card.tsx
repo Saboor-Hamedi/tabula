@@ -4,7 +4,7 @@ import { Link } from '../../../core/router'
 import { postPath } from '../../../core/router/paths'
 import type { PostSummary } from '../../../core/supabase/types'
 import { formatCount } from '../../../core/utils/format'
-import { EyeIcon, ImageIcon } from '../../common/Icons'
+import { ArrowRightIcon, EyeIcon, ImageIcon } from '../../common/Icons'
 
 const MermaidDiagram = lazy(() =>
   import('../../mermaid/MermaidDiagram').then((m) => ({
@@ -88,18 +88,22 @@ export const Card = memo(function Card({ post, featured = false }: CardProps) {
       {thumbnail?.kind === 'image' ? (
         <div className="post-card-cover">
           <img src={thumbnail.url} alt={thumbnail.alt} loading="lazy" />
+          <div className="post-card-cover-scrim" aria-hidden="true" />
+          <span className="post-card-read-pill">{post.reading_time_minutes} min read</span>
         </div>
       ) : thumbnail?.kind === 'mermaid' ? (
         <div className="post-card-cover is-mermaid" aria-hidden="true">
           <Suspense fallback={<div className="post-card-cover-placeholder" />}>
             <MermaidDiagram code={thumbnail.code} />
           </Suspense>
+          <span className="post-card-read-pill">{post.reading_time_minutes} min read</span>
         </div>
       ) : (
         <div className="post-card-cover is-placeholder" aria-hidden="true">
           <div className="post-card-placeholder-art">
             <ImageIcon size={32} />
           </div>
+          <span className="post-card-read-pill">{post.reading_time_minutes} min read</span>
         </div>
       )}
 
@@ -147,7 +151,10 @@ export const Card = memo(function Card({ post, featured = false }: CardProps) {
               <EyeIcon size={12} />
               {formatCount(post.view_count)}
             </span>
-            <span className="post-chip">{post.reading_time_minutes} min</span>
+            <span className="post-card-cta">
+              <span>Read</span>
+              <ArrowRightIcon size={12} />
+            </span>
           </div>
         </div>
       </div>

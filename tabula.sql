@@ -167,3 +167,86 @@ as $$
 $$;
 
 grant execute on function public.search_published_posts(text, text, int, int) to anon, authenticated;
+
+-- ==============================================================================
+-- Self-Service Account Deletion & Admin Security Hardening
+-- 1. Permanently deletes the signed-in non-admin user's account and cascades to
+--    profiles, subscriptions, and usage_ledger.
+-- 2. Strictly blocks administrators from deleting their own account (42501).
+-- 3. Prevents admins from accidentally demoting themselves and locks down
+--    sensitive profile columns (role, tier, email) from client-side tampering.
+-- Run this directly in the Supabase Dashboard -> SQL Editor.
+-- ==============================================================================
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_is_admin boolean := false;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated' using errcode = '28000';
+  end if;
+
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = v_uid
+      and p.role = 'admin'
+  ) into v_is_admin;
+
+  if v_is_admin then
+    raise exception 'Administrator accounts cannot be self-deleted.'
+      using errcode = '42501';
+  end if;
+
+  if to_regclass('public.posts') is not null then
+    delete from public.posts where author_id = v_uid;
+  end if;
+
+  delete from auth.users where id = v_uid;
+end;
+$$;
+
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
+
+-- Prevent self-escalation and accidental admin self-demotion
+create or replace function public.guard_profile_role()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if auth.uid() is not null then
+    if new.role is distinct from old.role then
+      if not public.is_admin() then
+        raise exception 'Only administrators can change an account role.'
+          using errcode = '42501';
+      end if;
+      if old.id = auth.uid() and old.role = 'admin' then
+        raise exception 'Administrators cannot demote their own account.'
+          using errcode = '42501';
+      end if;
+    end if;
+
+    if new.tier is distinct from old.tier and not public.is_admin() then
+      raise exception 'Subscription tier can only be updated by billing.'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_profile_role on public.profiles;
+create trigger guard_profile_role
+  before update on public.profiles
+  for each row execute function public.guard_profile_role();
+
+revoke update on public.profiles from authenticated;
+grant update (display_name, avatar_url) on public.profiles to authenticated;

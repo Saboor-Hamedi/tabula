@@ -6,10 +6,9 @@ import { ArrowRightIcon } from '../../common/Icons'
 import { Feed, listPublishedPostsPage } from '../../posts'
 
 /**
- * The public Posts section on the front page.
+ * Published Stories on the front page.
  *
- * Brings the paginated list of published posts right onto the landing page so
- * visitors can browse analyses immediately. Hidden when no published posts exist.
+ * Editorial masthead above the magazine post grid. Hidden when no published posts exist.
  */
 
 export function Insights() {
@@ -39,22 +38,20 @@ export function Insights() {
   return (
     <section id="posts" className="landing-section landing-insights">
       <div className="landing-container">
-        <div className="landing-section-header">
-          <span className="landing-subhead">Posts</span>
-          <h2 className="landing-section-title">Published Posts From The Workspace</h2>
-          <p className="landing-section-desc">
-            Explore published analyses, summary tables, charts, and diagrams directly from Lumina Tabula.
-          </p>
+        <div className="landing-masthead" data-reveal>
+          <div className="landing-masthead-left">
+            <span className="landing-kicker">Published Stories</span>
+            <h2 className="landing-section-title">
+              From the <span className="landing-serif-italic">Workspace.</span>
+            </h2>
+          </div>
+          <Link className="landing-masthead-link" to={ROUTES.posts}>
+            <span>Explore all stories</span>
+            <ArrowRightIcon size={14} />
+          </Link>
         </div>
 
         <Feed limit={6} paginate />
-
-        <div className="landing-insights-cta">
-          <Link className="landing-cta-btn landing-cta-secondary" to={ROUTES.posts}>
-            <span>Browse all posts</span>
-            <ArrowRightIcon size={13} />
-          </Link>
-        </div>
       </div>
     </section>
   )

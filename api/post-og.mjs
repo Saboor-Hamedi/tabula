@@ -1,8 +1,8 @@
 const SITE_ORIGIN = 'https://www.luminatabula.com'
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/logo.png`
-const DEFAULT_TITLE = 'Lumina Tabula — Chat with your data'
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-preview.png`
+const DEFAULT_TITLE = 'Lumina Tabula — Chat with your spreadsheets'
 const DEFAULT_DESC =
-  'Private, in-browser data analysis. Upload a CSV or Excel file and get charts, SQL insights, and Python plots — your files never leave your device.'
+  'Private, on-device spreadsheet analysis. Drop in any Excel or CSV file and get instant charts, tables, and executive reports — your files never leave your device.'
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,120}$/
 

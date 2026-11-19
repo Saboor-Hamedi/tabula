@@ -1,16 +1,17 @@
+import { useState } from 'react'
 import {
-  BarChartIcon,
+  ArrowRightIcon,
   CheckIcon,
-  FileIcon,
+  SheetIcon,
   ZapIcon,
 } from '../../common/Icons'
 import { DEMO_SCENARIOS, type DemoScenario } from '../data'
 
 /**
- * The interactive walkthrough.
+ * The interactive editorial showcase.
  *
- * The tabs are real scenarios, and the preview shows exactly what the model
- * does with them — no screenshots, no mock-ups.
+ * Clean pill switcher above a crisp high-contrast studio window with
+ * animated column/bar visualization, step-by-step trace, and result table.
  */
 
 export interface DemoProps {
@@ -21,6 +22,8 @@ export interface DemoProps {
   onNavigateToApp: () => void
 }
 
+type OutputView = 'chart' | 'steps' | 'table'
+
 export function Demo({
   activeScenario,
   setActiveScenario,
@@ -28,116 +31,191 @@ export function Demo({
   onNavigateToAuth,
   onNavigateToApp,
 }: DemoProps) {
-  return (
-<section id="demo" className="landing-section landing-demo-section">
-        <div className="landing-container">
-          <div className="landing-section-header">
-            <span className="landing-subhead">How It Works</span>
-            <h2 className="landing-section-title">Ask In Plain English, Get Instant Insights</h2>
-            <p className="landing-section-desc">
-              Select an example scenario below to see how Lumina Tabula analyzes spreadsheets right in your browser.
-            </p>
-          </div>
+  const [view, setView] = useState<OutputView>('chart')
 
-          {/* Scenario Tabs */}
-          <div className="landing-demo-tabs">
-            {DEMO_SCENARIOS.map((sc) => (
+  return (
+    <section id="demo" className="landing-section landing-demo-section">
+      <div className="landing-container">
+        <div className="landing-masthead" data-reveal>
+          <div className="landing-masthead-left">
+            <span className="landing-kicker">01 — Interactive Showcase</span>
+            <h2 className="landing-section-title">
+              Plain English in. <span className="landing-serif-italic">Clarity out.</span>
+            </h2>
+          </div>
+          <p className="landing-masthead-desc">
+            Choose a real-world spreadsheet below to explore how Lumina Tabula turns complex files
+            into immediate charts, tables, and executive briefs.
+          </p>
+        </div>
+
+        {/* Sleek Segmented Scenario Switcher */}
+        <div className="demo-pill-nav" role="tablist" aria-label="Example spreadsheets" data-reveal>
+          {DEMO_SCENARIOS.map((sc) => {
+            const isActive = activeScenario.id === sc.id
+            return (
               <button
                 key={sc.id}
                 type="button"
-                className={`landing-demo-tab ${activeScenario.id === sc.id ? 'is-active' : ''}`}
+                role="tab"
+                aria-selected={isActive}
+                className={`demo-pill-btn ${isActive ? 'is-active' : ''}`}
                 onClick={() => setActiveScenario(sc)}
               >
-                <div className="landing-tab-title">{sc.name}</div>
-                <div className="landing-tab-meta">
-                  <span>{sc.rows}</span>
-                  <span className="landing-tab-dot">•</span>
-                  <span>{sc.fileType}</span>
-                </div>
+                <span className="demo-pill-name">{sc.name}</span>
+                <span className="demo-pill-rows">{sc.rows}</span>
               </button>
-            ))}
+            )
+          })}
+        </div>
+
+        {/* Editorial Studio Window */}
+        <div className="demo-studio-frame" data-reveal>
+          <div className="demo-studio-bar">
+            <div className="demo-studio-file">
+              <SheetIcon size={14} />
+              <span className="demo-studio-filename">{activeScenario.fileType}</span>
+              <span className="demo-studio-sep">·</span>
+              <span className="demo-studio-meta">{activeScenario.rows}</span>
+            </div>
+
+            <div className="demo-studio-controls">
+              <span className="demo-studio-speed">
+                <ZapIcon size={12} />
+                <span>{activeScenario.execTime}</span>
+              </span>
+
+              <div className="demo-view-switch" role="tablist" aria-label="Output format">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === 'chart'}
+                  className={`demo-view-btn ${view === 'chart' ? 'is-active' : ''}`}
+                  onClick={() => setView('chart')}
+                >
+                  Chart
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === 'steps'}
+                  className={`demo-view-btn ${view === 'steps' ? 'is-active' : ''}`}
+                  onClick={() => setView('steps')}
+                >
+                  Steps
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === 'table'}
+                  className={`demo-view-btn ${view === 'table' ? 'is-active' : ''}`}
+                  onClick={() => setView('table')}
+                >
+                  Table
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Clean App Preview Window */}
-          <div className="landing-sandbox-card">
-            <div className="landing-window-header">
-              <div className="landing-window-dots">
-                <span className="dot dot-gray" />
-                <span className="dot dot-gray" />
-                <span className="dot dot-gray" />
+          <div className="demo-studio-grid">
+            {/* Left: Prompt + KPIs + Executive Brief */}
+            <div className="demo-studio-left">
+              <div className="demo-question-block">
+                <span className="demo-micro-label">Question asked</span>
+                <p className="demo-question-quote">“{activeScenario.question}”</p>
               </div>
-              <div className="landing-window-title">
-                <span className="landing-window-filename">{activeScenario.fileType}</span>
-                <span className="landing-window-rows">{activeScenario.rows}</span>
+
+              <div className="demo-kpi-strip">
+                {activeScenario.kpis.map((kpi) => (
+                  <div key={kpi.label} className="demo-kpi-cell">
+                    <span className="demo-kpi-label">{kpi.label}</span>
+                    <strong className={`demo-kpi-val tone-${kpi.tone ?? 'neutral'}`}>
+                      {kpi.value}
+                    </strong>
+                  </div>
+                ))}
               </div>
-              <div className="landing-window-speed">
-                <ZapIcon size={12} />
-                <span>Processed in {activeScenario.execTime}</span>
+
+              <div className="demo-summary-block">
+                <span className="demo-micro-label">Executive summary</span>
+                <p className="demo-summary-text">{activeScenario.summary}</p>
+              </div>
+
+              <div className="demo-studio-foot">
+                <span className="demo-local-tag">
+                  <CheckIcon size={12} /> Computed privately on your device
+                </span>
+                <button
+                  type="button"
+                  className="demo-try-link"
+                  onClick={() =>
+                    isAuthenticated ? onNavigateToApp() : onNavigateToAuth('signup')
+                  }
+                >
+                  <span>Try with your file</span>
+                  <ArrowRightIcon size={13} />
+                </button>
               </div>
             </div>
 
-            <div className="landing-sandbox-body">
-              <div className="landing-sandbox-col">
-                <div className="landing-prompt-box">
-                  <div className="landing-prompt-badge">Your Question</div>
-                  <div className="landing-prompt-text">"{activeScenario.question}"</div>
-                </div>
-
-                <div className="landing-process-box">
-                  <div className="landing-process-header">
-                    <FileIcon size={13} />
-                    <span>Automated Local Calculation</span>
-                  </div>
-                  <div className="landing-process-content">
-                    {activeScenario.calcStep}
-                  </div>
-                </div>
-              </div>
-
-              <div className="landing-sandbox-col">
-                <div className="landing-result-box">
-                  <div className="landing-result-header">
-                    <BarChartIcon size={13} />
-                    <span>Instant Visual Breakdown</span>
-                  </div>
-                  <div className="landing-bars-container">
+            {/* Right: Crisp Visual Canvas */}
+            <div className="demo-studio-right">
+              {view === 'chart' && (
+                <div className="demo-chart-stage" key={activeScenario.id}>
+                  <div className="demo-chart-columns">
                     {activeScenario.chartData.map((item, idx) => (
-                      <div key={idx} className="landing-bar-row">
-                        <div className="landing-bar-info">
-                          <span className="landing-bar-label">{item.label}</span>
-                          <span className="landing-bar-val">{item.formatted}</span>
-                        </div>
-                        <div className="landing-bar-track">
+                      <div key={item.label} className="demo-col-item">
+                        <span className="demo-col-val">{item.formatted}</span>
+                        <div className="demo-col-track">
                           <div
-                            className="landing-bar-fill"
-                            style={{ width: `${item.value}%` }}
+                            className={`demo-col-bar ${idx === 0 ? 'is-lead' : ''}`}
+                            style={{ height: `${item.value}%` }}
                           />
                         </div>
+                        <span className="demo-col-label">{item.label}</span>
                       </div>
                     ))}
                   </div>
                 </div>
+              )}
 
-                <div className="landing-ai-synthesis">
-                  <div className="landing-synthesis-header">Executive Summary</div>
-                  <p className="landing-synthesis-body">{activeScenario.summary}</p>
-                  <div className="landing-synthesis-footer">
-                    <span className="landing-badge-green">
-                      <CheckIcon size={11} /> Calculated on your device
-                    </span>
-                    <button
-                      type="button"
-                      className="landing-synthesis-cta"
-                      onClick={() => (isAuthenticated ? onNavigateToApp() : onNavigateToAuth('signup'))}
-                    >
-                      Try with your own file →
-                    </button>
-                  </div>
+              {view === 'steps' && (
+                <ol className="demo-steps-list">
+                  {activeScenario.steps.map((step, i) => (
+                    <li key={i}>
+                      <span className="demo-step-num">0{i + 1}</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {view === 'table' && (
+                <div className="demo-table-wrap">
+                  <table className="demo-mini-table">
+                    <thead>
+                      <tr>
+                        {activeScenario.tableColumns.map((col) => (
+                          <th key={col}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeScenario.tableRows.map((row, rIdx) => (
+                        <tr key={rIdx}>
+                          {row.map((cell, cIdx) => (
+                            <td key={cIdx}>{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
   )
 }
