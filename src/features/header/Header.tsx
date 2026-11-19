@@ -40,11 +40,19 @@ export interface HeaderProps {
    * `page`: unified public header shared across Landing, Insights, and Articles.
    */
   variant?: 'workspace' | 'page' | 'dashboard'
+  sidebarOpen?: boolean
+  onToggleSidebar?: () => void
   onSignIn?: () => void
   onSignUp?: () => void
 }
 
-export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
+export function Header({
+  variant = 'page',
+  sidebarOpen = true,
+  onToggleSidebar,
+  onSignIn,
+  onSignUp,
+}: HeaderProps) {
   const { navigate } = useRouter()
   const session = useContext(SessionStateContext)
   const actions = useContext(SessionActionsContext)
@@ -83,6 +91,18 @@ export function Header({ variant = 'page', onSignIn, onSignUp }: HeaderProps) {
               label={session.sidebarOpen ? 'Collapse sources' : 'Expand sources'}
               active={session.sidebarOpen}
               onClick={() => actions.toggleSidebar()}
+            >
+              <SidebarIcon size={16} />
+            </IconButton>
+          </span>
+        ) : null}
+
+        {isDashboard && onToggleSidebar ? (
+          <span className="dashboard-header-toggle">
+            <IconButton
+              label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              active={sidebarOpen}
+              onClick={onToggleSidebar}
             >
               <SidebarIcon size={16} />
             </IconButton>

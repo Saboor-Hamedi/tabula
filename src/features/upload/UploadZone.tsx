@@ -78,9 +78,10 @@ export function UploadZone() {
           <div className="workspace-welcome-mark">
             <DatabaseIcon size={20} />
           </div>
-          <h1 className="workspace-welcome-title">Add sources to get started</h1>
+          <h1 className="workspace-welcome-title">Drop a spreadsheet to begin</h1>
           <p className="workspace-welcome-subtitle">
-            Upload your spreadsheets, CSV, or Excel workbooks. Ask questions, explore trends, and generate executive summaries.
+            Open any Excel or CSV file and ask questions in plain English. Get instant charts,
+            clean tables, and executive summaries — without uploading your file.
           </p>
         </div>
 
@@ -139,10 +140,10 @@ export function UploadZone() {
             </div>
             <div className="source-drop-main">
               <span className="source-drop-title">
-                {busy ? 'Reading file…' : 'Drop spreadsheet here, or browse'}
+                {busy ? 'Opening your spreadsheet…' : 'Drop your spreadsheet here, or browse'}
               </span>
               <span className="source-drop-sub">
-                Supports Excel (.xlsx), CSV, and TSV up to millions of rows
+                Works with Excel (.xlsx), CSV, and TSV — even millions of rows
               </span>
             </div>
             <div className="source-drop-formats">
@@ -151,7 +152,7 @@ export function UploadZone() {
                   {ext.slice(1).toUpperCase()}
                 </span>
               ))}
-              <span className="format-badge-private">100% Client-Side</span>
+              <span className="format-badge-private">Stays on your device</span>
             </div>
 
             <input
@@ -191,7 +192,7 @@ export function UploadZone() {
           <div className="upload-status is-error" role="alert">
             <AlertIcon size={15} />
             <div>
-              <strong>The analysis engine could not start</strong>
+              <strong>Could not start the workspace</strong>
               <span>{dbError}</span>
             </div>
           </div>

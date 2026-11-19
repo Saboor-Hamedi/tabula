@@ -104,7 +104,7 @@ export function Members({ members, loading = false }: MembersProps) {
     <div className="dash-table-wrap">
       <div className="dash-table-tools">
         <div className="dash-table-search">
-          <SearchIcon size={14} />
+          <SearchIcon size={13} />
           <input
             type="search"
             value={query}

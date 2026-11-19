@@ -51,6 +51,37 @@
   overflow: hidden;
 }
 
+/* ---------- Dashboard Header Sidebar Toggle ---------- */
+
+.dashboard-header-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dashboard-header-toggle .icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.dashboard-header-toggle .icon-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.dashboard-header-toggle .icon-btn.is-active {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
 .app-header-right {
   display: flex;
   align-items: center;
@@ -810,6 +841,19 @@
 @media (max-width: 640px) {
   .app-header {
     padding: 0 var(--space-3);
+  }
+
+  .app-header.is-dashboard .app-header-left {
+    gap: var(--space-2);
+  }
+
+  .dashboard-header-toggle {
+    display: inline-flex !important;
+  }
+
+  .dashboard-header-toggle .icon-btn {
+    width: 30px;
+    height: 30px;
   }
 
   .header-account-name,

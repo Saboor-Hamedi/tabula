@@ -135,7 +135,7 @@ export function Insights() {
   return (
     <section className="dash-panel">
       <header className="dash-panel-head">
-        <div>
+        <div className="dash-panel-titles">
           <h2 className="dash-section-title">Posts</h2>
           <span className="dash-panel-note">
             Organize, publish, archive, and review all workspace posts.
@@ -172,7 +172,7 @@ export function Insights() {
         </div>
 
         <div className="dash-table-search">
-          <SearchIcon size={14} />
+          <SearchIcon size={13} />
           <input
             type="search"
             value={query}

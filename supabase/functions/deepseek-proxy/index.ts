@@ -23,6 +23,25 @@ const GUEST_ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-chat'])
 const GUEST_ID_TOKEN_LIMIT = 20_000
 const GUEST_IP_DAILY_TOKEN_LIMIT = 25_000
 const GUEST_WINDOW_MS = 24 * 60 * 60 * 1000
+const MAX_USER_PROMPT_WORDS = 300
+const MAX_USER_PROMPT_CHARS = 3000
+const UNSAFE_PROMPT_RE =
+  /(?:javascript:|vbscript:|file:\/\/|data:text\/html|<\s*\/?\s*(?:script|iframe|object|embed|svg|link|meta)\b|on(?:error|load|click|mouseover|focus)\s*=|\beval\s*\(|document\.cookie|window\.location|https?:\/\/[^\s]+|\bwww\.[a-z0-9-]+(?:\.[a-z0-9-]+)+|\b(?:127\.0\.0\.1|169\.254\.169\.254|0\.0\.0\.0|localhost)(?::\d+)?)/i
+
+function extractLastUserText(messages: unknown): string {
+  if (!Array.isArray(messages)) return ''
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i] as { role?: unknown; content?: unknown } | null
+    if (msg?.role !== 'user') continue
+    if (typeof msg.content === 'string') return msg.content
+    if (Array.isArray(msg.content)) {
+      return msg.content
+        .map((part) => (part && typeof part === 'object' && 'text' in part ? String((part as { text?: unknown }).text ?? '') : ''))
+        .join(' ')
+    }
+  }
+  return ''
+}
 
 function getClientIp(req: Request): string {
   const cfIp = req.headers.get('cf-connecting-ip')?.trim()
@@ -290,6 +309,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let model = typeof payload.model === 'string' ? payload.model : 'deepseek-v4-flash'
   if (!ALLOWED_MODELS.has(model)) {
     return jsonResponse(req, { error: `Unsupported model: ${model}` }, 400)
+  }
+
+  // Server-side guard on latest user question (300-word limit + block links/XSS/injection)
+  const latestUserText = extractLastUserText(payload.messages).trim()
+  if (latestUserText.length > 0) {
+    const wordCount = latestUserText.split(/\s+/).filter(Boolean).length
+    if (wordCount > MAX_USER_PROMPT_WORDS || latestUserText.length > MAX_USER_PROMPT_CHARS) {
+      return jsonResponse(
+        req,
+        { error: `Questions are limited to ${MAX_USER_PROMPT_WORDS} words.` },
+        400,
+      )
+    }
+    if (UNSAFE_PROMPT_RE.test(latestUserText)) {
+      return jsonResponse(
+        req,
+        { error: 'Links and scripts are not allowed in questions. Please ask in plain text.' },
+        400,
+      )
+    }
   }
   if (isGuest && !GUEST_ALLOWED_MODELS.has(model)) {
     model = 'deepseek-v4-flash'

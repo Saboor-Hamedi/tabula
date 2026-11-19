@@ -32,22 +32,29 @@ export const Welcome = memo(function Welcome() {
         (!/int|float|double|decimal|num|real|date|time|bool/i.test(c.type) && c.distinctCount > 1),
     )
 
-    const numSamples = numericCols.slice(0, 5).map((c) => `\`${c.name}\``)
-    const catSamples = categoricalCols.slice(0, 5).map((c) => `\`${c.name}\``)
+    const numSamples = numericCols.slice(0, 4).map((c) => `**${c.name}**`)
+    const catSamples = categoricalCols.slice(0, 4).map((c) => `**${c.name}**`)
+    const colsWithBlanks = columns.filter(
+      (c) => typeof c.nullPct === 'number' && c.nullPct >= 1,
+    )
 
-    let paragraph = `This dataset contains **${formatCount(totalRows)}** records across **${columns.length || activeSession.tables?.[0]?.columnCount || 0}** columns in the \`${primaryTable}\` table.`
+    let paragraph = `This dataset contains **${formatCount(totalRows)}** records across **${columns.length || activeSession.tables?.[0]?.columnCount || 0}** columns.`
 
     if (numericCols.length > 0 && categoricalCols.length > 0) {
-      paragraph += ` It features **${numericCols.length}** quantitative metrics (${numSamples.join(', ')}${numericCols.length > 5 ? ', …' : ''}) alongside **${categoricalCols.length}** categorical dimensions (${catSamples.join(', ')}${categoricalCols.length > 5 ? ', …' : ''}).`
+      paragraph += ` It includes **${numericCols.length}** number columns (${numSamples.join(', ')}${numericCols.length > 4 ? ', …' : ''}) and **${categoricalCols.length}** category columns (${catSamples.join(', ')}${categoricalCols.length > 4 ? ', …' : ''}).`
     } else if (numericCols.length > 0) {
-      paragraph += ` It features **${numericCols.length}** quantitative metrics (${numSamples.join(', ')}).`
+      paragraph += ` It includes **${numericCols.length}** number columns (${numSamples.join(', ')}).`
     } else if (categoricalCols.length > 0) {
-      paragraph += ` It features **${categoricalCols.length}** categorical dimensions (${catSamples.join(', ')}).`
+      paragraph += ` It includes **${categoricalCols.length}** category columns (${catSamples.join(', ')}).`
     }
 
-    paragraph += ' Ask any question to analyze distributions, compare categories, or run calculations in natural language.'
+    if (colsWithBlanks.length > 0) {
+      paragraph += ` Heads up: **${colsWithBlanks.length}** column${colsWithBlanks.length === 1 ? '' : 's'} have some blank cells.`
+    }
 
-    // 4 great suggestion questions tailored to the dataset
+    paragraph += ' Pick a quick question below or ask anything in plain English.'
+
+    // 4 friendly, plain-English starter questions tailored to the spreadsheet
     const starters: StarterItem[] = []
 
     if (numericCols.length >= 2) {
@@ -55,16 +62,16 @@ export const Welcome = memo(function Welcome() {
       const n2 = numericCols[1].name
       starters.push({
         icon: TableIcon,
-        title: 'Correlations & Metrics',
-        desc: `Analyze relationships between ${n1} and ${n2}`,
-        prompt: `Analyze the statistical correlation and distribution between ${n1} and ${n2} in ${primaryTable}. Provide summary stats and highlight any notable patterns.`,
+        title: 'Compare Key Numbers',
+        desc: `See how ${n1} and ${n2} move together`,
+        prompt: `Compare ${n1} and ${n2} in ${primaryTable} in plain English. Highlight the main pattern, typical ranges, and include a clear chart.`,
       })
     } else {
       starters.push({
         icon: TableIcon,
-        title: 'Metric Distributions',
-        desc: 'Analyze statistical distributions of key numbers',
-        prompt: `Analyze the statistical distribution of numeric variables in ${primaryTable}. Provide mean, median, IQR, and variance.`,
+        title: 'Key Numbers Summary',
+        desc: 'Averages, highs, lows, and typical ranges',
+        prompt: `Summarize the main numbers in ${primaryTable} in plain English with averages, highs, lows, and a clear chart.`,
       })
     }
 
@@ -73,31 +80,31 @@ export const Welcome = memo(function Welcome() {
       const num = numericCols[numericCols.length - 1].name
       starters.push({
         icon: ActivityIcon,
-        title: 'Category Breakdown',
-        desc: `Segment ${num} across ${cat} groups`,
-        prompt: `Group and aggregate ${num} across different ${cat} categories in ${primaryTable}. Show comparative rankings and summaries.`,
+        title: 'Top Performers',
+        desc: `Compare ${num} across ${cat} groups`,
+        prompt: `Compare ${num} across each ${cat} group in ${primaryTable}. Rank the top performers, explain the biggest differences in plain English, and include a clean chart.`,
       })
     } else {
       starters.push({
         icon: ActivityIcon,
         title: 'Executive Summary',
-        desc: 'Descriptive statistics & key metric highlights',
-        prompt: `Provide an executive summary and descriptive statistics for the ${primaryTable} dataset.`,
+        desc: 'Key highlights & takeaways at a glance',
+        prompt: `Write a clear executive summary of ${primaryTable} in plain English with the main takeaways and a chart.`,
       })
     }
 
     starters.push({
       icon: SearchIcon,
       title: 'Data Quality Audit',
-      desc: 'Check null rates, duplicates & anomalies',
-      prompt: `Audit data quality: check missing values, null percentages, distinct counts, and potential anomalies in ${primaryTable}.`,
+      desc: 'Spot blank cells, duplicates & unusual values',
+      prompt: `Check ${primaryTable} for blank cells, duplicate rows, and unusual values. Explain any issues in plain English and suggest how to clean them.`,
     })
 
     starters.push({
       icon: FileIcon,
       title: 'Schema & Records',
-      desc: 'Preview column types and first 10 rows',
-      prompt: `Display the column schema with data types and show the first 10 sample records from ${primaryTable}.`,
+      desc: 'See every column and the first 10 rows',
+      prompt: `Explain each column in ${primaryTable} in simple terms and show a clean preview of the first 10 rows.`,
     })
 
     return {

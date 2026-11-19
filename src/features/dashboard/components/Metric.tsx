@@ -18,9 +18,11 @@ export interface MetricProps {
 export function Metric({ label, value, hint, icon }: MetricProps) {
   return (
     <div className="dash-metric">
-      {icon ? <span className="dash-metric-icon">{icon}</span> : null}
+      <div className="dash-metric-top">
+        <span className="dash-metric-label">{label}</span>
+        {icon ? <span className="dash-metric-icon">{icon}</span> : null}
+      </div>
       <span className="dash-metric-value">{value}</span>
-      <span className="dash-metric-label">{label}</span>
       {hint ? <span className="dash-metric-hint">{hint}</span> : null}
     </div>
   )

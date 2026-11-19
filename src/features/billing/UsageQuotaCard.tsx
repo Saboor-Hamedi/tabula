@@ -80,18 +80,23 @@ export function UsageQuotaCard() {
 
       <div className="quota-meta">
         <span>
-          {formatCount(usage.usedTokens)}
-          {limit !== null ? ` / ${formatCount(limit)} tokens` : ' tokens spent'}
+          {limit !== null
+            ? `${Math.max(0, 100 - pct)}% remaining`
+            : `${formatCount(usage.queryCount)} questions`}
         </span>
         {usage.remainingTokens !== null ? (
           <span>{formatCount(usage.remainingTokens)} left</span>
         ) : (
-          <span>{usage.queryCount} queries</span>
+          <span>Unlimited</span>
         )}
       </div>
 
       <div className="quota-submeta">
-        {formatCount(usage.inputTokens)} in · {formatCount(usage.outputTokens)} out this month
+        {isGuest
+          ? 'Sign up free for 12× more usage'
+          : limit !== null
+            ? `${formatCount(usage.usedTokens)} of ${formatCount(limit)} used`
+            : 'Active workspace plan'}
       </div>
     </div>
   )

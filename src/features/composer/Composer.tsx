@@ -1,4 +1,5 @@
 import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
+import { validateUserPrompt } from '../../core/utils/promptGuard'
 import { LockIcon } from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { Input } from '../chat'
@@ -41,10 +42,10 @@ export function Composer() {
       openPricingModal(blockedReason)
       return
     }
-    const text = value.trim()
-    if (text.length === 0) return
+    const check = validateUserPrompt(value)
+    if (!check.ok) return
     setValue('')
-    void sendMessage(text)
+    void sendMessage(check.sanitized)
   }
 
   return (
@@ -106,11 +107,11 @@ export function Composer() {
               disabled={disabled || isStreaming}
               onClick={() =>
                 void sendMessage(
-                  'Generate a comprehensive executive report with a KPI scorecard, key trends, statistical comparisons, charts, and recommendations.',
+                  'Summarize the most important trends, top performers, and biggest changes in this spreadsheet in plain English with a clear chart.',
                 )
               }
             >
-              Executive Report
+              Summarize Trends
             </button>
             <button
               type="button"
@@ -118,11 +119,35 @@ export function Composer() {
               disabled={disabled || isStreaming}
               onClick={() =>
                 void sendMessage(
-                  'Audit data quality and statistical outliers (IQR/Z-score), missing values, and duplicates across the dataset.',
+                  'Create a clean, easy-to-read chart highlighting the main story in this spreadsheet.',
                 )
               }
             >
-              Find Outliers
+              Build a Chart
+            </button>
+            <button
+              type="button"
+              className="chip chip-action"
+              disabled={disabled || isStreaming}
+              onClick={() =>
+                void sendMessage(
+                  'Check this spreadsheet for blank cells, duplicate rows, unusual values, or formatting issues, and explain them simply.',
+                )
+              }
+            >
+              Check for Errors
+            </button>
+            <button
+              type="button"
+              className="chip chip-action"
+              disabled={disabled || isStreaming}
+              onClick={() =>
+                void sendMessage(
+                  'Generate a clear executive summary report with key takeaways, a clean chart, a compact summary table, and practical next steps.',
+                )
+              }
+            >
+              Executive Report
             </button>
           </div>
         ) : null}

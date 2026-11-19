@@ -17,8 +17,15 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
   const summary = typeof entry.summary === 'string' ? entry.summary : ''
   const safeArgs = { ...(entry.args ?? {}) }
   if (entry.toolName === 'run_sql') delete safeArgs.sql
-  const argsText = JSON.stringify(safeArgs, null, 2)
-  const friendlyTool = entry.toolName === 'inspect_schema' ? 'Read columns' : 'Analysed data'
+  if (entry.toolName === 'run_python') delete safeArgs.code
+  const hasVisibleArgs = Object.keys(safeArgs).length > 0
+  const argsText = hasVisibleArgs ? JSON.stringify(safeArgs, null, 2) : ''
+  const friendlyTool =
+    entry.toolName === 'inspect_schema'
+      ? 'Checked columns'
+      : entry.toolName === 'run_python'
+        ? 'Built chart & summary'
+        : 'Calculated numbers'
 
   return (
     <div className={`trace-entry is-${entry.status}`}>
@@ -62,10 +69,12 @@ export function TraceEntry({ entry }: { entry: ToolTraceEntry }) {
             </div>
           ) : null}
 
-          <div className="trace-detail-row is-column">
-            <span className="trace-detail-label">Step details</span>
-            <pre className="trace-code">{argsText}</pre>
-          </div>
+          {hasVisibleArgs ? (
+            <div className="trace-detail-row is-column">
+              <span className="trace-detail-label">Step details</span>
+              <pre className="trace-code">{argsText}</pre>
+            </div>
+          ) : null}
 
           <div className="trace-detail-row is-column">
             <span className="trace-detail-label">Outcome</span>

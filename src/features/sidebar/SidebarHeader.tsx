@@ -1,4 +1,6 @@
 import logoUrl from '../../assets/logo.png'
+import { Link } from '../../core/router'
+import { ROUTES } from '../../core/router/paths'
 import { CloseIcon } from '../common/Icons'
 import { IconButton } from '../common/IconButton'
 
@@ -17,9 +19,10 @@ export interface SidebarHeaderProps {
 export function SidebarHeader({ onClose, closable = false }: SidebarHeaderProps) {
   return (
     <div className="sidebar-header">
-      <div className="brand">
-        <img src={logoUrl} alt="Lumina Tabula" className="header-brand-logo" />
-      </div>
+      <Link className="brand header-brand" to={ROUTES.landing} aria-label="Lumina Tabula home">
+        <img src={logoUrl} alt="" className="header-brand-logo" />
+        <span className="header-brand-name">Lumina Tabula</span>
+      </Link>
 
       {closable ? (
         <div className="sidebar-header-actions">

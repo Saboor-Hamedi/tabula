@@ -113,6 +113,24 @@ export function Analyse() {
   const [nameSaved, setNameSaved] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(readInitialTheme)
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    try {
+      return localStorage.getItem('tabula:dash-sidebar') !== 'closed'
+    } catch {
+      return true
+    }
+  })
+
+  const handleToggleSidebar = () => {
+    setSidebarOpen((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('tabula:dash-sidebar', next ? 'open' : 'closed')
+      } catch {}
+      return next
+    })
+  }
 
   // Non-admin self-service account deletion state (with optional feedback)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
@@ -321,45 +339,51 @@ export function Analyse() {
           : (profile?.tier ?? 'Free').toUpperCase()
 
   const navItems: { id: DashSection; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { id: 'overview', label: 'Overview', icon: <ActivityIcon size={15} /> },
+    { id: 'overview', label: 'Overview', icon: <ActivityIcon size={14} /> },
     ...(isAdmin
       ? [
           {
             id: 'members' as const,
             label: 'Members',
-            icon: <UserIcon size={15} />,
+            icon: <UserIcon size={14} />,
             badge: overview.users,
           },
           {
             id: 'stories' as const,
             label: 'Published Stories',
-            icon: <FileIcon size={15} />,
+            icon: <FileIcon size={14} />,
           },
         ]
       : []),
-    { id: 'account', label: 'Account & Security', icon: <SettingsIcon size={15} /> },
+    { id: 'account', label: 'Account & Security', icon: <SettingsIcon size={14} /> },
   ]
 
   return (
     <div className="shell-frame">
-      <Header variant="dashboard" />
+      <Header
+        variant="dashboard"
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
+      />
 
-      <div className="dash-shell">
+      <div className={`dash-shell ${sidebarOpen ? 'is-sidebar-open' : 'is-sidebar-collapsed'}`}>
         {/* Unified Dashboard Sidebar */}
         <aside className="dash-sidebar" aria-label="Dashboard navigation">
           <div className="dash-sidebar-profile">
-            {avatarUrl ? (
-              <img className="dash-sidebar-avatar" src={avatarUrl} alt="" />
-            ) : (
-              <span className="dash-sidebar-avatar is-fallback" aria-hidden="true">
-                {initial}
-              </span>
-            )}
-            <div className="dash-sidebar-identity">
-              <span className="dash-sidebar-name">{displayName}</span>
-              <span className="dash-sidebar-role">
-                {isAdmin ? 'Administrator' : planLabel}
-              </span>
+            <div className="dash-sidebar-profile-main">
+              {avatarUrl ? (
+                <img className="dash-sidebar-avatar" src={avatarUrl} alt="" />
+              ) : (
+                <span className="dash-sidebar-avatar is-fallback" aria-hidden="true">
+                  {initial}
+                </span>
+              )}
+              <div className="dash-sidebar-identity">
+                <span className="dash-sidebar-name">{displayName}</span>
+                <span className="dash-sidebar-role">
+                  {isAdmin ? 'Administrator' : planLabel}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -387,7 +411,7 @@ export function Analyse() {
               onClick={() => void handleOpenDataset()}
             >
               <span>Open Workspace</span>
-              <ArrowRightIcon size={14} />
+              <ArrowRightIcon size={12} />
             </button>
 
             <button
@@ -395,7 +419,7 @@ export function Analyse() {
               className="dash-sidebar-link"
               onClick={() => navigate(ROUTES.landing)}
             >
-              <GlobeIcon size={14} />
+              <GlobeIcon size={12} />
               <span>View Public Site</span>
             </button>
           </div>
@@ -455,7 +479,7 @@ export function Analyse() {
                     )
                   }
                 >
-                  <ZapIcon size={14} />
+                  <ZapIcon size={13} />
                   <span>
                     {usage.trialExpired || quotaExhausted ? 'Upgrade Now' : 'Upgrade to Pro'}
                   </span>
@@ -468,7 +492,7 @@ export function Analyse() {
                 onClick={() => void handleOpenDataset()}
               >
                 <span>Open Workspace</span>
-                <ArrowRightIcon size={15} />
+                <ArrowRightIcon size={13} />
               </button>
             </div>
           </header>
@@ -515,25 +539,25 @@ export function Analyse() {
                       label="Total Members"
                       value={formatCount(overview.users)}
                       hint={`${overview.admins} admin${overview.admins === 1 ? '' : 's'}`}
-                      icon={<DatabaseIcon size={15} />}
+                      icon={<DatabaseIcon size={13} />}
                     />
                     <Metric
                       label="Paid Subscribers"
                       value={formatCount(overview.subscribers)}
                       hint={`${formatCount(overview.trialing)} active trial${overview.trialing === 1 ? '' : 's'}`}
-                      icon={<BarChartIcon size={15} />}
+                      icon={<BarChartIcon size={13} />}
                     />
                     <Metric
                       label="Your Datasets"
                       value={formatCount(stats?.datasets ?? 0)}
                       hint={`${formatCount(stats?.rows ?? 0)} rows locally`}
-                      icon={<SheetIcon size={15} />}
+                      icon={<SheetIcon size={13} />}
                     />
                     <Metric
                       label="Questions Asked"
                       value={formatCount(stats?.questions ?? 0)}
                       hint="Saved on this device"
-                      icon={<ZapIcon size={15} />}
+                      icon={<ZapIcon size={13} />}
                     />
                   </>
                 ) : (
@@ -542,13 +566,13 @@ export function Analyse() {
                       label="Datasets"
                       value={formatCount(stats?.datasets ?? 0)}
                       hint={`${formatCount(stats?.rows ?? 0)} total rows`}
-                      icon={<SheetIcon size={15} />}
+                      icon={<SheetIcon size={13} />}
                     />
                     <Metric
                       label="Questions Asked"
                       value={formatCount(stats?.questions ?? 0)}
                       hint="Saved on this device"
-                      icon={<ZapIcon size={15} />}
+                      icon={<ZapIcon size={13} />}
                     />
                     <Metric
                       label="Usage"
@@ -562,7 +586,7 @@ export function Analyse() {
                           ? `${formatCount(usage?.remainingTokens ?? 0)} remaining`
                           : 'Unlimited monthly quota'
                       }
-                      icon={<BarChartIcon size={15} />}
+                      icon={<BarChartIcon size={13} />}
                     />
                     <Metric
                       label="Current Plan"
@@ -574,100 +598,181 @@ export function Analyse() {
                             : (profile?.tier ?? 'Free')
                       }
                       hint="100% private on-device"
-                      icon={<GlobeIcon size={15} />}
+                      icon={<GlobeIcon size={13} />}
                     />
                   </>
                 )}
               </section>
 
-              <section className="dash-card dash-datasets-card">
-                <div className="dash-card-head">
-                  <div>
-                    <h2 className="dash-card-title">Your Datasets</h2>
-                    <p className="dash-card-desc">
-                      Spreadsheets stored privately in this browser — never uploaded to any server.
-                    </p>
+              <div className="dash-studio-grid">
+                <section className="dash-card dash-datasets-card">
+                  <div className="dash-card-head">
+                    <div>
+                      <h2 className="dash-card-title">Your Datasets</h2>
+                      <p className="dash-card-desc">
+                        Spreadsheets stored privately in this browser — never uploaded to any server.
+                      </p>
+                    </div>
+                    <span className="dash-count-pill">{stats?.datasets ?? 0}</span>
                   </div>
-                  <span className="dash-count-pill">{stats?.datasets ?? 0}</span>
-                </div>
 
-                {(stats?.items.length ?? 0) > 0 ? (
-                  <div className="dash-input-search-wrap">
-                    <SearchIcon size={15} />
-                    <input
-                      type="text"
-                      className="dash-input dash-input-search"
-                      value={datasetQuery}
-                      onChange={(e) => setDatasetQuery(e.target.value)}
-                      placeholder="Filter your spreadsheets…"
-                      aria-label="Filter your spreadsheets"
-                    />
-                    {datasetQuery ? (
-                      <button
-                        type="button"
-                        className="dash-input-clear"
-                        onClick={() => setDatasetQuery('')}
-                        aria-label="Clear filter"
-                      >
-                        <CloseIcon size={13} />
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {filteredDatasets.length > 0 ? (
-                  <ul className="dash-dataset-list">
-                    {filteredDatasets.map((item) => (
-                      <li key={item.id} className="dash-dataset-row">
-                        <div className="dash-dataset-icon">
-                          <SheetIcon size={16} />
-                        </div>
-                        <div className="dash-dataset-info">
-                          <span className="dash-dataset-name">{item.name}</span>
-                          <span className="dash-dataset-meta">
-                            {formatCount(item.rows)} rows · {formatCount(item.questions)} messages
-                          </span>
-                        </div>
+                  {(stats?.items.length ?? 0) > 0 ? (
+                    <div className="dash-input-search-wrap">
+                      <SearchIcon size={14} />
+                      <input
+                        type="text"
+                        className="dash-input dash-input-search"
+                        value={datasetQuery}
+                        onChange={(e) => setDatasetQuery(e.target.value)}
+                        placeholder="Filter your spreadsheets…"
+                        aria-label="Filter your spreadsheets"
+                      />
+                      {datasetQuery ? (
                         <button
                           type="button"
-                          className="dash-btn dash-btn-ghost dash-btn-sm"
-                          onClick={() => void handleOpenDataset(item.id)}
+                          className="dash-input-clear"
+                          onClick={() => setDatasetQuery('')}
+                          aria-label="Clear filter"
                         >
-                          <span>Open</span>
-                          <ArrowRightIcon size={13} />
+                          <CloseIcon size={13} />
                         </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (stats?.items.length ?? 0) > 0 ? (
-                  <div className="dash-empty-box">
-                    <p>No spreadsheets match “{datasetQuery}”.</p>
-                    <button
-                      type="button"
-                      className="dash-btn dash-btn-ghost dash-btn-sm"
-                      onClick={() => setDatasetQuery('')}
-                    >
-                      Clear filter
-                    </button>
-                  </div>
-                ) : (
-                  <div className="dash-empty-box">
-                    <div className="dash-empty-icon">
-                      <SheetIcon size={22} />
+                      ) : null}
                     </div>
-                    <h3>No spreadsheets loaded yet</h3>
-                    <p>Drop an Excel or CSV file into the workspace to start asking questions.</p>
-                    <button
-                      type="button"
-                      className="dash-btn dash-btn-primary dash-btn-sm"
-                      onClick={() => void handleOpenDataset()}
-                    >
-                      <span>Open Workspace</span>
-                      <ArrowRightIcon size={13} />
-                    </button>
-                  </div>
-                )}
-              </section>
+                  ) : null}
+
+                  {filteredDatasets.length > 0 ? (
+                    <ul className="dash-dataset-list">
+                      {filteredDatasets.map((item) => (
+                        <li key={item.id} className="dash-dataset-row">
+                          <div className="dash-dataset-icon">
+                            <SheetIcon size={14} />
+                          </div>
+                          <div className="dash-dataset-info">
+                            <span className="dash-dataset-name">{item.name}</span>
+                            <span className="dash-dataset-meta">
+                              {formatCount(item.rows)} rows · {formatCount(item.questions)} messages
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="dash-btn dash-btn-ghost dash-btn-sm"
+                            onClick={() => void handleOpenDataset(item.id)}
+                          >
+                            <span>Open</span>
+                            <ArrowRightIcon size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (stats?.items.length ?? 0) > 0 ? (
+                    <div className="dash-empty-box">
+                      <p>No spreadsheets match “{datasetQuery}”.</p>
+                      <button
+                        type="button"
+                        className="dash-btn dash-btn-ghost dash-btn-sm"
+                        onClick={() => setDatasetQuery('')}
+                      >
+                        Clear filter
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="dash-empty-box">
+                      <div className="dash-empty-icon">
+                        <SheetIcon size={18} />
+                      </div>
+                      <h3>No spreadsheets loaded yet</h3>
+                      <p>Drop an Excel or CSV file into the workspace to start asking questions.</p>
+                      <button
+                        type="button"
+                        className="dash-btn dash-btn-primary dash-btn-sm"
+                        onClick={() => void handleOpenDataset()}
+                      >
+                        <span>Open Workspace</span>
+                        <ArrowRightIcon size={12} />
+                      </button>
+                    </div>
+                  )}
+                </section>
+
+                <div className="dash-side-stack">
+                  {/* Quick Shortcuts */}
+                  <section className="dash-card">
+                    <div className="dash-card-head">
+                      <div>
+                        <h2 className="dash-card-title">Quick Actions</h2>
+                        <p className="dash-card-desc">Direct shortcuts to your work.</p>
+                      </div>
+                    </div>
+                    <div className="dash-actions-stack">
+                      <button
+                        type="button"
+                        className="dash-action-btn"
+                        onClick={() => void handleOpenDataset()}
+                      >
+                        <div className="dash-action-icon">
+                          <ZapIcon size={13} />
+                        </div>
+                        <div className="dash-action-body">
+                          <span className="dash-action-title">Launch Workspace</span>
+                          <span className="dash-action-text">Query your data privately</span>
+                        </div>
+                        <ArrowRightIcon size={13} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="dash-action-btn"
+                        onClick={() => setSection('account')}
+                      >
+                        <div className="dash-action-icon">
+                          <SettingsIcon size={13} />
+                        </div>
+                        <div className="dash-action-body">
+                          <span className="dash-action-title">Account &amp; Security</span>
+                          <span className="dash-action-text">Manage profile &amp; preferences</span>
+                        </div>
+                        <ArrowRightIcon size={13} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="dash-action-btn"
+                        onClick={() => navigate(ROUTES.landing)}
+                      >
+                        <div className="dash-action-icon">
+                          <GlobeIcon size={13} />
+                        </div>
+                        <div className="dash-action-body">
+                          <span className="dash-action-title">Public Website</span>
+                          <span className="dash-action-text">Explore features and stories</span>
+                        </div>
+                        <ArrowRightIcon size={13} />
+                      </button>
+                    </div>
+                  </section>
+
+                  {/* Privacy & Storage Guarantee */}
+                  <section className="dash-card">
+                    <div className="dash-card-head">
+                      <div>
+                        <h2 className="dash-card-title">Private Storage</h2>
+                        <p className="dash-card-desc">Zero cloud retention guarantee.</p>
+                      </div>
+                    </div>
+                    <ul className="dash-security-list" style={{ margin: 0, padding: 0, borderTop: 'none' }}>
+                      <li>
+                        <CheckIcon size={12} /> Stored 100% locally on your computer
+                      </li>
+                      <li>
+                        <CheckIcon size={12} /> No spreadsheet data is uploaded to servers
+                      </li>
+                      <li>
+                        <CheckIcon size={12} /> Queries executed safely in local sandbox
+                      </li>
+                    </ul>
+                  </section>
+                </div>
+              </div>
             </>
           )}
 
@@ -676,7 +781,7 @@ export function Analyse() {
             <div className="dash-admin-stack">
               <section className="dash-panel">
                 <header className="dash-panel-head">
-                  <div>
+                  <div className="dash-panel-titles">
                     <h2 className="dash-section-title">Member Directory</h2>
                     <span className="dash-panel-note">
                       Live sign-ins, trial windows, and subscription status.
@@ -721,7 +826,7 @@ export function Analyse() {
               {/* Deleted Accounts & Optional Exit Feedback */}
               <section className="dash-panel">
                 <header className="dash-panel-head">
-                  <div>
+                  <div className="dash-panel-titles">
                     <h2 className="dash-section-title">Deleted Accounts &amp; Feedback</h2>
                     <span className="dash-panel-note">
                       Users who deleted their account and any optional feedback they left.

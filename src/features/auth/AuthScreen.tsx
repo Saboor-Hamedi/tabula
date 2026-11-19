@@ -1,16 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import logoUrl from '../../assets/logo.png'
 import { supabase } from '../../core/supabase/client'
 import { useRouter } from '../../core/router'
 import { ROUTES } from '../../core/router/paths'
 import {
   AlertIcon,
+  ArrowRightIcon,
   CheckIcon,
-  DatabaseIcon,
   EyeIcon,
   EyeOffIcon,
   LockIcon,
-  TableIcon,
-  UserIcon,
+  ShieldCheckIcon,
 } from '../common/Icons'
 import { Header } from '../header/Header'
 import { useAuth } from './useAuth'
@@ -48,15 +48,17 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
 
   const isSignUp = mode === 'signup'
 
+  // Sync mode whenever route switches between /login (signin) and /signup (signup)
   useEffect(() => {
     if (passwordRecovery) {
       setMode('update-password')
       setMessage(null)
+      return
     }
-  }, [passwordRecovery])
+    setMode(initialMode)
+    setMessage(null)
+  }, [initialMode, passwordRecovery])
 
-  // Ask the project which providers are enabled, so the screen only offers
-  // the ones that can actually work.
   useEffect(() => {
     let active = true
     void fetchProviderAvailability().then((availability) => {
@@ -67,11 +69,18 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     }
   }, [])
 
+  const switchMode = (next: AuthMode) => {
+    setMode(next)
+    setMessage(null)
+    if (next === 'signin') navigate(ROUTES.signIn, { replace: true })
+    if (next === 'signup') navigate(ROUTES.signUp, { replace: true })
+  }
+
   const handleOAuthSignIn = async (provider: OAuthProvider) => {
     if (!supabase) {
       setMessage({
         type: 'error',
-        text: 'No project is configured, so social sign-in is unavailable.',
+        text: 'Social sign-in is currently unavailable.',
       })
       return
     }
@@ -97,7 +106,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
-    // 4.5 Honeypot bot protection: ignore bot submissions
+    // Honeypot bot protection
     if (honeypot.trim().length > 0) {
       setMessage({
         type: 'success',
@@ -109,24 +118,18 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
     if (!supabase) {
       setMessage({
         type: 'error',
-        text: 'Supabase client is not configured. Please check your environment variables.',
+        text: 'Authentication is not configured right now.',
       })
       return
     }
 
     if (mode === 'update-password') {
       if (!password || password.length < 6) {
-        setMessage({
-          type: 'error',
-          text: 'New password must be at least 6 characters long.',
-        })
+        setMessage({ type: 'error', text: 'New password must be at least 6 characters.' })
         return
       }
       if (password !== confirmPassword) {
-        setMessage({
-          type: 'error',
-          text: 'Passwords do not match.',
-        })
+        setMessage({ type: 'error', text: 'Passwords do not match.' })
         return
       }
       setLoading(true)
@@ -134,16 +137,10 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
       try {
         const { error } = await updatePassword(password)
         if (error) throw error
-        setMessage({
-          type: 'success',
-          text: 'Password updated! Redirecting to your workspace…',
-        })
-        setTimeout(() => onSuccess(), 900)
+        setMessage({ type: 'success', text: 'Password updated! Opening your workspace…' })
+        setTimeout(() => onSuccess(), 800)
       } catch (err: unknown) {
-        setMessage({
-          type: 'error',
-          text: describeAuthError(err),
-        })
+        setMessage({ type: 'error', text: describeAuthError(err) })
       } finally {
         setLoading(false)
       }
@@ -152,10 +149,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
 
     const cleanEmail = email.trim()
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      setMessage({
-        type: 'error',
-        text: 'Please enter a valid email address.',
-      })
+      setMessage({ type: 'error', text: 'Please enter a valid email address.' })
       return
     }
 
@@ -170,7 +164,7 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         if (error) throw error
         setMessage({
           type: 'success',
-          text: 'Password reset link sent! Check your email inbox to reset your password.',
+          text: 'Reset link sent — check your inbox to choose a new password.',
         })
         return
       }
@@ -185,17 +179,14 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         if (error) throw error
         setMessage({
           type: 'success',
-          text: 'Magic sign-in link sent! Click the link in your email to log in instantly.',
+          text: 'Sign-in link sent — click the link in your email to log in.',
         })
         return
       }
 
       if (isSignUp) {
         if (!password || password.length < 6) {
-          setMessage({
-            type: 'error',
-            text: 'Password must be at least 6 characters long.',
-          })
+          setMessage({ type: 'error', text: 'Password must be at least 6 characters.' })
           setLoading(false)
           return
         }
@@ -218,16 +209,13 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         } else {
           setMessage({
             type: 'success',
-            text: 'Account created! Please check your email inbox to confirm your registration.',
+            text: 'Account created! Check your inbox to confirm your email.',
           })
           setMode('signin')
         }
       } else {
         if (!password || password.length < 6) {
-          setMessage({
-            type: 'error',
-            text: 'Password must be at least 6 characters long.',
-          })
+          setMessage({ type: 'error', text: 'Password must be at least 6 characters.' })
           setLoading(false)
           return
         }
@@ -240,158 +228,85 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         onSuccess()
       }
     } catch (err: unknown) {
-      setMessage({
-        type: 'error',
-        text: describeAuthError(err),
-      })
+      setMessage({ type: 'error', text: describeAuthError(err) })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="auth-screen">
+    <div className="auth-v2-page">
       <Header
         variant="page"
-        onSignIn={() => {
-          setMode('signin')
-          setMessage(null)
-        }}
-        onSignUp={() => {
-          setMode('signup')
-          setMessage(null)
-        }}
+        onSignIn={() => switchMode('signin')}
+        onSignUp={() => switchMode('signup')}
       />
 
-      <div className="auth-screen-container">
-        {/* Left Side: Brand Story & Security Features */}
-        <div className="auth-screen-hero">
-          <div className="auth-hero-badge">
-            <DatabaseIcon size={24} />
-          </div>
+      <main className="auth-v2-main">
+        <div className="auth-v2-grid-bg" aria-hidden="true" />
 
-          <h1 className="auth-hero-title">
-            Lumina Tabula
-            <span className="auth-hero-tag">Analytics</span>
-          </h1>
-
-          <p className="auth-hero-lead">
-            The private, in-browser conversational data science workbench.
-          </p>
-
-          <div className="auth-feature-list">
-            <div className="auth-feature-item">
-              <div className="auth-feature-icon">
-                <LockIcon size={16} />
-              </div>
-              <div className="auth-feature-text">
-                <strong>100% Client-Side Privacy</strong>
-                <span>
-                  DuckDB WASM & Pyodide run on your CPU. Confidential spreadsheet data never touches a cloud server.
-                </span>
-              </div>
-            </div>
-
-            <div className="auth-feature-item">
-              <div className="auth-feature-icon">
-                <TableIcon size={16} />
-              </div>
-              <div className="auth-feature-text">
-                <strong>Instant SQL & Python Plots</strong>
-                <span>
-                  Query millions of rows in milliseconds, generate publication charts, and model regressions.
-                </span>
-              </div>
-            </div>
-
-            <div className="auth-feature-item">
-              <div className="auth-feature-icon">
-                <CheckIcon size={16} />
-              </div>
-              <div className="auth-feature-text">
-                <strong>Word & Docs Ready Exports</strong>
-                <span>
-                  1-click copy formatted tables directly to Microsoft Word or Google Docs, plus clean executive PDF reports.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="auth-hero-foot">
-            <span>Serverless • Zero-knowledge data architecture • DuckDB WASM</span>
-          </div>
-        </div>
-
-        {/* Right Side: High-polish Authentication Card */}
-        <div className="auth-screen-card">
-          <div className="auth-card-header">
-            <h2>
+        <div className="auth-v2-card">
+          <div className="auth-v2-head">
+            <img src={logoUrl} alt="Lumina Tabula" className="auth-v2-logo" />
+            <h1 className="auth-v2-title">
               {mode === 'update-password'
-                ? 'Set a new password'
+                ? 'Set new password'
                 : mode === 'forgot-password'
-                ? 'Reset your password'
-                : mode === 'magic-link'
-                ? 'Sign in with magic link'
-                : isSignUp
-                ? 'Create your account'
-                : 'Sign in to Lumina Tabula'}
-            </h2>
-            <p>
+                  ? 'Reset password'
+                  : mode === 'magic-link'
+                    ? 'Email sign-in link'
+                    : isSignUp
+                      ? 'Create your account'
+                      : 'Welcome back'}
+            </h1>
+            <p className="auth-v2-sub">
               {mode === 'update-password'
-                ? 'Enter a new password for your Lumina Tabula account'
+                ? 'Choose a new password for your account.'
                 : mode === 'forgot-password'
-                ? "Enter your email address and we'll send you a recovery link"
-                : mode === 'magic-link'
-                ? "We'll email you a one-click login link with no password needed"
-                : isSignUp
-                ? 'Get started with private, local-first dataset analysis'
-                : 'Enter your credentials to access your workspace'}
+                  ? 'We will email you a link to reset your password.'
+                  : mode === 'magic-link'
+                    ? 'Sign in with a single click from your inbox.'
+                    : isSignUp
+                      ? '7-day free trial · No credit card required.'
+                      : 'Sign in to continue to your workspace.'}
             </p>
           </div>
 
-          {/* Toggle between Sign In & Sign Up when in regular modes */}
           {(mode === 'signin' || mode === 'signup') && (
-            <div className="auth-mode-switch" role="tablist">
+            <div className="auth-v2-tabs" role="tablist">
               <button
                 type="button"
                 role="tab"
                 aria-selected={!isSignUp}
-                className={`auth-mode-btn ${!isSignUp ? 'is-active' : ''}`}
-                onClick={() => {
-                  setMode('signin')
-                  setMessage(null)
-                }}
+                className={`auth-v2-tab ${!isSignUp ? 'is-active' : ''}`}
+                onClick={() => switchMode('signin')}
               >
-                Sign In
+                Sign in
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={isSignUp}
-                className={`auth-mode-btn ${isSignUp ? 'is-active' : ''}`}
-                onClick={() => {
-                  setMode('signup')
-                  setMessage(null)
-                }}
+                className={`auth-v2-tab ${isSignUp ? 'is-active' : ''}`}
+                onClick={() => switchMode('signup')}
               >
-                Create Account
+                Create account
               </button>
             </div>
           )}
 
-          {/* Social sign-in — only the providers the project has enabled */}
           {(mode === 'signin' || mode === 'signup') &&
           providers &&
           (providers.google || providers.github) ? (
-            <div className="auth-social-group">
+            <div className="auth-v2-social">
               {providers.google ? (
                 <button
                   type="button"
-                  className="auth-social-btn"
+                  className="auth-v2-social-btn"
                   onClick={() => handleOAuthSignIn('google')}
                   disabled={socialLoading !== null}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24">
+                  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -409,44 +324,38 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                     />
                   </svg>
-                  <span>
-                    {socialLoading === 'google' ? 'Connecting…' : 'Continue with Google'}
-                  </span>
+                  <span>{socialLoading === 'google' ? 'Connecting…' : 'Continue with Google'}</span>
                 </button>
               ) : null}
 
               {providers.github ? (
                 <button
                   type="button"
-                  className="auth-social-btn"
+                  className="auth-v2-social-btn"
                   onClick={() => handleOAuthSignIn('github')}
                   disabled={socialLoading !== null}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
                   </svg>
-                  <span>
-                    {socialLoading === 'github' ? 'Connecting…' : 'Continue with GitHub'}
-                  </span>
+                  <span>{socialLoading === 'github' ? 'Connecting…' : 'Continue with GitHub'}</span>
                 </button>
               ) : null}
 
-              <div className="auth-divider">
-                <span>or continue with email</span>
+              <div className="auth-v2-divider">
+                <span>or with email</span>
               </div>
             </div>
           ) : null}
 
-          {/* Error / Success Banner */}
           {message && (
-            <div className={`auth-banner is-${message.type}`}>
-              {message.type === 'error' ? <AlertIcon size={16} /> : <CheckIcon size={16} />}
+            <div className={`auth-v2-alert is-${message.type}`} role="alert">
+              {message.type === 'error' ? <AlertIcon size={15} /> : <CheckIcon size={15} />}
               <span>{message.text}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="auth-screen-form">
-            {/* Honeypot field for bot protection */}
+          <form onSubmit={handleSubmit} className="auth-v2-form">
             <input
               type="text"
               name="company_website"
@@ -459,116 +368,96 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
             />
 
             {isSignUp && (
-              <div className="auth-input-group">
-                <label className="auth-input-label" htmlFor="auth-name">
-                  Full Name
+              <div className="auth-v2-field">
+                <label className="auth-v2-label" htmlFor="auth-name">
+                  Full name
                 </label>
-                <div className="auth-input-wrap">
-                  <span className="auth-input-icon">
-                    <UserIcon size={16} />
-                  </span>
-                  <input
-                    id="auth-name"
-                    type="text"
-                    required={isSignUp}
-                    className="auth-input"
-                    placeholder="Alex Morgan"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                  />
-                </div>
+                <input
+                  id="auth-name"
+                  type="text"
+                  required={isSignUp}
+                  className="auth-v2-input"
+                  placeholder="Alex Morgan"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
               </div>
             )}
 
             {mode !== 'update-password' && (
-              <div className="auth-input-group">
-                <label className="auth-input-label" htmlFor="auth-email">
-                  Work Email
+              <div className="auth-v2-field">
+                <label className="auth-v2-label" htmlFor="auth-email">
+                  Email
                 </label>
-                <div className="auth-input-wrap">
-                  <span className="auth-input-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="4" width="20" height="16" rx="2" />
-                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                    </svg>
-                  </span>
-                  <input
-                    id="auth-email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    className="auth-input"
-                    placeholder="name@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
+                <input
+                  id="auth-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  className="auth-v2-input"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
             )}
 
             {mode !== 'forgot-password' && mode !== 'magic-link' && (
-              <div className="auth-input-group">
-                <div className="auth-label-row">
-                  <label className="auth-input-label" htmlFor="auth-password">
-                    {mode === 'update-password' ? 'New Password' : 'Password'}
+              <div className="auth-v2-field">
+                <div className="auth-v2-label-row">
+                  <label className="auth-v2-label" htmlFor="auth-password">
+                    {mode === 'update-password' ? 'New password' : 'Password'}
                   </label>
                   {mode === 'signin' && (
                     <button
                       type="button"
-                      className="auth-forgot-link"
-                      onClick={() => {
-                        setMode('forgot-password')
-                        setMessage(null)
-                      }}
+                      className="auth-v2-link"
+                      onClick={() => switchMode('forgot-password')}
                     >
-                      Forgot password?
+                      Forgot?
                     </button>
                   )}
                 </div>
-                <div className="auth-input-wrap">
-                  <span className="auth-input-icon">
-                    <LockIcon size={16} />
-                  </span>
+                <div className="auth-v2-pwd-wrap">
                   <input
                     id="auth-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     minLength={6}
-                    autoComplete={isSignUp || mode === 'update-password' ? 'new-password' : 'current-password'}
-                    className="auth-input"
-                    placeholder="••••••••••••"
+                    autoComplete={
+                      isSignUp || mode === 'update-password' ? 'new-password' : 'current-password'
+                    }
+                    className="auth-v2-input is-pwd"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
-                    className="auth-show-pwd-btn"
-                    onClick={() => setShowPassword(!showPassword)}
-                    title={showPassword ? 'Hide password' : 'Show password'}
+                    className="auth-v2-pwd-toggle"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                    {showPassword ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
                   </button>
                 </div>
               </div>
             )}
 
             {mode === 'update-password' && (
-              <div className="auth-input-group">
-                <label className="auth-input-label" htmlFor="auth-confirm-password">
-                  Confirm New Password
+              <div className="auth-v2-field">
+                <label className="auth-v2-label" htmlFor="auth-confirm-password">
+                  Confirm password
                 </label>
-                <div className="auth-input-wrap">
-                  <span className="auth-input-icon">
-                    <LockIcon size={16} />
-                  </span>
+                <div className="auth-v2-pwd-wrap">
                   <input
                     id="auth-confirm-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     autoComplete="new-password"
-                    className="auth-input"
-                    placeholder="••••••••••••"
+                    className="auth-v2-input"
+                    placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />
@@ -576,58 +465,57 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
               </div>
             )}
 
-            <button type="submit" className="auth-primary-submit" disabled={loading}>
+            <button type="submit" className="auth-v2-submit" disabled={loading}>
               {loading ? (
                 <span className="auth-spinner" />
-              ) : mode === 'update-password' ? (
-                'Update Password'
-              ) : mode === 'forgot-password' ? (
-                'Send Password Reset Link'
-              ) : mode === 'magic-link' ? (
-                'Send Magic Sign-In Link'
-              ) : isSignUp ? (
-                'Create Account & Enter'
               ) : (
-                'Sign In to Workspace'
+                <>
+                  <span>
+                    {mode === 'update-password'
+                      ? 'Update password'
+                      : mode === 'forgot-password'
+                        ? 'Send reset link'
+                        : mode === 'magic-link'
+                          ? 'Send sign-in link'
+                          : isSignUp
+                            ? 'Create free account'
+                            : 'Sign in'}
+                  </span>
+                  <ArrowRightIcon size={14} />
+                </>
               )}
             </button>
           </form>
 
-          {/* Mode Switchers & Alternative Options */}
-          <div className="auth-aux-links">
+          <div className="auth-v2-aux">
             {mode === 'forgot-password' || mode === 'magic-link' || mode === 'update-password' ? (
               <button
                 type="button"
-                className="auth-aux-btn"
+                className="auth-v2-link"
                 onClick={() => {
                   clearPasswordRecovery()
-                  setMode('signin')
-                  setMessage(null)
+                  switchMode('signin')
                 }}
               >
-                ← Back to Sign In
+                ← Back to sign in
               </button>
             ) : !isSignUp ? (
               <button
                 type="button"
-                className="auth-aux-btn"
-                onClick={() => {
-                  setMode('magic-link')
-                  setMessage(null)
-                }}
+                className="auth-v2-link"
+                onClick={() => switchMode('magic-link')}
               >
-                Sign in with a password-free magic link →
+                <LockIcon size={12} /> Email me a one-click sign-in link
               </button>
             ) : null}
           </div>
 
-          <div className="auth-card-footer">
-            <span>
-              By signing in, you agree to local data processing terms. Lumina Tabula operates 100% on-device.
-            </span>
+          <div className="auth-v2-foot">
+            <ShieldCheckIcon size={13} />
+            <span>Your files stay 100% on your device.</span>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
