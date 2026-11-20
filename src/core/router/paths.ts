@@ -25,6 +25,7 @@ export const ROUTES = {
   signIn: '/login',
   signUp: '/signup',
   verify: '/verify',
+  suspended: '/suspended',
   notFound: '*',
 } as const
 
@@ -42,6 +43,7 @@ const RESERVED_SLUGS = new Set([
   'login',
   'signup',
   'verify',
+  'suspended',
   'api',
   'assets',
 ])

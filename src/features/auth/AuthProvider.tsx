@@ -91,6 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const onFocus = () => {
       void refreshUsage()
+      void supabase?.auth.getSession().then(({ data: { session: activeSession } }) => {
+        if (activeSession?.user) {
+          void fetchProfile(activeSession.user.id).then((p) => {
+            setProfile(p)
+            setAuthState({ user: activeSession.user, profile: p })
+          })
+        }
+      })
     }
     window.addEventListener('focus', onFocus)
 

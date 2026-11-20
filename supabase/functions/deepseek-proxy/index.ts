@@ -165,6 +165,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let guestIpHash: string | null = null
   let guestIpRemaining = GUEST_IP_DAILY_TOKEN_LIMIT
   let isGuest = false
+  let isAdminUser = false
   let tokensRemaining = 0
 
   if (authHeader.startsWith('Bearer ')) {
@@ -185,20 +186,97 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     userId = user.id
     isGuest = Boolean((user as { is_anonymous?: boolean }).is_anonymous)
-    const defaultTokens = isGuest ? GUEST_ID_TOKEN_LIMIT : 250_000
 
-    const { data: balanceRow, error: balanceError } = await supabaseAdmin
-      .from('user_balances')
-      .select('tokens_remaining')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const [profileRes, subRes, balanceRes] = await Promise.all([
+      supabaseAdmin
+        .from('profiles')
+        .select('role, tier, is_suspended, suspended_reason')
+        .eq('id', user.id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('subscriptions')
+        .select('tier, status, trial_ends_at, current_period_end')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('user_balances')
+        .select('tokens_remaining')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ])
 
-    if (balanceError) {
+    if (balanceRes.error) {
       return jsonResponse(req, { error: 'Failed to check token balance.' }, 500)
     }
 
-    tokensRemaining = balanceRow?.tokens_remaining ?? defaultTokens
-    if (!balanceRow) {
+    const profileRow = profileRes.data as {
+      role?: string | null
+      tier?: string | null
+      is_suspended?: boolean | null
+      suspended_reason?: string | null
+    } | null
+
+    const subRow = subRes.data as {
+      tier?: string | null
+      status?: string | null
+      trial_ends_at?: string | null
+      current_period_end?: string | null
+    } | null
+
+    isAdminUser = !isGuest && profileRow?.role === 'admin'
+
+    if (!isAdminUser && profileRow?.is_suspended) {
+      return jsonResponse(
+        req,
+        {
+          error:
+            profileRow.suspended_reason ||
+            'Your account has been suspended by an administrator.',
+          code: 'ACCOUNT_SUSPENDED',
+          tokens_remaining: 0,
+        },
+        403,
+      )
+    }
+
+    const effectiveTier = subRow?.tier ?? profileRow?.tier ?? 'free'
+    const periodEndIso = subRow?.current_period_end ?? subRow?.trial_ends_at ?? null
+    const periodExpired =
+      !isAdminUser &&
+      !isGuest &&
+      (subRow?.status === 'canceled' ||
+        (periodEndIso !== null && Date.parse(periodEndIso) <= Date.now()))
+
+    if (periodExpired) {
+      return jsonResponse(
+        req,
+        {
+          error:
+            effectiveTier === 'pro' || effectiveTier === 'enterprise'
+              ? 'Your 1-month Pro period has ended. Upgrade to Lumina Tabula Pro to continue.'
+              : 'Your 7-day free trial has ended. Upgrade to Lumina Tabula Pro to continue.',
+          code: 'TRIAL_EXPIRED',
+          tokens_remaining: 0,
+        },
+        402,
+      )
+    }
+
+    const defaultTokens = isGuest
+      ? GUEST_ID_TOKEN_LIMIT
+      : effectiveTier === 'enterprise'
+        ? 25_000_000
+        : effectiveTier === 'pro'
+          ? 5_000_000
+          : 250_000
+
+    tokensRemaining = isAdminUser
+      ? 50_000_000
+      : (balanceRes.data?.tokens_remaining ?? defaultTokens)
+
+    if (!balanceRes.data && !isAdminUser) {
       await supabaseAdmin
         .from('user_balances')
         .upsert({ user_id: user.id, tokens_remaining: defaultTokens }, { onConflict: 'user_id' })
@@ -382,7 +460,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const deductTokens = async (usedTokens: number): Promise<number> => {
-    if (usedTokens <= 0) return tokensRemaining
+    if (usedTokens <= 0 || isAdminUser) return tokensRemaining
     if (guestId) {
       const nowIso = new Date().toISOString()
       const clampedId = Math.max(0, tokensRemaining - usedTokens)

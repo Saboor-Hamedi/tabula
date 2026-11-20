@@ -7,6 +7,8 @@ export interface UsageStatus {
   status: SubscriptionStatus | string
   isAdmin: boolean
   isGuest?: boolean
+  isSuspended?: boolean
+  suspendedReason?: string | null
   hasAccess: boolean
   trialEndsAt: string | null
   trialDaysRemaining: number | null
@@ -118,25 +120,41 @@ async function buildUsageFromSupabaseFallback(
 ): Promise<UsageStatus | null> {
   if (!supabase) return null
   const [profileRes, subRes, balanceTokens] = await Promise.all([
-    supabase.from('profiles').select('role, tier').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabase
       .from('subscriptions')
       .select('tier, status, trial_ends_at, current_period_end, cancel_at_period_end')
       .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle(),
     fetchLiveBalanceFromSupabase(userId),
   ])
 
-  const isAdmin = !isGuest && profileRes.data?.role === 'admin'
-  const tier = (subRes.data?.tier ?? profileRes.data?.tier ?? 'free') as PricingTier
-  const status = (subRes.data?.status ?? 'trialing') as SubscriptionStatus | string
-  const trialEndsAt = subRes.data?.trial_ends_at ?? null
+  const profileData = (profileRes.data ?? null) as {
+    role?: string | null
+    tier?: PricingTier | null
+    is_suspended?: boolean | null
+    suspended_reason?: string | null
+  } | null
+
+  const isAdmin = !isGuest && profileData?.role === 'admin'
+  const isSuspended = !isAdmin && !isGuest && Boolean(profileData?.is_suspended)
+  const suspendedReason = isSuspended ? (profileData?.suspended_reason ?? null) : null
+  const tier = (subRes.data?.tier ?? profileData?.tier ?? 'free') as PricingTier
+  const status = isSuspended
+    ? 'suspended'
+    : ((subRes.data?.status ?? 'trialing') as SubscriptionStatus | string)
+  const trialEndsAt = subRes.data?.current_period_end ?? subRes.data?.trial_ends_at ?? null
   const trialMsLeft = trialEndsAt ? Date.parse(trialEndsAt) - Date.now() : null
   const trialDaysRemaining =
     trialMsLeft !== null ? Math.max(0, Math.ceil(trialMsLeft / 86_400_000)) : null
-  const trialExpired =
-    !isAdmin && !isGuest && tier === 'free' && trialMsLeft !== null && trialMsLeft <= 0
-  const hasAccess = isAdmin || tier !== 'free' || !trialExpired
+  const periodExpired =
+    !isAdmin &&
+    !isGuest &&
+    (subRes.data?.status === 'canceled' || (trialMsLeft !== null && trialMsLeft <= 0))
+  const trialExpired = isSuspended || periodExpired
+  const hasAccess = isAdmin || (!isSuspended && !periodExpired)
   const monthlyLimit = isGuest
     ? 20_000
     : isAdmin || tier === 'enterprise'
@@ -144,8 +162,11 @@ async function buildUsageFromSupabaseFallback(
       : tier === 'pro'
         ? 5_000_000
         : 250_000
-  const remainingTokens =
-    isAdmin || tier === 'enterprise' ? null : (balanceTokens ?? monthlyLimit)
+  const remainingTokens = isSuspended
+    ? 0
+    : isAdmin || tier === 'enterprise'
+      ? null
+      : (balanceTokens ?? monthlyLimit)
   const usedTokens =
     monthlyLimit !== null && remainingTokens !== null
       ? Math.max(0, monthlyLimit - remainingTokens)
@@ -156,6 +177,8 @@ async function buildUsageFromSupabaseFallback(
     status,
     isAdmin,
     isGuest,
+    isSuspended,
+    suspendedReason,
     hasAccess,
     trialEndsAt,
     trialDaysRemaining,

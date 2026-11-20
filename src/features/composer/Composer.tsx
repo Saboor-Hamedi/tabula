@@ -23,10 +23,12 @@ export function Composer() {
   const [value, setValue] = useComposerDraft()
 
   const isGuest = Boolean(usage?.isGuest)
-  const trialExpired = Boolean(usage?.trialExpired)
+  const isSuspended = Boolean(usage?.isSuspended)
+  const trialExpired = !isSuspended && Boolean(usage?.trialExpired)
   const quotaExhausted = Boolean(
     usage &&
       !usage.isAdmin &&
+      !isSuspended &&
       usage.monthlyLimit !== null &&
       usage.remainingTokens !== null &&
       usage.remainingTokens <= 0,
@@ -36,9 +38,10 @@ export function Composer() {
     : quotaExhausted
       ? (isGuest ? 'guest-limit' : 'quota-exceeded')
       : null
-  const disabled = !activeSession || !dbReady || blockedReason !== null
+  const disabled = !activeSession || !dbReady || isSuspended || blockedReason !== null
 
   const handleSubmit = () => {
+    if (isSuspended) return
     if (blockedReason) {
       openPricingModal(blockedReason)
       return
@@ -52,12 +55,23 @@ export function Composer() {
   return (
     <div className="composer">
       <div className="composer-inner">
-        {blockedReason ? (
+        {isSuspended ? (
           <div className="composer-trial-bar" role="status">
             <span className="composer-trial-bar-left">
               <LockIcon size={13} />
               <span>
-                {blockedReason === 'quota-exceeded'
+                {usage?.suspendedReason
+                  ? `Account suspended: ${usage.suspendedReason}`
+                  : 'Account suspended by administrator'}
+              </span>
+            </span>
+          </div>
+        ) : blockedReason ? (
+          <div className="composer-trial-bar" role="status">
+            <span className="composer-trial-bar-left">
+              <LockIcon size={13} />
+              <span>
+                {blockedReason === 'quota-exceeded' || blockedReason === 'guest-limit'
                   ? 'Trial tokens finished'
                   : '7-day free trial ended'}
               </span>

@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react'
+import { useRouter } from '../../core/router'
+import { ROUTES } from '../../core/router/paths'
 import { supabase } from '../../core/supabase/client'
 import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
 import { formatCount } from '../../core/utils/format'
@@ -12,6 +14,7 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onClose }: AuthModalProps) {
+  const { navigate } = useRouter()
   const { user, profile, tier, isPro, signOut, resetPasswordForEmail } = useAuth()
   const { usage } = useUsageStatus()
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot-password'>('signin')
@@ -83,6 +86,17 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         onClose()
       }
     } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : ''
+      if (/banned|suspend/i.test(raw)) {
+        try {
+          sessionStorage.setItem('tabula:suspended-notice', email.trim().toLowerCase())
+        } catch {
+          // ignore
+        }
+        onClose()
+        navigate(ROUTES.suspended, { replace: true })
+        return
+      }
       setMessage({
         type: 'error',
         text: err instanceof Error ? err.message : 'Authentication failed.',

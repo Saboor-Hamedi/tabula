@@ -131,6 +131,13 @@ async function managedProxyFetch(
       setLiveTokensRemaining(payload.tokens_remaining)
     }
 
+    if (payload?.code === 'ACCOUNT_SUSPENDED') {
+      void refreshUsage()
+      throw new Error(
+        payload.error || 'Your account has been suspended by an administrator.',
+      )
+    }
+
     if (
       payload?.code === 'GUEST_LIMIT_REACHED' ||
       (isGuestSession && (response.status === 403 || payload?.code === 'QUOTA_EXCEEDED')) ||

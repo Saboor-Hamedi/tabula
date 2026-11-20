@@ -1013,9 +1013,7 @@ a.post-tag:hover {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(7, 10, 15, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1610,13 +1608,12 @@ a.post-tag:hover {
 .admin-posts-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: blur(6px);
+  background: transparent;
   animation: post-fade 160ms ease-out;
 }
 

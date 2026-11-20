@@ -14,6 +14,9 @@ export interface UserProfile {
   avatar_url: string | null
   tier: PricingTier
   role: AppRole
+  is_suspended?: boolean
+  suspended_reason?: string | null
+  suspended_at?: string | null
   created_at: string
   updated_at: string
 }

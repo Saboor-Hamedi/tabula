@@ -8,7 +8,7 @@ import { SessionProvider } from './features/SessionProvider'
 import { RequireAuth, RequireVerified } from './features/auth/auth'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { AuthScreen } from './features/auth/AuthScreen'
-import { useAuthUser, useUserSlug } from './features/auth/useProfile'
+import { useAuthUser, useProfile, useUserSlug } from './features/auth/useProfile'
 import { VerifyEmailScreen } from './features/auth/VerifyEmailScreen'
 import { PricingModal } from './features/billing/PricingModal'
 import { Analyse } from './features/dashboard'
@@ -16,6 +16,7 @@ import { Header, PublicHeaderProvidedContext } from './features/header/Header'
 import { FeaturesPage, Landing, PricingPage } from './features/landing'
 import { Article, Insights } from './features/posts'
 import { SourcesPage } from './features/sources'
+import { SuspendedPage } from './features/suspend'
 
 /**
  * The route table.
@@ -32,8 +33,38 @@ import { SourcesPage } from './features/sources'
  *   /login /signup /verify
  */
 
+function DashboardGuard() {
+  const { navigate } = useRouter()
+  const profile = useProfile()
+  const isSuspended = Boolean(profile?.is_suspended && profile.role !== 'admin')
+
+  useEffect(() => {
+    if (isSuspended) {
+      navigate(ROUTES.suspended, { replace: true })
+    }
+  }, [isSuspended, navigate])
+
+  if (isSuspended) {
+    return <SuspendedPage reasonOverride={profile?.suspended_reason} />
+  }
+  return <Analyse />
+}
+
 function Workspace() {
+  const { navigate } = useRouter()
   const user = useAuthUser()
+  const profile = useProfile()
+  const isSuspended = Boolean(profile?.is_suspended && profile.role !== 'admin')
+
+  useEffect(() => {
+    if (isSuspended) {
+      navigate(ROUTES.suspended, { replace: true })
+    }
+  }, [isSuspended, navigate])
+
+  if (isSuspended) {
+    return <SuspendedPage reasonOverride={profile?.suspended_reason} />
+  }
 
   return (
     <SessionProvider key={user?.id ?? 'guest'}>
@@ -61,10 +92,12 @@ function isPublicMarketingOrPostsRoute(path: string): boolean {
 function UserUrlSync() {
   const { path, query, navigate } = useRouter()
   const user = useAuthUser()
+  const profile = useProfile()
   const userSlug = useUserSlug()
 
   useEffect(() => {
     if (!userSlug || user?.is_anonymous) return
+    if (profile?.is_suspended && profile.role !== 'admin') return
     const search = query.toString()
     const suffix = search ? `?${search}` : ''
 
@@ -90,7 +123,7 @@ export function AppRoutes() {
   const dashboardElement = (
     <RequireAuth>
       <RequireVerified>
-        <Analyse />
+        <DashboardGuard />
       </RequireVerified>
     </RequireAuth>
   )
@@ -120,6 +153,7 @@ export function AppRoutes() {
             <Route path={ROUTES.signIn} element={<AuthScreen initialMode="signin" />} />
             <Route path={ROUTES.signUp} element={<AuthScreen initialMode="signup" />} />
             <Route path={ROUTES.verify} element={<VerifyEmailScreen />} />
+            <Route path={ROUTES.suspended} element={<SuspendedPage />} />
             <Route path={ROUTES.notFound} element={<Navigate to={ROUTES.home} />} />
           </Routes>
         </div>

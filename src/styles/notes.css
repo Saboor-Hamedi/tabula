@@ -249,10 +249,8 @@
 .note-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 1100;
+  background: transparent;
+  z-index: 2000;
   display: grid;
   place-items: center;
   padding: 24px;

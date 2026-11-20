@@ -3033,13 +3033,11 @@ button.chip-action:disabled {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 2000;
   display: grid;
   place-items: center;
   padding: var(--space-4);
-  background: rgba(10, 14, 20, 0.56);
-  backdrop-filter: blur(8px) saturate(140%);
-  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  background: transparent;
   animation: modal-fade-in 160ms ease-out;
 }
 
@@ -3570,9 +3568,7 @@ button.chip-action:disabled {
 /* ---------- Figure editor ---------- */
 
 .figure-editor-overlay {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  background: rgba(15, 23, 42, 0.45);
+  background: transparent;
 }
 
 .figure-editor-modal {
@@ -5742,10 +5738,8 @@ button.chip-action:disabled {
 .note-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 1000;
+  background: transparent;
+  z-index: 2000;
   display: grid;
   place-items: center;
   padding: 24px;

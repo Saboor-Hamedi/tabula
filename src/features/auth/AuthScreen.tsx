@@ -228,6 +228,16 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
         onSuccess()
       }
     } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : ''
+      if (/banned|suspend/i.test(raw)) {
+        try {
+          sessionStorage.setItem('tabula:suspended-notice', cleanEmail)
+        } catch {
+          // ignore
+        }
+        navigate(ROUTES.suspended, { replace: true })
+        return
+      }
       setMessage({ type: 'error', text: describeAuthError(err) })
     } finally {
       setLoading(false)

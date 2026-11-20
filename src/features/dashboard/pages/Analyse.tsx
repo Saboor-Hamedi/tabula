@@ -38,9 +38,13 @@ import { Members } from '../components/Members'
 import { Metric } from '../components/Metric'
 import { ResearchSources, type ReadyDatasetFile } from '../../sources'
 import {
+  listAdminAuditLogs,
   listDeletedAccounts,
+  listEmailGrants,
   listMembers,
+  type AdminAuditLogEntry,
   type DeletedAccountEntry,
+  type EmailGrantEntry,
   type Member,
 } from '../api'
 
@@ -61,7 +65,7 @@ const EXIT_REASONS = [
  */
 
 type DashSection = 'overview' | 'sources' | 'members' | 'stories' | 'account'
-type MemberFilter = 'all' | 'subscribers' | 'trialing' | 'admins'
+type MemberFilter = 'all' | 'subscribers' | 'trialing' | 'suspended' | 'admins'
 
 interface LocalDatasetItem {
   id: string
@@ -122,6 +126,8 @@ export function Analyse() {
   const { usage } = useUsageStatus()
   const [members, setMembers] = useState<Member[]>([])
   const [deletedAccounts, setDeletedAccounts] = useState<DeletedAccountEntry[]>([])
+  const [emailGrants, setEmailGrants] = useState<EmailGrantEntry[]>([])
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLogEntry[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
   const [schemaMissing, setSchemaMissing] = useState(false)
@@ -236,44 +242,51 @@ export function Analyse() {
     }
   }, [user?.id])
 
+  const refreshAdminData = async (showSpinner = false) => {
+    if (!isAdmin) return
+    if (showSpinner) setMembersLoading(true)
+    try {
+      const [rows, deletions, grants, logs] = await Promise.all([
+        listMembers(),
+        listDeletedAccounts(),
+        listEmailGrants(),
+        listAdminAuditLogs(),
+      ])
+      setMembers(rows)
+      setDeletedAccounts(deletions)
+      setEmailGrants(grants)
+      setAuditLogs(logs)
+      setAdminError(null)
+      setSchemaMissing(false)
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error ? loadError.message : 'The member list could not be loaded.'
+      setAdminError(message)
+      setSchemaMissing(isMissingSchema(message))
+    } finally {
+      if (showSpinner) setMembersLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!isAdmin) return
-    let active = true
-
-    const loadAdmin = async () => {
-      setMembersLoading(true)
-      try {
-        const [rows, deletions] = await Promise.all([listMembers(), listDeletedAccounts()])
-        if (!active) return
-        setMembers(rows)
-        setDeletedAccounts(deletions)
-        setAdminError(null)
-        setSchemaMissing(false)
-      } catch (loadError) {
-        if (!active) return
-        const message =
-          loadError instanceof Error ? loadError.message : 'The member list could not be loaded.'
-        setAdminError(message)
-        setSchemaMissing(isMissingSchema(message))
-      } finally {
-        if (active) setMembersLoading(false)
-      }
-    }
-
-    void loadAdmin()
-    return () => {
-      active = false
-    }
+    void refreshAdminData(true)
   }, [isAdmin])
 
   const overview = useMemo(() => {
-    if (!isAdmin) return { users: 0, admins: 0, subscribers: 0, trialing: 0 }
+    if (!isAdmin) return { users: 0, admins: 0, subscribers: 0, trialing: 0, suspended: 0 }
     const subscribers = members.filter(
-      (m) => m.subscription_status === 'active' && (m.tier === 'pro' || m.tier === 'enterprise'),
+      (m) =>
+        !m.is_suspended &&
+        m.subscription_status === 'active' &&
+        (m.tier === 'pro' || m.tier === 'enterprise'),
     ).length
-    const trialing = members.filter((m) => m.subscription_status === 'trialing').length
+    const trialing = members.filter(
+      (m) => !m.is_suspended && m.subscription_status === 'trialing',
+    ).length
+    const suspended = members.filter((m) => m.is_suspended).length
     const admins = members.filter((m) => m.role === 'admin').length
-    return { users: members.length, admins, subscribers, trialing }
+    return { users: members.length, admins, subscribers, trialing, suspended }
   }, [members, isAdmin])
 
   const filteredDatasets = useMemo(() => {
@@ -287,11 +300,16 @@ export function Analyse() {
     if (memberFilter === 'subscribers') {
       return members.filter(
         (m) =>
-          m.subscription_status === 'active' && (m.tier === 'pro' || m.tier === 'enterprise'),
+          !m.is_suspended &&
+          m.subscription_status === 'active' &&
+          (m.tier === 'pro' || m.tier === 'enterprise'),
       )
     }
     if (memberFilter === 'trialing') {
-      return members.filter((m) => m.subscription_status === 'trialing')
+      return members.filter((m) => !m.is_suspended && m.subscription_status === 'trialing')
+    }
+    if (memberFilter === 'suspended') {
+      return members.filter((m) => m.is_suspended)
     }
     if (memberFilter === 'admins') {
       return members.filter((m) => m.role === 'admin')
@@ -885,6 +903,7 @@ export function Analyse() {
                         ['all', `All (${overview.users})`],
                         ['subscribers', `Paid (${overview.subscribers})`],
                         ['trialing', `Trial (${overview.trialing})`],
+                        ['suspended', `Suspended (${overview.suspended})`],
                         ['admins', `Admins (${overview.admins})`],
                       ] as const
                     ).map(([key, label]) => (
@@ -906,12 +925,65 @@ export function Analyse() {
                   <p className="publish-error" style={{ padding: '12px 18px' }}>
                     {adminError}
                     {schemaMissing
-                      ? ' Apply features/migration/migration.sql to your project to enable it.'
+                      ? ' Apply features/migration/admin.sql (or tabula.sql) to your project to enable it.'
                       : ''}
                   </p>
                 ) : null}
 
-                <Members members={filteredMembers} loading={membersLoading} />
+                <Members
+                  members={filteredMembers}
+                  emailGrants={emailGrants}
+                  loading={membersLoading}
+                  onRefresh={() => refreshAdminData(false)}
+                />
+              </section>
+
+              {/* Admin Security Audit Log */}
+              <section className="dash-panel">
+                <header className="dash-panel-head">
+                  <div className="dash-panel-titles">
+                    <h2 className="dash-section-title">Security &amp; Plan Audit Log</h2>
+                    <span className="dash-panel-note">
+                      Immutable record of manual Pro grants, token overrides, suspensions, and deletions.
+                    </span>
+                  </div>
+                  <span className="dash-count-pill">{auditLogs.length}</span>
+                </header>
+
+                {auditLogs.length === 0 ? (
+                  <div className="dash-table-empty">No admin actions recorded yet.</div>
+                ) : (
+                  <ul className="dash-deletions-list">
+                    {auditLogs.slice(0, 20).map((log) => (
+                      <li key={log.id} className="dash-deletion-row">
+                        <div className="dash-deletion-top">
+                          <div className="dash-deletion-user">
+                            <strong>{log.action.replace(/_/g, ' ')}</strong>
+                            <span>
+                              {log.target_email || log.target_user_id || 'Unknown target'} · by{' '}
+                              {log.admin_email || 'admin'}
+                            </span>
+                          </div>
+                          <div className="dash-deletion-meta">
+                            {log.details?.tier ? (
+                              <span className={`dash-plan is-${String(log.details.tier)}`}>
+                                {String(log.details.tier)}
+                              </span>
+                            ) : null}
+                            <span className="dash-deletion-date">
+                              {new Date(log.created_at).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
 
               {/* Deleted Accounts & Optional Exit Feedback */}
