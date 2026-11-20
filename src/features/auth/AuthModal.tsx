@@ -83,6 +83,11 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
           password,
         })
         if (error) throw error
+        try {
+          sessionStorage.removeItem('tabula:suspended-notice')
+        } catch {
+          // ignore
+        }
         onClose()
       }
     } catch (err: unknown) {

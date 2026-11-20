@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery, useRouter } from '../../../core/router'
 import { postPath, ROUTES } from '../../../core/router/paths'
 import { useIsAdmin } from '../../auth/useProfile'
 import { HeroPixelField } from '../../common/HeroPixelField'
-import { PlusIcon } from '../../common/Icons'
+import { FileIcon, PlusIcon, SearchIcon, CloseIcon } from '../../common/Icons'
 import { Header } from '../../header/Header'
 import { Footer } from '../../landing/components/Footer'
 import { Feed } from '../components/Feed'
@@ -30,27 +30,77 @@ export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProp
   const urlTag = query.get('tag')
   const urlSearch = query.get('q')?.trim() ?? ''
   const [tag, setTag] = useState<string | null>(initialTag ?? urlTag)
+  const [searchInput, setSearchInput] = useState(urlSearch)
   const [creatingPost, setCreatingPost] = useState(false)
 
   useEffect(() => {
     setTag(initialTag ?? urlTag)
   }, [initialTag, urlTag])
 
+  useEffect(() => {
+    setSearchInput(urlSearch)
+  }, [urlSearch])
+
+  const handleSearchSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    const clean = searchInput.trim()
+    const params = new URLSearchParams()
+    if (clean) params.set('q', clean)
+    if (tag) params.set('tag', tag)
+    const qs = params.toString()
+    navigate(qs ? `${ROUTES.posts}?${qs}` : ROUTES.posts)
+  }
+
   return (
     <div className="shell-frame">
       <Header onSignIn={onSignIn} onSignUp={onSignUp} />
 
-      <section className="insights-hero">
+      <section className="subpage-hero">
+        <div className="hero-ledger-grid" aria-hidden="true" />
         <HeroPixelField />
-        <div className="shell-container insights-hero-inner">
-          <span className="landing-subhead">Posts</span>
-          <h1 className="insights-title">Published Posts</h1>
-          <p className="insights-subtitle">
-            Published analyses from the Lumina Tabula workspace — every table, chart, and diagram
-            preserved as it was produced.
+        <div className="subpage-hero-inner">
+          <span className="subpage-hero-kicker">
+            <FileIcon size={12} />
+            <span>Published Posts</span>
+          </span>
+          <h1 className="subpage-hero-title">
+            Data stories &amp;{' '}
+            <span className="landing-hero-serif">research reports.</span>
+          </h1>
+          <p className="subpage-hero-subtitle">
+            Published analyses from the Lumina Tabula workspace — every SQL table, chart, and
+            diagram preserved as it was produced.
           </p>
-          {isAdmin || tag ? (
-            <div style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+
+          <form className="subpage-hero-search" onSubmit={handleSearchSubmit} role="search">
+            <SearchIcon size={15} />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search published posts, datasets, or topics…"
+              aria-label="Search published posts"
+            />
+            {searchInput ? (
+              <button
+                type="button"
+                className="subpage-hero-search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchInput('')
+                  if (urlSearch) navigate(ROUTES.posts)
+                }}
+              >
+                <CloseIcon size={12} />
+              </button>
+            ) : null}
+            <button type="submit" className="subpage-hero-search-btn">
+              Search
+            </button>
+          </form>
+
+          {isAdmin || tag || urlSearch ? (
+            <div className="subpage-hero-actions">
               {isAdmin ? (
                 <button
                   type="button"
@@ -68,6 +118,18 @@ export function Insights({ initialTag = null, onSignIn, onSignUp }: InsightsProp
                   onClick={() => setTag(null)}
                 >
                   Tag: “{tag}” ×
+                </button>
+              ) : null}
+              {urlSearch ? (
+                <button
+                  type="button"
+                  className="btn btn-small btn-ghost"
+                  onClick={() => {
+                    setSearchInput('')
+                    navigate(ROUTES.posts)
+                  }}
+                >
+                  Clear “{urlSearch}” ×
                 </button>
               ) : null}
             </div>

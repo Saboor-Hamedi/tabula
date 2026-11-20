@@ -125,6 +125,7 @@ as $$
     from public.profiles p
     where p.id = auth.uid()
       and p.role = 'admin'
+      and coalesce(p.is_suspended, false) = false
   );
 $$;
 
@@ -604,6 +605,9 @@ create table if not exists public.account_deletions (
 );
 
 alter table public.account_deletions enable row level security;
+revoke all on table public.account_deletions from public, anon, authenticated;
+grant select on table public.account_deletions to authenticated;
+grant all on table public.account_deletions to service_role;
 
 drop policy if exists "Admins can view account deletions" on public.account_deletions;
 create policy "Admins can view account deletions"

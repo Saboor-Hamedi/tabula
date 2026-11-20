@@ -36,9 +36,10 @@ export function useUserSlug(): string | null {
   return slugifyUsername(raw)
 }
 
-/** True when the signed-in account is an administrator. */
+/** True when the signed-in account is an active (non-suspended) administrator. */
 export function useIsAdmin(): boolean {
-  return useProfile()?.role === 'admin'
+  const profile = useProfile()
+  return profile?.role === 'admin' && !profile?.is_suspended
 }
 
 /** True until the first session has been read. */

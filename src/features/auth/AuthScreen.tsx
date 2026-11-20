@@ -225,6 +225,11 @@ export function AuthScreen({ initialMode = 'signin' }: AuthScreenProps) {
           password,
         })
         if (error) throw error
+        try {
+          sessionStorage.removeItem('tabula:suspended-notice')
+        } catch {
+          // ignore
+        }
         onSuccess()
       }
     } catch (err: unknown) {

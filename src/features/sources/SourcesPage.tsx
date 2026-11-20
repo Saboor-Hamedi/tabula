@@ -2,6 +2,7 @@ import { useRouter } from '../../core/router'
 import { ROUTES, userPath } from '../../core/router/paths'
 import { useAuthUser, useUserSlug } from '../auth/useProfile'
 import { HeroPixelField } from '../common/HeroPixelField'
+import { DatabaseIcon, GlobeIcon, ShieldCheckIcon } from '../common/Icons'
 import { Header } from '../header/Header'
 import { Footer } from '../landing/components/Footer'
 import { ResearchSources } from './ResearchSources'
@@ -33,15 +34,36 @@ export function SourcesPage() {
     <div className="sources-page-shell">
       <Header variant="page" />
 
-      <section className="sources-page-hero">
+      <section className="subpage-hero">
+        <div className="hero-ledger-grid" aria-hidden="true" />
         <HeroPixelField />
-        <div className="sources-page-hero-inner">
-          <span className="sources-page-kicker">Open Research Directory</span>
-          <h1 className="sources-page-title">Free Research Sources &amp; Open Datasets</h1>
-          <p className="sources-page-subtitle">
-            Browse verified open data hubs like Kaggle, Hugging Face, World Bank, and Our World in
-            Data by category — or open ready-to-query CSV workbooks directly in Tabula.
+        <div className="subpage-hero-inner">
+          <span className="subpage-hero-kicker">
+            <GlobeIcon size={12} />
+            <span>Open Research Directory</span>
+          </span>
+          <h1 className="subpage-hero-title">
+            Verified datasets,{' '}
+            <span className="landing-hero-serif">ready to query.</span>
+          </h1>
+          <p className="subpage-hero-subtitle">
+            Browse curated open-data hubs like Kaggle, Hugging Face, World Bank, and Our World in
+            Data — or load ready-to-query CSV workbooks straight into Tabula.
           </p>
+          <div className="subpage-hero-meta">
+            <span className="subpage-hero-pill">
+              <GlobeIcon size={13} />
+              <span>6 Curated Repositories</span>
+            </span>
+            <span className="subpage-hero-pill">
+              <DatabaseIcon size={13} />
+              <span>Instant CSV Workbooks</span>
+            </span>
+            <span className="subpage-hero-pill">
+              <ShieldCheckIcon size={13} />
+              <span>100% Local Processing</span>
+            </span>
+          </div>
         </div>
       </section>
 
