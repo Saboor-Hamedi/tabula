@@ -1,5 +1,12 @@
 import { stepCountIs, streamText, type ModelMessage } from 'ai'
-import type { ChatMessage, DatasetDigest, ModelId, Session, ToolTraceEntry } from '../types'
+import type {
+  ChatMessage,
+  DatasetDigest,
+  ExecutedCodeStep,
+  ModelId,
+  Session,
+  ToolTraceEntry,
+} from '../types'
 import type { PythonExecutionResult } from '../python'
 import { MAX_AGENT_STEPS } from '../constants'
 import { createDeepSeekModel, buildProviderOptions } from '../deepseek/client'
@@ -7,6 +14,7 @@ import { getDuckDBHandle } from '../duckdb/initDuckDB'
 import { buildSystemPrompt } from './systemPrompt'
 import { createAgentTools } from './tools'
 import type { ToolContext } from './executeTool'
+import { extractStreamingCodeArg } from '../../tabula/utils/agentHelpers'
 
 export interface AgentTurnInput {
   model: ModelId
@@ -17,10 +25,13 @@ export interface AgentTurnInput {
   digestBySession?: Record<string, DatasetDigest>
   history: ChatMessage[]
   userText: string
+  /** Optional one-turn context (e.g. target code block to edit) excluded from UI bubble. */
+  hiddenContext?: string
   signal: AbortSignal
   onDelta: (delta: string) => void
   onTrace: (entry: ToolTraceEntry) => void
   onPythonResult?: (result: PythonExecutionResult) => void
+  onCodeStep?: (step: ExecutedCodeStep) => void
 }
 
 export interface AgentTurnResult {
@@ -38,17 +49,16 @@ export interface AgentTurnResult {
  * conversation. Keeping them out also stops the transcript from growing a
  * boilerplate preamble on every turn.
  */
-const MAX_HISTORY_MESSAGES = 8
-const MAX_HISTORY_CHARS = 12_000
+const MAX_HISTORY_MESSAGES = 6
+const MAX_HISTORY_CHARS = 9_000
 
 function compactOlderAssistantMessage(content: string): string {
-  // Strip large chart/mermaid blocks and long markdown tables from older turns
+  // Strip large chart/mermaid/code blocks and long markdown tables from older turns
   // so follow-up turns don't re-send thousands of redundant tokens.
-  const withoutCharts = content.replace(
-    /```(?:mermaid|chart)\b[\s\S]*?```/g,
-    '[chart omitted]',
-  )
-  const lines = withoutCharts.split('\n')
+  const withoutBlocks = content
+    .replace(/```(?:mermaid|chart)\b[\s\S]*?```/g, '[chart omitted]')
+    .replace(/```(?:python|py|sql)\b[\s\S]*?```/gi, '[code omitted]')
+  const lines = withoutBlocks.split('\n')
   const compacted: string[] = []
   let tableRows = 0
   let omittedRows = 0
@@ -56,14 +66,14 @@ function compactOlderAssistantMessage(content: string): string {
     const isTableLine = /^\s*\|.*\|\s*$/.test(line)
     if (isTableLine) {
       tableRows += 1
-      if (tableRows <= 5) {
+      if (tableRows <= 4) {
         compacted.push(line)
       } else {
         omittedRows += 1
       }
     } else {
       if (omittedRows > 0) {
-        compacted.push(`… [${omittedRows} table rows omitted]`)
+        compacted.push(`… [${omittedRows} rows omitted]`)
         omittedRows = 0
       }
       tableRows = 0
@@ -71,13 +81,17 @@ function compactOlderAssistantMessage(content: string): string {
     }
   }
   if (omittedRows > 0) {
-    compacted.push(`… [${omittedRows} table rows omitted]`)
+    compacted.push(`… [${omittedRows} rows omitted]`)
   }
   const result = compacted.join('\n').trim()
-  return result.length > 1600 ? `${result.slice(0, 1560)}\n… [truncated]` : result
+  return result.length > 1200 ? `${result.slice(0, 1160)}\n… [truncated]` : result
 }
 
-function toModelMessages(history: ChatMessage[], userText: string): ModelMessage[] {
+function toModelMessages(
+  history: ChatMessage[],
+  userText: string,
+  hiddenContext?: string,
+): ModelMessage[] {
   const safeHistory = Array.isArray(history) ? history : []
   const cleaned = safeHistory
     .filter(
@@ -95,8 +109,24 @@ function toModelMessages(history: ChatMessage[], userText: string): ModelMessage
   let seenAssistant = false
   for (let index = cleaned.length - 1; index >= 0; index -= 1) {
     const message = cleaned[index]
-    const raw = typeof message?.content === 'string' ? message.content.trim() : ''
+    let raw = typeof message?.content === 'string' ? message.content.trim() : ''
     if (!raw) continue
+    // If the most recent assistant message had executed code steps that weren't in prose,
+    // include a compact reference so follow-up "edit that code" turns have context.
+    if (
+      message.role === 'assistant' &&
+      !seenAssistant &&
+      Array.isArray(message.codeSteps) &&
+      message.codeSteps.length > 0 &&
+      !/```(?:python|py|sql)\b/i.test(raw)
+    ) {
+      const lastStep = message.codeSteps[message.codeSteps.length - 1]
+      if (lastStep?.code) {
+        const snippet =
+          lastStep.code.length > 900 ? `${lastStep.code.slice(0, 900)}\n# ...` : lastStep.code
+        raw = `${raw}\n\n\`\`\`${lastStep.language}\n${snippet}\n\`\`\``
+      }
+    }
     const isOlderAssistant = message.role === 'assistant' && seenAssistant
     if (message.role === 'assistant') seenAssistant = true
     const content = isOlderAssistant ? compactOlderAssistantMessage(raw) : raw
@@ -105,7 +135,10 @@ function toModelMessages(history: ChatMessage[], userText: string): ModelMessage
     characters += content.length
   }
 
-  selected.push({ role: 'user', content: userText })
+  const finalUserContent = hiddenContext?.trim()
+    ? `${userText}\n\n${hiddenContext.trim()}`
+    : userText
+  selected.push({ role: 'user', content: finalUserContent })
   return selected
 }
 
@@ -170,10 +203,12 @@ export async function runAgentTurn({
   digestBySession,
   history,
   userText,
+  hiddenContext,
   signal,
   onDelta,
   onTrace,
   onPythonResult,
+  onCodeStep,
 }: AgentTurnInput): Promise<AgentTurnResult> {
   let lastPythonResult: PythonExecutionResult | undefined
 
@@ -190,6 +225,7 @@ export async function runAgentTurn({
       lastPythonResult = pyResult
       onPythonResult?.(pyResult)
     },
+    onCodeStep,
   }
 
   const tools = createAgentTools(toolContext)
@@ -206,7 +242,7 @@ export async function runAgentTurn({
       allSessions,
       digestBySession,
     }),
-    messages: toModelMessages(history, userText),
+    messages: toModelMessages(history, userText, hiddenContext),
     tools,
     stopWhen: stepCountIs(MAX_AGENT_STEPS),
     abortSignal: signal,
@@ -219,11 +255,46 @@ export async function runAgentTurn({
 
   let text = ''
   let needsStepSeparator = false
+  let activeStreamTool: { id: string; name: string; rawJson: string } | null = null
+
   for await (const part of result.fullStream) {
     if (signal.aborted) break
     if (part.type === 'start-step') {
+      activeStreamTool = null
       if (text.trim().length > 0 && !text.endsWith('\n\n')) {
         needsStepSeparator = true
+      }
+      continue
+    }
+    if (part.type === 'tool-input-start') {
+      const toolId =
+        (part as { id?: string; toolCallId?: string }).id ??
+        (part as { toolCallId?: string }).toolCallId ??
+        'live-stream-step'
+      activeStreamTool = { id: toolId, name: part.toolName, rawJson: '' }
+      continue
+    }
+    if (part.type === 'tool-input-delta' && activeStreamTool) {
+      const deltaChunk =
+        (part as { delta?: string; inputTextDelta?: string }).delta ??
+        (part as { inputTextDelta?: string }).inputTextDelta ??
+        ''
+      activeStreamTool.rawJson += deltaChunk
+      const isPy = activeStreamTool.name === 'run_python'
+      const isSq = activeStreamTool.name === 'run_sql'
+      if (isPy || isSq) {
+        const liveCode = extractStreamingCodeArg(
+          activeStreamTool.rawJson,
+          isSq ? 'sql' : 'code',
+        )
+        if (liveCode.length > 0) {
+          onCodeStep?.({
+            id: 'live-stream-step',
+            language: isSq ? 'sql' : 'python',
+            code: liveCode,
+            status: 'running',
+          })
+        }
       }
       continue
     }

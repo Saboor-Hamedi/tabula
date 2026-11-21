@@ -1,11 +1,50 @@
-/* Unified Left & Right Sidebar Appearance (Light & Dark Theme Parity) */
+/* Unified Left & Right Sidebar Appearance — Flush Edges, Borderless Center Canvas */
 
-.app-shell.is-workspace-shell .sidebar,
-.app-shell.is-workspace-shell .app-main,
+.app-shell.is-workspace-shell {
+  background: var(--bg);
+}
+
+.app-shell.is-workspace-shell .app-header.is-workspace {
+  height: 46px;
+  min-height: 46px;
+  padding: 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.app-shell.is-workspace-shell .app-grid {
+  flex: 1;
+  min-height: 0;
+  padding: 0 !important;
+  gap: 0;
+}
+
+.app-shell.is-workspace-shell .sidebar {
+  background: var(--surface);
+  border: none;
+  border-right: 1px solid var(--border);
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  min-height: 0;
+}
+
 .app-shell.is-workspace-shell .inspector {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.app-shell.is-workspace-shell .app-main {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   overflow: hidden;
   min-height: 0;
 }
@@ -17,18 +56,23 @@
   border-bottom: 1px solid var(--border);
 }
 
-.app-shell.is-workspace-shell .inspector-head {
-  border-bottom: none;
-}
-
 .app-shell.is-workspace-shell .sidebar-body,
 .app-shell.is-workspace-shell .inspector-body {
-  padding: 5px;
+  padding: 6px;
+}
+
+[data-theme='dark'] .app-shell.is-workspace-shell {
+  background: var(--bg);
 }
 
 [data-theme='dark'] .app-shell.is-workspace-shell .sidebar,
-[data-theme='dark'] .app-shell.is-workspace-shell .app-main,
 [data-theme='dark'] .app-shell.is-workspace-shell .inspector {
   background: var(--surface);
   border-color: var(--border);
+}
+
+[data-theme='dark'] .app-shell.is-workspace-shell .app-main {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }

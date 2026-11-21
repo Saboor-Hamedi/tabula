@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import type {
   ChatMessage,
   DatasetDigest,
+  ExecutedCodeTable,
   ModelId,
   PanelTab,
   Session,
@@ -53,7 +54,7 @@ export interface SessionActions {
   uploadFiles: (files: File[]) => Promise<void>
   selectSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => Promise<void>
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (text: string, options?: { hiddenContext?: string }) => Promise<void>
   stopStreaming: () => void
   openSettings: () => void
   closeSettings: () => void
@@ -79,6 +80,7 @@ export interface SessionActions {
   /** Hands the original uploaded file to the OS so it opens in Excel. */
   openActiveFile: () => Promise<void>
   runPythonCode: (code: string, options?: { openPanel?: boolean }) => Promise<PythonExecutionResult>
+  runSqlCode: (sql: string) => Promise<{ table?: ExecutedCodeTable; elapsedMs: number; error?: string }>
   clearPythonResult: () => void
   removePythonRun: (index: number) => void
   saveToNotes: (text: string) => void

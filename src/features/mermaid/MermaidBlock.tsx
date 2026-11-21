@@ -235,12 +235,12 @@ export function MermaidBlock({
                 rows={parsedSeries.points.map((p) => [p.label, String(p.value)])}
               />
             </div>
-          ) : chartView !== 'mermaid' && chartView !== 'table' && parsedSeries ? (
+          ) : parsedSeries ? (
             <div className="mermaid-image-box" ref={diagramContainerRef}>
               <SeriesChart
                 data={{
                   ...parsedSeries,
-                  kind: chartView,
+                  kind: chartView === 'mermaid' || chartView === 'table' ? parsedSeries.kind : chartView,
                   title: readMermaidTitle(code) || parsedSeries.title,
                   textColor: readMermaidTextColor(code),
                 }}

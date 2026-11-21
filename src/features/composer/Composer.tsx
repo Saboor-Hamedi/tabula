@@ -1,23 +1,34 @@
+import { useMemo } from 'react'
+import {
+  findDimensions,
+  findEntityColumn,
+  findMeasures,
+  humanizeColumn,
+} from '../../core/agent/suggestions'
 import { openPricingModal, useUsageStatus } from '../../core/supabase/usage'
 import { validateUserPrompt } from '../../core/utils/promptGuard'
-import { LockIcon } from '../common/Icons'
+import {
+  ActivityIcon,
+  DatabaseIcon,
+  FileIcon,
+  LockIcon,
+  SearchIcon,
+  SparklesIcon,
+  TableIcon,
+} from '../common/Icons'
 import { useSessionActions, useSessionState } from '../SessionProvider'
 import { Input } from '../chat'
 import { useComposerDraft } from './useComposerDraft'
 
 /**
- * Composer.
+ * Studio Composer.
  *
- * The composer is the width reference for the whole conversation: the chat
- * column and every assistant response share its exact width, so the transcript
- * reads as one column instead of a stack of differently-sized boxes.
- *
- * The draft is kept in a module-level store, so switching datasets or opening
- * settings never loses what the user was typing.
+ * Features dynamic data-aware quick chips derived from the active dataset's
+ * columns and loaded workspace files, plus a sleek elevated prompt input.
  */
 
 export function Composer() {
-  const { activeSession, sessions, isStreaming, dbReady } = useSessionState()
+  const { activeSession, sessions, digest, isStreaming, dbReady } = useSessionState()
   const { sendMessage, stopStreaming } = useSessionActions()
   const { usage } = useUsageStatus()
   const [value, setValue] = useComposerDraft()
@@ -36,9 +47,93 @@ export function Composer() {
   const blockedReason = trialExpired
     ? 'trial-expired'
     : quotaExhausted
-      ? (isGuest ? 'guest-limit' : 'quota-exceeded')
+      ? isGuest
+        ? 'guest-limit'
+        : 'quota-exceeded'
       : null
   const disabled = !activeSession || !dbReady || isSuspended || blockedReason !== null
+
+  const quickChips = useMemo(() => {
+    if (!activeSession) return []
+    const primaryTable = activeSession.primaryTable || activeSession.tables?.[0]?.name || 'dataset'
+    const digestTable =
+      digest?.tables?.find((t) => t.name === primaryTable) || digest?.tables?.[0]
+    const totalRows =
+      activeSession.tables?.reduce((sum, t) => sum + (t.rowCount || 0), 0) ?? 0
+    const cols = (digestTable?.columns ?? []).filter(
+      (c) => !/^column_\d+$/i.test(c.name.trim()),
+    )
+
+    const measures = findMeasures(cols)
+    const dimensions = findDimensions(cols, totalRows)
+    const entity = findEntityColumn(cols, totalRows)
+
+    const m1 = measures[0] ? humanizeColumn(measures[0].name) : null
+    const m2 = measures[1] ? humanizeColumn(measures[1].name) : null
+    const d1 = dimensions[0] ? humanizeColumn(dimensions[0].name) : null
+    const ent = entity ? humanizeColumn(entity.name) : null
+
+    const chips: Array<{
+      label: string
+      prompt: string
+      icon: typeof ActivityIcon
+    }> = []
+
+    if (sessions.length > 1) {
+      chips.push({
+        icon: DatabaseIcon,
+        label: `Combine & Compare (${sessions.length} files)`,
+        prompt: m1
+          ? `Combine all ${sessions.length} uploaded files into one dataset and compare average ${m1} across each group with a clean bar chart.`
+          : `Combine all ${sessions.length} uploaded files into one dataset and compare their key metrics with a chart.`,
+      })
+    }
+
+    if (d1 && m1) {
+      chips.push({
+        icon: ActivityIcon,
+        label: `${m1} by ${d1}`,
+        prompt: `Compare average and total ${m1} across each ${d1} group with a clean chart and summary table.`,
+      })
+    } else if (m1) {
+      chips.push({
+        icon: ActivityIcon,
+        label: `Analyze ${m1}`,
+        prompt: `Analyze the distribution, average, and key drivers of ${m1} with a clear chart.`,
+      })
+    }
+
+    if (ent && m1 && ent !== d1) {
+      chips.push({
+        icon: TableIcon,
+        label: `Top 10 ${ent}`,
+        prompt: `Rank the top 10 ${ent} records by ${m1} and plot a comparison chart.`,
+      })
+    } else if (m1 && m2) {
+      chips.push({
+        icon: TableIcon,
+        label: `${m1} vs ${m2}`,
+        prompt: `Compare ${m1} and ${m2} across the dataset and visualize their relationship.`,
+      })
+    }
+
+    chips.push({
+      icon: SearchIcon,
+      label: 'Outliers & Quality',
+      prompt: m1
+        ? `Check ${m1} and all columns for outliers, missing values, or unusual rows and summarize the findings.`
+        : 'Check this dataset for missing values, duplicate rows, and unusual values.',
+    })
+
+    chips.push({
+      icon: FileIcon,
+      label: 'Executive Summary',
+      prompt:
+        'Generate a concise executive summary with the main headline finding, a key comparison chart, and top takeaways.',
+    })
+
+    return chips.slice(0, 4)
+  }, [activeSession, digest, sessions.length])
 
   const handleSubmit = () => {
     if (isSuspended) return
@@ -86,84 +181,24 @@ export function Composer() {
           </div>
         ) : null}
 
-        {activeSession ? (
+        {activeSession && quickChips.length > 0 ? (
           <div className="composer-chips">
-            {sessions.length > 1 ? (
-              <>
+            {quickChips.map((chip) => {
+              const Icon = chip.icon || SparklesIcon
+              return (
                 <button
+                  key={chip.label}
                   type="button"
                   className="chip chip-action"
                   disabled={disabled || isStreaming}
-                  onClick={() =>
-                    void sendMessage(
-                      'Merge all uploaded files into one clean unified dataset, normalize headers, and show the full summary and class/source breakdown.',
-                    )
-                  }
+                  onClick={() => void sendMessage(chip.prompt)}
+                  title={chip.prompt}
                 >
-                  Merge All Files
+                  <Icon size={11} />
+                  <span className="chip-text">{chip.label}</span>
                 </button>
-                <button
-                  type="button"
-                  className="chip chip-action"
-                  disabled={disabled || isStreaming}
-                  onClick={() =>
-                    void sendMessage(
-                      'Compare all uploaded files side-by-side across key metrics, distributions, and top performers.',
-                    )
-                  }
-                >
-                  Compare Sources
-                </button>
-              </>
-            ) : null}
-            <button
-              type="button"
-              className="chip chip-action"
-              disabled={disabled || isStreaming}
-              onClick={() =>
-                void sendMessage(
-                  'Summarize the most important trends, top performers, and biggest changes in this spreadsheet in plain English with a clear chart.',
-                )
-              }
-            >
-              Summarize Trends
-            </button>
-            <button
-              type="button"
-              className="chip chip-action"
-              disabled={disabled || isStreaming}
-              onClick={() =>
-                void sendMessage(
-                  'Create a clean, easy-to-read chart highlighting the main story in this spreadsheet.',
-                )
-              }
-            >
-              Build a Chart
-            </button>
-            <button
-              type="button"
-              className="chip chip-action"
-              disabled={disabled || isStreaming}
-              onClick={() =>
-                void sendMessage(
-                  'Check this spreadsheet for blank cells, duplicate rows, unusual values, or formatting issues, and explain them simply.',
-                )
-              }
-            >
-              Check for Errors
-            </button>
-            <button
-              type="button"
-              className="chip chip-action"
-              disabled={disabled || isStreaming}
-              onClick={() =>
-                void sendMessage(
-                  'Generate a clear executive summary report with key takeaways, a clean chart, a compact summary table, and practical next steps.',
-                )
-              }
-            >
-              Executive Report
-            </button>
+              )
+            })}
           </div>
         ) : null}
 
@@ -183,7 +218,7 @@ export function Composer() {
                   ? 'Upload a file to begin…'
                   : !dbReady
                     ? 'Initializing analysis engine…'
-                    : 'Ask questions, analyze trends, or request a summary…'
+                    : 'Ask a question about your data, request a chart, or compare groups…'
           }
         />
       </div>

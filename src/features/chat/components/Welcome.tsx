@@ -1,4 +1,11 @@
 import { memo, useMemo } from 'react'
+import {
+  buildLocalSuggestions,
+  findDimensions,
+  findEntityColumn,
+  findMeasures,
+  humanizeColumn,
+} from '../../../core/agent/suggestions'
 import { formatCount } from '../../../core/utils/format'
 import { ActivityIcon, ArrowUpIcon, FileIcon, SearchIcon, TableIcon } from '../../common/Icons'
 import { MarkdownText } from '../../render/MarkdownText'
@@ -11,8 +18,10 @@ interface StarterItem {
   prompt: string
 }
 
+const STARTER_ICONS = [ActivityIcon, TableIcon, SearchIcon, FileIcon]
+
 export const Welcome = memo(function Welcome() {
-  const { activeSession, digest, isStreaming } = useSessionState()
+  const { activeSession, sessions, digest, isStreaming } = useSessionState()
   const { sendMessage } = useSessionActions()
 
   const summary = useMemo(() => {
@@ -22,96 +31,80 @@ export const Welcome = memo(function Welcome() {
     const primaryTable = activeSession.primaryTable || activeSession.tables?.[0]?.name || 'dataset'
     const digestTable = digest?.tables?.find((t) => t.name === primaryTable) || digest?.tables?.[0]
     const columns = digestTable?.columns ?? []
+    const realColumns = columns.filter((c) => !/^column_\d+$/i.test(c.name.trim()))
+    const displayColumns = realColumns.length > 0 ? realColumns : columns
 
-    const numericCols = columns.filter((c) =>
-      /int|float|double|decimal|num|real/i.test(c.type),
-    )
-    const categoricalCols = columns.filter(
-      (c) =>
-        /char|text|str|varchar/i.test(c.type) ||
-        (!/int|float|double|decimal|num|real|date|time|bool/i.test(c.type) && c.distinctCount > 1),
-    )
-
-    const numSamples = numericCols.slice(0, 4).map((c) => `**${c.name}**`)
-    const catSamples = categoricalCols.slice(0, 4).map((c) => `**${c.name}**`)
-    const colsWithBlanks = columns.filter(
+    const measures = findMeasures(displayColumns)
+    const dimensions = findDimensions(displayColumns, totalRows)
+    const entityCol = findEntityColumn(displayColumns, totalRows)
+    const colsWithBlanks = displayColumns.filter(
       (c) => typeof c.nullPct === 'number' && c.nullPct >= 1,
     )
 
-    let paragraph = `This dataset contains **${formatCount(totalRows)}** records across **${columns.length || activeSession.tables?.[0]?.columnCount || 0}** columns.`
+    const measureNames = measures.slice(0, 3).map((c) => `**${humanizeColumn(c.name)}**`)
+    const dimNames = dimensions.slice(0, 3).map((c) => `**${humanizeColumn(c.name)}**`)
 
-    if (numericCols.length > 0 && categoricalCols.length > 0) {
-      paragraph += ` It includes **${numericCols.length}** number columns (${numSamples.join(', ')}${numericCols.length > 4 ? ', …' : ''}) and **${categoricalCols.length}** category columns (${catSamples.join(', ')}${categoricalCols.length > 4 ? ', …' : ''}).`
-    } else if (numericCols.length > 0) {
-      paragraph += ` It includes **${numericCols.length}** number columns (${numSamples.join(', ')}).`
-    } else if (categoricalCols.length > 0) {
-      paragraph += ` It includes **${categoricalCols.length}** category columns (${catSamples.join(', ')}).`
+    let paragraph = `Loaded **${formatCount(totalRows)}** rows across **${displayColumns.length || activeSession.tables?.[0]?.columnCount || 0}** columns`
+    if (sessions.length > 1) {
+      paragraph += ` (${sessions.length} uploaded sources active in workspace).`
+    } else {
+      paragraph += '.'
+    }
+
+    if (measureNames.length > 0 && dimNames.length > 0) {
+      paragraph += ` Key metrics include ${measureNames.join(', ')}, grouped by ${dimNames.join(', ')}.`
+    } else if (measureNames.length > 0) {
+      paragraph += ` Key numeric metrics include ${measureNames.join(', ')}.`
+    } else if (dimNames.length > 0) {
+      paragraph += ` Key dimensions include ${dimNames.join(', ')}.`
     }
 
     if (colsWithBlanks.length > 0) {
-      paragraph += ` Heads up: **${colsWithBlanks.length}** column${colsWithBlanks.length === 1 ? '' : 's'} have some blank cells.`
+      paragraph += ` Note: **${colsWithBlanks.length}** column${colsWithBlanks.length === 1 ? '' : 's'} contain missing values.`
     }
 
-    paragraph += ' Pick a quick question below or ask anything in plain English.'
-
-    // 4 friendly, plain-English starter questions tailored to the spreadsheet
-    const starters: StarterItem[] = []
-
-    if (numericCols.length >= 2) {
-      const n1 = numericCols[0].name
-      const n2 = numericCols[1].name
-      starters.push({
-        icon: TableIcon,
-        title: 'Compare Key Numbers',
-        desc: `See how ${n1} and ${n2} move together`,
-        prompt: `Compare ${n1} and ${n2} in ${primaryTable} in plain English. Highlight the main pattern, typical ranges, and include a clear chart.`,
-      })
-    } else {
-      starters.push({
-        icon: TableIcon,
-        title: 'Key Numbers Summary',
-        desc: 'Averages, highs, lows, and typical ranges',
-        prompt: `Summarize the main numbers in ${primaryTable} in plain English with averages, highs, lows, and a clear chart.`,
-      })
-    }
-
-    if (categoricalCols.length > 0 && numericCols.length > 0) {
-      const cat = categoricalCols[0].name
-      const num = numericCols[numericCols.length - 1].name
-      starters.push({
-        icon: ActivityIcon,
-        title: 'Top Performers',
-        desc: `Compare ${num} across ${cat} groups`,
-        prompt: `Compare ${num} across each ${cat} group in ${primaryTable}. Rank the top performers, explain the biggest differences in plain English, and include a clean chart.`,
-      })
-    } else {
-      starters.push({
-        icon: ActivityIcon,
-        title: 'Executive Summary',
-        desc: 'Key highlights & takeaways at a glance',
-        prompt: `Write a clear executive summary of ${primaryTable} in plain English with the main takeaways and a chart.`,
-      })
-    }
-
-    starters.push({
-      icon: SearchIcon,
-      title: 'Data Quality Audit',
-      desc: 'Spot blank cells, duplicates & unusual values',
-      prompt: `Check ${primaryTable} for blank cells, duplicate rows, and unusual values. Explain any issues in plain English and suggest how to clean them.`,
+    // Build data-driven suggestions from the real schema, values, and loaded sources
+    const localPrompts = buildLocalSuggestions(activeSession, digest, {
+      allSessions: sessions,
     })
 
-    starters.push({
-      icon: FileIcon,
-      title: 'Schema & Records',
-      desc: 'See every column and the first 10 rows',
-      prompt: `Explain each column in ${primaryTable} in simple terms and show a clean preview of the first 10 rows.`,
+    const m1 = measures[0] ? humanizeColumn(measures[0].name) : null
+    const m2 = measures[1] ? humanizeColumn(measures[1].name) : null
+    const d1 = dimensions[0] ? humanizeColumn(dimensions[0].name) : null
+    const ent = entityCol ? humanizeColumn(entityCol.name) : null
+
+    const starters: StarterItem[] = localPrompts.slice(0, 4).map((prompt, idx) => {
+      const Icon = STARTER_ICONS[idx % STARTER_ICONS.length]
+      let title = 'Data Insight'
+      if (/combine all|compare.*between/i.test(prompt)) {
+        title = sessions.length > 2 ? `Compare All ${sessions.length} Files` : 'Compare Sources'
+      } else if (/top \d+|rank/i.test(prompt)) {
+        title = ent && m1 ? `Top ${ent} by ${m1}` : m1 ? `Top Rankings by ${m1}` : 'Top Performers'
+      } else if (/share of|across each/i.test(prompt)) {
+        title = d1 && m1 ? `${m1} by ${d1}` : 'Category Breakdown'
+      } else if (/trended over|changed over/i.test(prompt)) {
+        title = m1 ? `${m1} Trend` : 'Time Trend'
+      } else if (/compare.*and/i.test(prompt) && m1 && m2) {
+        title = `${m1} vs. ${m2}`
+      } else if (/distribution|outlier/i.test(prompt)) {
+        title = m1 ? `${m1} Distribution` : 'Distribution & Outliers'
+      } else if (/missing values/i.test(prompt)) {
+        title = 'Missing Values Check'
+      }
+
+      return {
+        icon: Icon,
+        title,
+        desc: prompt,
+        prompt,
+      }
     })
 
     return {
       paragraph,
-      starters: starters.slice(0, 4),
+      starters,
     }
-  }, [activeSession, digest])
+  }, [activeSession, digest, sessions])
 
   if (!activeSession || !summary) {
     return (
@@ -131,17 +124,17 @@ export const Welcome = memo(function Welcome() {
     <article className="message message-assistant message-welcome-plain">
       <MarkdownText content={paragraph} />
 
-      {/* 4 suggestion questions in a clean 2-column grid, NO 'Ask next' header */}
       <div className="welcome-suggestions-grid">
         {starters.map((starter) => {
           const Icon = starter.icon
           return (
             <button
-              key={starter.title}
+              key={starter.prompt}
               type="button"
               className="welcome-suggestion-card"
               disabled={isStreaming}
               onClick={() => void sendMessage(starter.prompt)}
+              title={starter.prompt}
             >
               <div className="welcome-suggestion-icon">
                 <Icon size={15} />

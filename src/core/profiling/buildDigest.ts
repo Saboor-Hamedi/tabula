@@ -277,8 +277,12 @@ export function isTemporalColumn(column: DigestColumn): boolean {
  */
 export function isNumericColumn(column: DigestColumn): boolean {
   if (!isNumeric(column.type)) return false
-  if (/(^|_)id$/i.test(column.name) || /^id$/i.test(column.name)) return false
-  if (/(^|_)(code|zip|postal|phone|year|yr)$/i.test(column.name)) return false
+  const clean = column.name.trim()
+  if (/(^|[_.\s-])(id|no|num|number|idx|index|row|serial|sr|s_no|roll|rank)$/i.test(clean)) {
+    return false
+  }
+  if (/^(id|no|sr|s\.?no\.?|roll\s*no\.?|index|row|#)$/i.test(clean)) return false
+  if (/(^|[_.\s-])(code|zip|postal|phone|year|yr)$/i.test(clean)) return false
   return true
 }
 
@@ -286,6 +290,11 @@ export function isNumericColumn(column: DigestColumn): boolean {
 export function isCategoricalColumn(column: DigestColumn): boolean {
   if (isBoolean(column.type)) return true
   if (!isGroupable(column.type)) return false
-  if (/(^|_)id$/i.test(column.name) || /^id$/i.test(column.name)) return false
+  const clean = column.name.trim()
+  if (/(^|[_.\s-])(id|no|num|idx|index|row|serial|sr|roll)$/i.test(clean)) return false
+  if (/^(id|no|sr|s\.?no\.?|roll\s*no\.?)$/i.test(clean)) return false
+  if (/(^|[_.\s-])(email|phone|url|link|address|comment|notes?|remarks?|description)($|[_.\s-])/i.test(clean)) {
+    return false
+  }
   return column.distinctCount > 1 && column.distinctCount <= 60
 }

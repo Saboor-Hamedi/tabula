@@ -102,18 +102,20 @@ export function Input({
               ? 'Working…'
               : disabled
                 ? placeholder
-                : 'Enter to send · Shift+Enter for a new line'}
+                : 'Enter ↵ to send · Shift+Enter for new line'}
           </span>
         </div>
 
         <div className="composer-field-foot-right">
-          <span
-            className={`composer-word-counter ${counterTone}`}
-            aria-live="polite"
-            title={`${wordCount} of ${MAX_PROMPT_WORDS} words`}
-          >
-            {wordCount}/{MAX_PROMPT_WORDS}
-          </span>
+          {wordCount > 0 ? (
+            <span
+              className={`composer-word-counter ${counterTone}`}
+              aria-live="polite"
+              title={`${wordCount} of ${MAX_PROMPT_WORDS} words`}
+            >
+              {wordCount}/{MAX_PROMPT_WORDS}
+            </span>
+          ) : null}
 
           {streaming ? (
             <button

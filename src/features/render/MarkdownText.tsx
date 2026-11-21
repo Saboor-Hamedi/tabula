@@ -146,9 +146,17 @@ const components: Components = {
   pre: ({ children }) => <>{children}</>,
   code: ({ className, children, ...props }) => {
     const text = String(children).replace(/\n$/, '')
-    const isBlock = Boolean(className) || text.includes('\n')
-    if (isBlock) {
+    const isCodeLang = Boolean(
+      className &&
+        /^language-(?:python|py|sql|duckdb|javascript|js|typescript|ts|json|bash|sh|r)$/i.test(
+          className.trim(),
+        ),
+    )
+    if (isCodeLang) {
       return <CodeBlock code={text} className={className} />
+    }
+    if (text.includes('\n')) {
+      return <div className="markdown-plain-block">{text}</div>
     }
     return (
       <code className={className} {...props}>

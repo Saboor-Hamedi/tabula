@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isNumericOrStatValue } from './DataTable'
+import { formatTableCellText, isNumericOrStatValue } from './DataTable'
 
 describe('DataTable numeric & statistical value detection', () => {
   it('identifies statistical and quantitative numbers correctly', () => {
@@ -34,5 +34,12 @@ describe('DataTable numeric & statistical value detection', () => {
     expect(isNumericOrStatValue('Std Dev')).toBe(false)
     expect(isNumericOrStatValue('Median')).toBe(false)
     expect(isNumericOrStatValue('Customer Name')).toBe(false)
+  })
+
+  it('formats long decimals in table cells to 1 decimal place like 94.3', () => {
+    expect(formatTableCellText('94.4444434343')).toBe('94.4')
+    expect(formatTableCellText('94.31289%')).toBe('94.3%')
+    expect(formatTableCellText('16.70 ± 1.2845')).toBe('16.7 ± 1.3')
+    expect(formatTableCellText('94.0000')).toBe('94')
   })
 })

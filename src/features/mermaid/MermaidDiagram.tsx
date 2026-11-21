@@ -6,6 +6,7 @@ import {
   enqueue,
   getNextRenderId,
   PIE_COLORS,
+  sanitizeMermaidCode,
   XY_COLORS,
 } from './utils/mermaidUtils'
 
@@ -144,7 +145,7 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
 
   useEffect(() => {
     let active = true
-    const source = code.trim()
+    const source = sanitizeMermaidCode(code.trim())
     if (source.length === 0) return
 
     ensureInitialized(dark)

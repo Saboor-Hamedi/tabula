@@ -15,6 +15,7 @@ export interface PythonExecutionResult {
   dfInfo?: {
     shape: [number, number]
     columns: string[]
+    dfChanged?: boolean
   }
   dfPreview?: {
     columns: string[]

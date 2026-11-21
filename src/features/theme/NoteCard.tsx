@@ -1,4 +1,6 @@
-import { memo, useEffect, useRef, type RefObject } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { CheckIcon, CopyIcon } from '../common/Icons';
+import { countNoteWords, MAX_NOTE_WORDS } from './board-state';
 import { NOTE_COLORS, NOTE_COLOR_ORDER } from './colors';
 import { type NoteColor, type NoteItem } from './types';
 import { usePresence } from './use-presence';
@@ -27,13 +29,33 @@ export const NoteCard = memo(function NoteCard({
 }: NoteCardProps) {
   const palette = NOTE_COLORS[item.color] ?? NOTE_COLORS.butter;
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const [copied, setCopied] = useState(false);
   const { leave, stateClass } = usePresence(() => onRemove(item.id));
+
+  const wordCount = useMemo(() => countNoteWords(item.text), [item.text]);
 
   useEffect(() => {
     if (autoFocus) {
       textRef.current?.focus({ preventScroll: true });
     }
   }, [autoFocus]);
+
+  const handleCycleColor = () => {
+    const idx = NOTE_COLOR_ORDER.indexOf(item.color);
+    const nextColor = NOTE_COLOR_ORDER[(idx + 1) % NOTE_COLOR_ORDER.length];
+    onColor(item.id, nextColor);
+  };
+
+  const handleCopy = async () => {
+    if (!item.text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(item.text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <div
@@ -44,33 +66,46 @@ export const NoteCard = memo(function NoteCard({
       }}
       onPointerDownCapture={() => onRaise(item.id)}
     >
-      {/* Header with color palette swatches and actions (no number, no 'Note') */}
+      {/* Clean Header: live 200-word counter on left, actions on right (no color dots) */}
       <div className="sticky-note-header">
-        <div className="sticky-note-colors">
-          {NOTE_COLOR_ORDER.map((color) => (
-            <button
-              key={color}
-              type="button"
-              aria-label={`Change color to ${NOTE_COLORS[color].label}`}
-              aria-pressed={color === item.color}
-              title={NOTE_COLORS[color].label}
-              onClick={() => onColor(item.id, color)}
-              className={`sticky-note-color-btn ${color === item.color ? 'is-selected' : ''}`}
-              style={{ background: NOTE_COLORS[color].color }}
-            />
-          ))}
-        </div>
+        <button
+          type="button"
+          className="sticky-note-word-pill"
+          onClick={handleCycleColor}
+          title={`Tone: ${palette.label} (click to switch tone) · ${wordCount} of ${MAX_NOTE_WORDS} words`}
+        >
+          {wordCount}/{MAX_NOTE_WORDS}w
+        </button>
 
         <div className="sticky-note-actions">
+          <button
+            type="button"
+            aria-label="Copy note text"
+            title="Copy note"
+            onClick={handleCopy}
+            className="sticky-note-expand-btn"
+          >
+            {copied ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+          </button>
           {onExpand && (
             <button
               type="button"
               aria-label="Expand note in bigger modal"
-              title="Open note in bigger view"
+              title="Open note in larger view"
               onClick={() => onExpand(item.id)}
               className="sticky-note-expand-btn"
             >
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 16 16"
+                width="11"
+                height="11"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <polyline points="10 2 14 2 14 6" />
                 <polyline points="6 14 2 14 2 10" />
                 <line x1="14" y1="2" x2="9.5" y2="6.5" />
@@ -98,13 +133,13 @@ export const NoteCard = memo(function NoteCard({
         </div>
       </div>
 
-      {/* Note body with scrollable auto-fitting textarea */}
+      {/* Note body with 200-word capped textarea */}
       <div className="sticky-note-content">
         <textarea
           ref={textRef}
           value={item.text}
           onChange={(e) => onText(item.id, e.target.value)}
-          placeholder="Capture a finding or working note…"
+          placeholder="Write a note (up to 200 words)…"
           className="sticky-note-textarea"
         />
       </div>

@@ -7,27 +7,19 @@ import {
 } from '../profiling/buildDigest'
 
 /**
- * Suggestion engine.
+ * Data-grounded suggestion engine.
  *
- * Two layers, in this order:
- *  1. `buildLocalSuggestions` — deterministic, zero-latency questions derived from
- *     the digest (real table names, real columns, real top values).
- *  2. `generateSuggestions` — asks the managed model for sharper, dataset-specific
- *     questions, falling back to layer 1 on any failure.
- *
- * Nothing here is a hard-coded prompt list. Every question names a column or a
- * value that actually exists in the uploaded file.
+ * Derives specific, high-signal analytical questions directly from the active
+ * dataset's actual columns, sample category values, numeric ranges, null counts,
+ * and multi-file workspace context.
  */
 
 export interface SuggestionInput {
   session: Session
   digest: DatasetDigest | null
   model: ModelId
-  /** The question the user just asked, when this runs after an answer. */
   question?: string
-  /** The start of the answer, so follow-ups build on it. */
   answer?: string
-  /** Other loaded sessions in the workspace for cross-file suggestions. */
   allSessions?: Session[]
   signal?: AbortSignal
 }
@@ -38,7 +30,7 @@ export interface LocalSuggestionOptions {
   allSessions?: Session[]
 }
 
-/** Repairs a digest restored from an older/corrupt cache. */
+/** Repairs a digest restored from an older/corrupt cache while preserving stats. */
 function normalizeDigest(digest: DatasetDigest | null): DatasetDigest | null {
   if (!digest || !Array.isArray(digest.tables)) return null
 
@@ -58,6 +50,9 @@ function normalizeDigest(digest: DatasetDigest | null): DatasetDigest | null {
           topValues: Array.isArray(column.topValues)
             ? column.topValues.filter((value): value is string => typeof value === 'string')
             : [],
+          min: column.min ?? null,
+          max: column.max ?? null,
+          nullPct: typeof column.nullPct === 'number' ? column.nullPct : null,
         })
       }
     }
@@ -72,7 +67,6 @@ function normalizeDigest(digest: DatasetDigest | null): DatasetDigest | null {
   return { tables: tables.slice(0, DIGEST_MAX_TABLES) }
 }
 
-/** Picks the table with the most columns — usually the richest one. */
 function pickPrimaryTable(digest: DatasetDigest, session: Session): DigestTable | null {
   const tables = Array.isArray(digest.tables) ? digest.tables : []
   const preferred = tables.find((table) => table?.name === session.primaryTable)
@@ -84,12 +78,15 @@ function pickPrimaryTable(digest: DatasetDigest, session: Session): DigestTable 
   return richest && Array.isArray(richest.columns) && richest.columns.length > 0 ? richest : null
 }
 
-/** Turns `order_total_usd` into `order total usd` for readable questions. */
-function humanize(identifier: string): string {
-  return identifier.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
+/** Turns `order_total_usd` into `order total usd` and strips generic banner prefixes. */
+export function humanizeColumn(identifier: string): string {
+  return identifier
+    .replace(/\.[a-z0-9]{2,4}$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
-/** Formats a sample value for display inside a question. */
 function quoteValue(value: string): string {
   return `"${value}"`
 }
@@ -98,51 +95,88 @@ function findTemporal(columns: DigestColumn[]): DigestColumn | null {
   return columns.find(isTemporalColumn) ?? null
 }
 
-/**
- * Picks the best measure column.
- *
- * Ranked by how likely a column is to be the number someone actually cares
- * about. A total beats a unit price, which beats a raw count. Column order is
- * only the tie-breaker, so `order_total_usd` wins over `unit_price_usd`.
- */
 const MEASURE_RANK: ReadonlyArray<RegExp> = [
-  /(total|amount|revenue|sales|gmv|spend|profit|margin|balance)/i,
-  /(price|cost|rate|fee|value)/i,
-  /(qty|quantity|units|count)/i,
+  /(total|amount|revenue|sales|gmv|spend|profit|margin|balance|net|gross)/i,
+  /(score|practical|theory|final|grade|mark|exam|quiz|test|gpa|point|pct|percent|average|avg|rate|rating|accuracy|benchmark)/i,
+  /(price|cost|fee|value|salary|wage|income|budget)/i,
+  /(qty|quantity|units|count|volume|attendance|hours|days)/i,
 ]
 
-function findMeasures(columns: DigestColumn[]): DigestColumn[] {
-  const numeric = columns.filter(isNumericColumn)
+export function findMeasures(columns: DigestColumn[]): DigestColumn[] {
+  const numeric = columns.filter(
+    (c) => isNumericColumn(c) && !/^column_\d+$/i.test(c.name.trim()),
+  )
 
   const rankOf = (column: DigestColumn): number => {
     const index = MEASURE_RANK.findIndex((pattern) => pattern.test(column.name))
     return index === -1 ? MEASURE_RANK.length : index
   }
 
-  return [...numeric].sort((a, b) => rankOf(a) - rankOf(b)).slice(0, 3)
+  return [...numeric].sort((a, b) => rankOf(a) - rankOf(b)).slice(0, 4)
 }
 
-function findDimensions(columns: DigestColumn[]): DigestColumn[] {
-  return columns.filter(isCategoricalColumn).slice(0, 4)
+/**
+ * Finds true grouping dimensions (columns whose values repeat across rows, not unique row names).
+ */
+export function findDimensions(columns: DigestColumn[], rowCount = 0): DigestColumn[] {
+  return columns
+    .filter((col) => {
+      if (!isCategoricalColumn(col)) return false
+      if (/^column_\d+$/i.test(col.name.trim())) return false
+      // If a column is almost unique per row (e.g. 35 distinct Student Names in a 35-row sheet),
+      // it is an entity label rather than a grouping category.
+      if (rowCount >= 10 && col.distinctCount > Math.max(15, rowCount * 0.55)) {
+        return false
+      }
+      if (/(^|[_.\s-])(student\s*name|full\s*name|person|email)($|[_.\s-])/i.test(col.name)) {
+        return false
+      }
+      return true
+    })
+    .slice(0, 4)
+}
+
+/**
+ * Finds an entity/record label column (e.g. Student Name, Product Name, Customer, Country)
+ * suitable for top-N leaderboard rankings.
+ */
+export function findEntityColumn(columns: DigestColumn[], rowCount = 0): DigestColumn | null {
+  const realCols = columns.filter((c) => !/^column_\d+$/i.test(c.name.trim()))
+  const byName = realCols.find((c) =>
+    /(^|[_.\s-])(name|student|customer|client|employee|product|item|model|country|city|company|school|title)($|[_.\s-])/i.test(
+      c.name,
+    ),
+  )
+  if (byName) return byName
+
+  const highCardText = realCols.find(
+    (c) =>
+      /CHAR|TEXT|STR/i.test(c.type) &&
+      c.distinctCount >= Math.min(10, Math.max(3, Math.floor(rowCount * 0.4))),
+  )
+  return highCardText ?? null
 }
 
 function isSimilarQuestion(candidate: string, asked: string): boolean {
   const normCandidate = candidate.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim()
   const normAsked = asked.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim()
   if (!normCandidate || !normAsked) return false
-  if (normCandidate === normAsked || normCandidate.includes(normAsked) || normAsked.includes(normCandidate)) {
+  if (
+    normCandidate === normAsked ||
+    normCandidate.includes(normAsked) ||
+    normAsked.includes(normCandidate)
+  ) {
     return true
   }
   const askedTokens = new Set(normAsked.split(/\s+/).filter((w) => w.length > 3))
   const candTokens = normCandidate.split(/\s+/).filter((w) => w.length > 3)
   if (askedTokens.size === 0 || candTokens.length === 0) return false
   const overlap = candTokens.filter((w) => askedTokens.has(w)).length
-  return overlap / Math.min(askedTokens.size, candTokens.length) >= 0.75
+  return overlap / Math.min(askedTokens.size, candTokens.length) >= 0.72
 }
 
 /**
- * Deterministic, dataset-specific questions. Ordered by how likely they are to
- * be useful, then de-duplicated and capped.
+ * Deterministic, dataset-specific questions ordered by analytical value.
  */
 export function buildLocalSuggestions(
   session: Session,
@@ -152,88 +186,129 @@ export function buildLocalSuggestions(
   const safeDigest = normalizeDigest(digest)
   const table = safeDigest ? pickPrimaryTable(safeDigest, session) : null
   const sessionTables = Array.isArray(session?.tables) ? session.tables : []
-  const tableName = table?.name ?? session?.primaryTable ?? sessionTables[0]?.name ?? 'the data'
+  const rawTableName = table?.name ?? session?.primaryTable ?? sessionTables[0]?.name ?? 'the data'
+  const tableName = humanizeColumn(rawTableName)
+  const rowCount = table?.rowCount ?? sessionTables[0]?.rowCount ?? 0
   const columns = table?.columns ?? []
 
   const temporal = findTemporal(columns)
   const measures = findMeasures(columns)
-  const dimensions = findDimensions(columns)
+  const dimensions = findDimensions(columns, rowCount)
+  const entityCol = findEntityColumn(columns, rowCount)
+
   const measure = measures[0]
   const secondMeasure = measures[1]
+  const thirdMeasure = measures[2]
   const dimension = dimensions[0]
   const secondDimension = dimensions[1]
 
   const questions: string[] = []
 
-  // Cross-file comparison suggestion when multiple datasets are loaded.
-  const otherSession = (options?.allSessions ?? []).find(
-    (s) => s && s.id !== session.id && Array.isArray(s.tables) && s.tables.length > 0,
+  // 1. Multi-file workspace questions when multiple files are loaded
+  const allLoaded = (options?.allSessions ?? []).filter(
+    (s) => s && Array.isArray(s.tables) && s.tables.length > 0,
   )
-  if (otherSession) {
+  const otherSessions = allLoaded.filter((s) => s.id !== session.id)
+  if (otherSessions.length >= 2) {
+    const totalFiles = allLoaded.length
     if (measure) {
       questions.push(
-        `Compare ${humanize(measure.name)} between ${session.fileName} and ${otherSession.fileName}.`,
+        `Combine all ${totalFiles} uploaded files and compare average ${humanizeColumn(measure.name)} across each group with a chart.`,
+      )
+      questions.push(
+        `Who are the top 10 performers by ${humanizeColumn(measure.name)} across all ${totalFiles} uploaded files?`,
       )
     } else {
       questions.push(
-        `Compare ${session.fileName} with ${otherSession.fileName} and highlight key differences.`,
+        `Combine all ${totalFiles} uploaded files into one dataset and compare their key metrics with a chart.`,
+      )
+    }
+  } else if (otherSessions.length === 1) {
+    const other = otherSessions[0]
+    if (measure) {
+      questions.push(
+        `Compare ${humanizeColumn(measure.name)} between ${humanizeColumn(session.fileName)} and ${humanizeColumn(other.fileName)}.`,
+      )
+    } else {
+      questions.push(
+        `Compare ${humanizeColumn(session.fileName)} with ${humanizeColumn(other.fileName)} and highlight key differences.`,
       )
     }
   }
 
-  // Trend questions — only when there is a real date column and a real measure.
+  // 2. Time-series trend question
   if (temporal && measure) {
     questions.push(
-      `How has ${humanize(measure.name)} changed over ${humanize(temporal.name)}?`,
+      `How has ${humanizeColumn(measure.name)} trended over ${humanizeColumn(temporal.name)}?`,
     )
   }
 
-  // Composition questions anchored on an actual category value.
+  // 3. Dimension breakdown / top category share
   if (dimension && measure) {
     const topValue = Array.isArray(dimension.topValues) ? dimension.topValues[0] : undefined
     if (topValue) {
       questions.push(
-        `What share of ${humanize(measure.name)} does ${quoteValue(topValue)} represent in ${humanize(dimension.name)}?`,
-      )
-    } else {
-      questions.push(
-        `Which ${humanize(dimension.name)} contributes the most ${humanize(measure.name)}?`,
+        `What share of ${humanizeColumn(measure.name)} comes from ${quoteValue(topValue)} in ${humanizeColumn(dimension.name)}?`,
       )
     }
+    questions.push(
+      `Compare average and total ${humanizeColumn(measure.name)} across each ${humanizeColumn(dimension.name)} with a bar chart.`,
+    )
   }
 
-  // Ranking / comparison questions.
+  // 4. Entity leaderboard ranking (e.g. top 10 students/products/customers by score/revenue)
+  if (entityCol && measure && entityCol.name !== dimension?.name) {
+    questions.push(
+      `Rank the top 10 ${humanizeColumn(entityCol.name)} records by ${humanizeColumn(measure.name)} and plot the comparison.`,
+    )
+  }
+
+  // 5. Multi-measure correlation / comparison (e.g. Practical vs Theory, Revenue vs Margin)
+  if (measure && secondMeasure) {
+    questions.push(
+      `How do ${humanizeColumn(measure.name)} and ${humanizeColumn(secondMeasure.name)} compare across the dataset?`,
+    )
+  }
+  if (secondMeasure && thirdMeasure) {
+    questions.push(
+      `Compare ${humanizeColumn(secondMeasure.name)} and ${humanizeColumn(thirdMeasure.name)} and highlight any strong patterns.`,
+    )
+  }
+
+  // 6. Cross-dimension breakdown
   if (dimension && secondDimension && measure) {
     questions.push(
-      `Compare ${humanize(measure.name)} across ${humanize(dimension.name)} and ${humanize(secondDimension.name)}.`,
+      `Break down ${humanizeColumn(measure.name)} across ${humanizeColumn(dimension.name)} and ${humanizeColumn(secondDimension.name)}.`,
     )
-  } else if (dimension && measure) {
+  } else if (secondDimension && measure) {
     questions.push(
-      `Which ${humanize(dimension.name)} contributes the most ${humanize(measure.name)}?`,
+      `Plot ${humanizeColumn(measure.name)} across ${humanizeColumn(secondDimension.name)}.`,
+    )
+  } else if (dimension && secondMeasure) {
+    questions.push(
+      `Compare ${humanizeColumn(secondMeasure.name)} by ${humanizeColumn(dimension.name)}.`,
     )
   } else if (dimension) {
-    questions.push(`Which ${humanize(dimension.name)} values stand out the most?`)
+    questions.push(`Show the distribution of records across ${humanizeColumn(dimension.name)}.`)
   }
 
-  // Secondary measure / dimension angles so follow-up chips stay fresh across turns.
-  if (secondMeasure && dimension) {
-    questions.push(
-      `Break down ${humanize(secondMeasure.name)} by ${humanize(dimension.name)}.`,
-    )
-  }
-  if (secondDimension && measure) {
-    questions.push(
-      `Plot the distribution of ${humanize(measure.name)} across ${humanize(secondDimension.name)}.`,
-    )
-  }
-
-  // Outlier and data-quality questions are always valuable.
+  // 7. Distribution, outliers, and data health grounded in real columns
   if (measure) {
-    questions.push(`What are the outliers and unusual rows in ${humanize(measure.name)}?`)
+    questions.push(
+      `Show the distribution, average, and any outliers in ${humanizeColumn(measure.name)}.`,
+    )
   }
 
-  questions.push(`Profile ${tableName} and flag any data-quality issues.`)
-  questions.push(`Give me a full overview of ${tableName} with the key patterns.`)
+  const nullCols = columns.filter((c) => typeof c.nullPct === 'number' && c.nullPct >= 1)
+  if (nullCols.length > 0) {
+    const colList = nullCols
+      .slice(0, 2)
+      .map((c) => humanizeColumn(c.name))
+      .join(' and ')
+    questions.push(`Inspect missing values in ${colList} and show how they affect the summary.`)
+  }
+
+  questions.push(`Summarize the most important patterns and top rankings in ${tableName}.`)
 
   const asked = options?.question?.trim()
   const filtered = asked
@@ -255,10 +330,6 @@ function dedupe(values: string[]): string[] {
   return output
 }
 
-/**
- * Returns deterministic, zero-token follow-up questions grounded in the dataset
- * digest without making an extra LLM API call after every answer.
- */
 export async function generateSuggestions({
   session,
   digest,

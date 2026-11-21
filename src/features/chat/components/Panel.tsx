@@ -32,9 +32,16 @@ export function Panel() {
   const activity = useMemo(() => {
     if (!streamingHere) return null
     const running = traces.find((trace) => trace.status === 'running')
-    if (!running) return 'Thinking…'
-    if (running.toolName === 'inspect_schema') return 'Reading the columns…'
-    return 'Analysing the data…'
+    if (!running) return 'Writing analysis…'
+    const purpose =
+      typeof running.args?.purpose === 'string' && running.args.purpose.trim().length > 0
+        ? running.args.purpose.trim()
+        : null
+    if (running.toolName === 'inspect_schema') return 'Inspecting table columns…'
+    if (running.toolName === 'run_python') {
+      return purpose ? `${purpose}…` : 'Running code & building figures…'
+    }
+    return purpose ? `${purpose}…` : 'Calculating metrics…'
   }, [streamingHere, traces])
 
   const handleScroll = useCallback(() => {

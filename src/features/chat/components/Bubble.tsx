@@ -50,7 +50,8 @@ export const Bubble = memo(function Bubble({
   const content = typeof message.content === 'string' ? message.content : ''
 
   const isUser = message.role === 'user'
-  const isThinking = streaming && !isUser && content.trim().length === 0
+  const hasCodeSteps = Array.isArray(message.codeSteps) && message.codeSteps.length > 0
+  const isThinking = streaming && !isUser && content.trim().length === 0 && !hasCodeSteps
 
   const handleCopy = async () => {
     try {
@@ -140,8 +141,19 @@ export const Bubble = memo(function Bubble({
               editFigure(message.id, figureIndex, changes)
             }
             images={message.images}
+            codeSteps={message.codeSteps}
             onOpenImage={(idx) => setLightboxIndex(idx)}
           />
+          {streaming ? (
+            <div className="thinking is-inline-live">
+              <span className="thinking-dots" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </span>
+              <span>{activity ?? 'Writing insights…'}</span>
+            </div>
+          ) : null}
         </div>
       )}
 

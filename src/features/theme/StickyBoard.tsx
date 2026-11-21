@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createNote, useBoard } from './board-state';
+import { countNoteWords, createNote, MAX_NOTE_WORDS, useBoard } from './board-state';
 import { NOTE_COLORS, NOTE_COLOR_ORDER } from './colors';
 import { NoteCard } from './NoteCard';
 import { Toolbar } from './Toolbar';
@@ -119,25 +119,23 @@ export function StickyBoard({
             <div className="note-modal-header">
               <div className="note-modal-title-group">
                 <span className="note-modal-wordcount">
-                  {expandedNote.text.trim().split(/\s+/).filter(Boolean).length} words · {expandedNote.text.length} chars
+                  {countNoteWords(expandedNote.text)} / {MAX_NOTE_WORDS} words
                 </span>
               </div>
 
               <div className="note-modal-actions">
-                <div className="note-modal-colors">
-                  {NOTE_COLOR_ORDER.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      aria-label={`Change color to ${NOTE_COLORS[color].label}`}
-                      aria-pressed={color === expandedNote.color}
-                      title={NOTE_COLORS[color].label}
-                      onClick={() => board.setColor(expandedNote.id, color)}
-                      className={`sticky-note-color-btn ${color === expandedNote.color ? 'is-selected' : ''}`}
-                      style={{ background: NOTE_COLORS[color].color }}
-                    />
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  className="note-modal-tone-btn"
+                  onClick={() => {
+                    const idx = NOTE_COLOR_ORDER.indexOf(expandedNote.color);
+                    const nextColor = NOTE_COLOR_ORDER[(idx + 1) % NOTE_COLOR_ORDER.length];
+                    board.setColor(expandedNote.id, nextColor);
+                  }}
+                  title="Switch note tone"
+                >
+                  Tone: {NOTE_COLORS[expandedNote.color]?.label || 'Butter'}
+                </button>
 
                 <button
                   type="button"

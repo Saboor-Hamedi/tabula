@@ -7,7 +7,7 @@
  */
 
 export const PYTHON_HARNESS = `
-import sys, io, os, re, base64, traceback, math
+import sys, io, os, re, base64, traceback, math, ast
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -19,18 +19,25 @@ import numpy as np
 plt.rcParams.update({
     'axes.spines.top': False,
     'axes.spines.right': False,
+    'axes.edgecolor': '#cbd5e1',
+    'axes.linewidth': 0.9,
     'axes.grid': True,
-    'grid.alpha': 0.22,
+    'axes.axisbelow': True,
+    'grid.alpha': 0.35,
+    'grid.color': '#e2e8f0',
     'grid.linestyle': '--',
     'figure.facecolor': '#ffffff',
     'axes.facecolor': '#ffffff',
     'axes.prop_cycle': matplotlib.cycler(
-        color=['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#8b5cf6', '#06b6d4']
+        color=['#2563eb', '#0d9488', '#f59e0b', '#e11d48', '#7c3aed', '#0284c7']
     ),
-    'font.size': 10,
-    'axes.titlesize': 12,
+    'font.size': 9.5,
+    'axes.titlesize': 11,
     'axes.titleweight': 'bold',
-    'axes.labelsize': 10,
+    'axes.labelsize': 9.5,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'figure.figsize': (7.2, 3.8),
 })
 
 # Silent no-op so scripts calling plt.show() never emit FigureCanvasAgg warnings
@@ -351,11 +358,11 @@ def plot_top_classes(df, performance_column='Total', class_column='Class', top_n
         print(f"No valid numeric values in '{perf_col}' for '{cls_col}'.")
         return None
     top = work.groupby('group')['val'].mean().nlargest(int(top_n))
-    fig, ax = plt.subplots(figsize=(9, 4.8))
-    bars = ax.bar(top.index.astype(str), top.values)
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    bars = ax.bar(top.index.astype(str), top.values, color='#2563eb', edgecolor='none', width=0.58)
     for bar, val in zip(bars, top.values):
-        label = f"{val:.2f}%" if as_pct else f"{val:.2f}"
-        ax.text(bar.get_x() + bar.get_width() / 2, val, label, ha='center', va='bottom', fontsize=9, fontweight='bold')
+        label = f"{val:.1f}%" if as_pct else f"{val:.1f}"
+        ax.text(bar.get_x() + bar.get_width() / 2, val, label, ha='center', va='bottom', fontsize=8.5, fontweight='bold')
     ax.set_title(f"Top {len(top)} {cls_col} by {perf_col}")
     ax.set_xlabel(cls_col)
     ax.set_ylabel(perf_col)
@@ -558,6 +565,80 @@ pd.to_numeric = _safe_to_numeric
 pd.DataFrame.to_excel = _tracked_to_excel
 pd.DataFrame.to_csv = _tracked_to_csv
 
+def _clean_plot_text(s):
+    if not isinstance(s, str) or not s:
+        return s
+    # Remove (n=12), (N = 12), [n=12] sample count noise from figure labels and titles
+    cleaned = re.sub(r'\\s*[\\(\\[]\\s*[nN]\\s*=\\s*\\d+\\s*[\\)\\]]', '', s)
+    # Round long decimals inside figure annotations (e.g. 94.44443% -> 94.4%)
+    def _round_match(m):
+        prefix = m.group(1) or ''
+        num_str = m.group(2)
+        suffix = m.group(3) or ''
+        try:
+            v = float(num_str)
+            if v.is_integer():
+                return f"{prefix}{int(v)}{suffix}"
+            return f"{prefix}{v:.1f}{suffix}"
+        except Exception:
+            return m.group(0)
+    cleaned = re.sub(r'(^|[^\\d.])(-?\\d+\\.\\d{2,})(%?)', _round_match, cleaned)
+    return cleaned.strip()
+
+def _polish_figure(fig):
+    try:
+        if getattr(fig, '_suptitle', None) is not None:
+            fig._suptitle.set_text(_clean_plot_text(fig._suptitle.get_text()))
+        for ax in fig.get_axes():
+            ax.set_axisbelow(True)
+            if 'top' in ax.spines:
+                ax.spines['top'].set_visible(False)
+            if 'right' in ax.spines:
+                ax.spines['right'].set_visible(False)
+            ax.set_title(_clean_plot_text(ax.get_title()), pad=10)
+            ax.set_xlabel(_clean_plot_text(ax.get_xlabel()))
+            ax.set_ylabel(_clean_plot_text(ax.get_ylabel()))
+            try:
+                xt_objs = ax.get_xticklabels()
+                xt = [ _clean_plot_text(t.get_text()) for t in xt_objs ]
+                if any(xt):
+                    ax.set_xticklabels(xt)
+                non_empty_xt = [s for s in xt if s]
+                has_category_names = any(not _is_number_text(s) or len(s) > 4 for s in non_empty_xt)
+                if len(non_empty_xt) >= 2 and has_category_names:
+                    for t in ax.get_xticklabels():
+                        if t.get_rotation() == 0:
+                            t.set_rotation(25)
+                            t.set_ha('right')
+                            t.set_rotation_mode('anchor')
+            except Exception:
+                pass
+            try:
+                yt = [ _clean_plot_text(t.get_text()) for t in ax.get_yticklabels() ]
+                if any(yt):
+                    ax.set_yticklabels(yt)
+            except Exception:
+                pass
+            max_text_y = None
+            for txt in ax.texts:
+                txt.set_text(_clean_plot_text(txt.get_text()))
+                try:
+                    _, ty = txt.get_position()
+                    if isinstance(ty, (int, float, np.floating)) and math.isfinite(float(ty)):
+                        if max_text_y is None or float(ty) > max_text_y:
+                            max_text_y = float(ty)
+                except Exception:
+                    pass
+            if max_text_y is not None:
+                try:
+                    y0, y1 = ax.get_ylim()
+                    if y1 > y0 and max_text_y >= y1 * 0.92:
+                        ax.set_ylim(y0, max(y1, max_text_y) * 1.12)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
 def _format_cell(val):
     if val is None:
         return ''
@@ -568,7 +649,25 @@ def _format_cell(val):
             return ''
     except Exception:
         pass
-    return str(val)
+    if isinstance(val, (bool, np.bool_)):
+        return str(val)
+    if isinstance(val, (int, np.integer)):
+        return str(int(val))
+    if isinstance(val, (float, np.floating)):
+        fval = float(val)
+        if not math.isfinite(fval):
+            return ''
+        if fval.is_integer():
+            return str(int(fval))
+        return f"{fval:.1f}"
+    s = str(val).strip()
+    if re.match(r'^-?\\d+\\.\\d{2,}$', s):
+        try:
+            fval = float(s)
+            return str(int(fval)) if fval.is_integer() else f"{fval:.1f}"
+        except Exception:
+            pass
+    return s
 
 def __tabula_run__(user_code, csv_content=None, extra_csvs=None):
     old_stdout = sys.stdout
@@ -629,13 +728,32 @@ def __tabula_run__(user_code, csv_content=None, extra_csvs=None):
         _before_dfs = {
             _k: id(_v)
             for _k, _v in list(globals().items())
-            if not _k.startswith('_') and isinstance(_v, pd.DataFrame)
+            if not _k.startswith('_') and isinstance(_v, (pd.DataFrame, pd.Series))
         }
         globals().pop('__tabula_exported_df__', None)
-        
-        # Execute user code in the global environment
-        compiled = compile(user_code, '<input>', 'exec')
-        exec(compiled, globals())
+        _preview_df_override = None
+
+        # Execute user code; if the final statement is a bare expression (like df.head(10)), capture its value
+        _parsed_tree = None
+        try:
+            _parsed_tree = ast.parse(user_code, '<input>', 'exec')
+        except Exception:
+            _parsed_tree = None
+
+        if _parsed_tree and len(_parsed_tree.body) > 0 and isinstance(_parsed_tree.body[-1], ast.Expr):
+            _last_node = _parsed_tree.body[-1]
+            _prefix_mod = ast.Module(body=_parsed_tree.body[:-1], type_ignores=[])
+            if len(_prefix_mod.body) > 0:
+                exec(compile(_prefix_mod, '<input>', 'exec'), globals())
+            _expr_mod = ast.Expression(body=_last_node.value)
+            _last_val = eval(compile(_expr_mod, '<input>', 'eval'), globals())
+            if isinstance(_last_val, pd.DataFrame) and len(_last_val) > 0:
+                _preview_df_override = _last_val
+            elif isinstance(_last_val, pd.Series) and len(_last_val) > 0:
+                _preview_df_override = _last_val.reset_index()
+        else:
+            compiled = compile(user_code, '<input>', 'exec')
+            exec(compiled, globals())
 
         # If script produced a merged/output frame without reassigning df, promote it
         _current_df = globals().get('df')
@@ -648,8 +766,8 @@ def __tabula_run__(user_code, csv_content=None, extra_csvs=None):
                 and list(_current_df.columns) == _initial_cols
             )
         )
+        _promoted = None
         if _df_unchanged:
-            _promoted = None
             _exported = globals().get('__tabula_exported_df__')
             if isinstance(_exported, pd.DataFrame) and len(_exported) > 0:
                 _promoted = _exported
@@ -657,12 +775,16 @@ def __tabula_run__(user_code, csv_content=None, extra_csvs=None):
                 for _cand in (
                     'out', 'merged', 'combined', 'all_classes', 'all_data',
                     'master', 'result_df', 'final_df', 'cleaned', 'summary',
+                    'summary_df', 'grouped', 'stats', 'top_df', 'table_df',
                 ):
                     _val = globals().get(_cand)
-                    if isinstance(_val, pd.DataFrame) and len(_val) > 0:
+                    if isinstance(_val, pd.DataFrame) and len(_val) > 0 and id(_val) != _before_dfs.get(_cand):
                         _promoted = _val
                         break
-            if _promoted is None:
+                    elif isinstance(_val, pd.Series) and 0 < len(_val) <= 200 and id(_val) != _before_dfs.get(_cand):
+                        _preview_df_override = _val.reset_index()
+                        break
+            if _promoted is None and _preview_df_override is None:
                 _best_rows = 0
                 for _k, _v in list(globals().items()):
                     if _k.startswith('_') or _k in ('df', 'dfs'):
@@ -676,20 +798,25 @@ def __tabula_run__(user_code, csv_content=None, extra_csvs=None):
         # Collect all generated matplotlib figures
         for fig_num in plt.get_fignums():
             fig = plt.figure(fig_num)
+            _polish_figure(fig)
             img_buf = io.BytesIO()
-            fig.savefig(img_buf, format='png', bbox_inches='tight', dpi=140)
+            fig.savefig(img_buf, format='png', bbox_inches='tight', dpi=150)
             img_buf.seek(0)
             encoded = 'data:image/png;base64,' + base64.b64encode(img_buf.read()).decode('ascii')
             output_images.append(encoded)
             plt.close(fig)
             
         # Collect updated DataFrame metadata and preview if present
-        if 'df' in globals() and isinstance(globals()['df'], pd.DataFrame):
-            _target_df = _dedup_df_cols(globals()['df'])
-            globals()['df'] = _target_df
+        _active_table_df = _preview_df_override if isinstance(_preview_df_override, pd.DataFrame) else globals().get('df')
+        if isinstance(_active_table_df, pd.DataFrame):
+            _target_df = _dedup_df_cols(_active_table_df)
+            if _preview_df_override is None:
+                globals()['df'] = _target_df
+            _df_was_changed = bool(not _df_unchanged or _promoted is not None or _preview_df_override is not None)
             df_info = {
                 'shape': list(_target_df.shape),
-                'columns': [str(c) for c in _target_df.columns]
+                'columns': [str(c) for c in _target_df.columns],
+                'dfChanged': _df_was_changed
             }
             try:
                 # Generate clean preview and CSV

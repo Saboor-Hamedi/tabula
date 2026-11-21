@@ -18,6 +18,7 @@ export interface DataTableProps {
   headers: string[]
   rows: string[][]
   alignments?: ('left' | 'right' | 'center')[]
+  totalRows?: number
 }
 
 export type ColumnAlign = 'left' | 'right' | 'center'
@@ -40,9 +41,40 @@ export function isNumericOrStatValue(value: string): boolean {
   return false
 }
 
+/**
+ * Formats decimal numbers inside table cells to at most 1 decimal place
+ * (e.g. "94.4444434343" -> "94.4", "94.0000" -> "94", "94.34%" -> "94.3%")
+ * while leaving dates, IDs, and prose strings untouched.
+ */
+export function formatTableCellText(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  // Match pure or currency/percent decimal numbers: e.g. 94.444443, $1,234.567, 88.25%
+  const singleMatch = /^([$€£₨¥]?)([+-]?\d[\d,]*)\.(\d{2,})(%?)$/.exec(trimmed)
+  if (singleMatch) {
+    const [, prefix, intPart, decPart, suffix] = singleMatch
+    const num = Number.parseFloat(`${intPart.replace(/,/g, '')}.${decPart}`)
+    if (Number.isFinite(num)) {
+      const rounded = Math.round(num * 10) / 10
+      const formatted = Number.isInteger(rounded)
+        ? rounded.toLocaleString('en-US')
+        : rounded.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      return `${prefix}${formatted}${suffix}`
+    }
+  }
+  // Also round embedded long floats (3+ decimals) inside composite stat cells like "94.4444 ± 1.2888"
+  return trimmed.replace(/(-?\d+)\.(\d{2,})(%?)/g, (full, intP: string, decP: string, pct: string) => {
+    const num = Number.parseFloat(`${intP}.${decP}`)
+    if (!Number.isFinite(num)) return full
+    const rounded = Math.round(num * 10) / 10
+    return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)}${pct}`
+  })
+}
+
 /** Renders a cell's inline markdown tokens. */
 function CellValue({ value }: { value: string }) {
-  const tokens = useMemo(() => parseInlineMarkdown(value), [value])
+  const formatted = useMemo(() => formatTableCellText(value), [value])
+  const tokens = useMemo(() => parseInlineMarkdown(formatted), [formatted])
 
   if (tokens.length === 0) return <span className="cell-empty">—</span>
 
@@ -62,6 +94,7 @@ export const DataTable = memo(function DataTable({
   headers = [],
   rows = [],
   alignments = [],
+  totalRows,
 }: DataTableProps) {
   const sessionActions = useContext(SessionActionsContext)
   const [copied, setCopied] = useState(false)
@@ -211,9 +244,11 @@ export const DataTable = memo(function DataTable({
 
       <div className="data-table-foot">
         <span>
-          {safeRows.length > MAX_PREVIEW_ROWS
-            ? `Showing ${formatCount(MAX_PREVIEW_ROWS)} of ${formatCount(safeRows.length)} rows`
-            : `${formatCount(safeRows.length)} row${safeRows.length === 1 ? '' : 's'}`}
+          {typeof totalRows === 'number' && totalRows > visibleRows.length
+            ? `Showing ${formatCount(visibleRows.length)} of ${formatCount(totalRows)} rows`
+            : safeRows.length > MAX_PREVIEW_ROWS
+              ? `Showing ${formatCount(MAX_PREVIEW_ROWS)} of ${formatCount(safeRows.length)} rows`
+              : `${formatCount(safeRows.length)} row${safeRows.length === 1 ? '' : 's'}`}
         </span>
         <div className="data-table-foot-actions">
           {sessionActions ? (

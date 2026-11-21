@@ -6,8 +6,23 @@ import { runPython } from '../python'
 import { buildExtraDatasets } from '../python/extraDatasets'
 import { DIGEST_MAX_TABLES, MAX_AGENT_STEPS, MAX_RESULT_ROWS } from '../constants'
 import type { PythonExecutionResult } from '../python'
-import type { Session, TableProfile, TableSummary, ToolName, ToolResultPayload, ToolTraceEntry } from '../types'
-import { compactPythonToolResult, stripCodeFences } from '../../tabula/utils/agentHelpers'
+import type {
+  ExecutedCodeStep,
+  ExecutedCodeTable,
+  Session,
+  TableProfile,
+  TableSummary,
+  ToolName,
+  ToolResultPayload,
+  ToolTraceEntry,
+} from '../types'
+import {
+  compactPythonToolResult,
+  compactSqlToolResult,
+  formatPythonForDisplay,
+  formatSqlForDisplay,
+  stripCodeFences,
+} from '../../tabula/utils/agentHelpers'
 import {
   createTraceEntry,
   createTraceId,
@@ -26,6 +41,7 @@ export interface ToolContext {
   allSessions?: Session[]
   onTrace: (entry: ToolTraceEntry) => void
   onPythonResult?: (result: PythonExecutionResult) => void
+  onCodeStep?: (step: ExecutedCodeStep) => void
 }
 
 interface ResolvedTableTarget {
@@ -104,7 +120,7 @@ function listAvailableTargets(context: ToolContext): string[] {
 }
 
 const CACHE_LIMIT = 40
-const queryCache = new Map<string, ToolResultPayload>()
+const queryCache = new Map<string, { payload: ToolResultPayload; table?: ExecutedCodeTable; elapsedMs: number }>()
 const schemaCache = new Map<string, ToolResultPayload>()
 
 function cacheResult(
@@ -216,17 +232,39 @@ async function inspectSchema(
 async function runSql(
   args: Record<string, unknown>,
   context: ToolContext,
+  stepId: string,
 ): Promise<ToolResultPayload> {
   const rawSql = readString(args, 'sql')
   if (!rawSql) {
     return { error: 'The "sql" argument is required and must be a non-empty string.' }
   }
   const sql = stripCodeFences(rawSql)
+  const cleanSql = formatSqlForDisplay(sql)
 
   const purpose = readString(args, 'purpose')
   const cacheKey = `${context.schemaName}:${normalizeSql(sql)}`
   const cached = queryCache.get(cacheKey)
-  if (cached) return { ...cached, cached: true }
+  if (cached) {
+    context.onCodeStep?.({
+      id: stepId,
+      language: 'sql',
+      code: cleanSql,
+      purpose: purpose ?? undefined,
+      status: 'done',
+      elapsedMs: cached.elapsedMs,
+      table: cached.table,
+    })
+    return { ...cached.payload, cached: true }
+  }
+
+  // Stream the SQL code block into the chat response immediately while it executes
+  context.onCodeStep?.({
+    id: stepId,
+    language: 'sql',
+    code: cleanSql,
+    purpose: purpose ?? undefined,
+    status: 'running',
+  })
 
   const limitMatch = /\blimit\s+(\d+)\b/i.exec(sql)
   const explicitLimit = limitMatch ? parseInt(limitMatch[1], 10) : undefined
@@ -242,37 +280,57 @@ async function runSql(
     readOnly: true,
   })
 
-  const compactRows = Array.isArray(result.rows)
+  const tableRows: string[][] = Array.isArray(result.rows)
     ? result.rows.map((row) =>
-        Array.isArray(row)
-          ? row.map((cell) =>
-              typeof cell === 'string' && cell.length > 120
-                ? `${cell.slice(0, 117)}…`
-                : cell,
-            )
-          : row,
+        result.columns.map((col) => {
+          if (!row || typeof row !== 'object') return ''
+          const cell = (row as Record<string, unknown>)[col]
+          return cell === null || cell === undefined ? '' : String(cell)
+        }),
       )
-    : result.rows
+    : []
 
-  return cacheResult(queryCache, cacheKey, {
-    ...result,
-    rows: compactRows,
+  const uiTable: ExecutedCodeTable | undefined =
+    result.columns.length > 0
+      ? {
+          headers: result.columns,
+          rows: tableRows,
+          totalRows: result.rowCount,
+          totalCols: result.columns.length,
+        }
+      : undefined
+
+  context.onCodeStep?.({
+    id: stepId,
+    language: 'sql',
+    code: cleanSql,
     purpose: purpose ?? undefined,
-    note: result.truncated
-      ? `Results were capped at ${result.returnedRows} returned rows out of ${result.rowCount}. Aggregate or filter further if you need the full picture.`
-      : undefined,
+    status: 'done',
+    elapsedMs: result.elapsedMs,
+    table: uiTable,
   })
+
+  const payload = compactSqlToolResult(result, purpose)
+  if (queryCache.size >= CACHE_LIMIT) {
+    const oldest = queryCache.keys().next().value
+    if (oldest !== undefined) queryCache.delete(oldest)
+  }
+  queryCache.set(cacheKey, { payload, table: uiTable, elapsedMs: result.elapsedMs })
+  return payload
 }
 
 async function runPythonTool(
   args: Record<string, unknown>,
   context: ToolContext,
+  stepId: string,
 ): Promise<ToolResultPayload> {
   const rawCode = readString(args, 'code')
   if (!rawCode) {
     return { error: 'The "code" argument is required and must be a non-empty string.' }
   }
   const code = stripCodeFences(rawCode)
+  const cleanPy = formatPythonForDisplay(code)
+  const purpose = readString(args, 'purpose') ?? undefined
 
   const available = Array.isArray(context.tableNames) ? context.tableNames : []
   const requestedTable = readString(args, 'table')
@@ -324,6 +382,15 @@ async function runPythonTool(
     )
   }
 
+  // Stream the Python code block into the chat response immediately while Pyodide runs it
+  context.onCodeStep?.({
+    id: stepId,
+    language: 'python',
+    code: cleanPy,
+    purpose,
+    status: 'running',
+  })
+
   const result = await runPython(code, {
     connection: context.handle?.connection ?? null,
     schemaName: targetSchema,
@@ -331,13 +398,42 @@ async function runPythonTool(
     extraDatasets: extraDatasets.length > 0 ? extraDatasets : undefined,
   })
 
-  // Synchronize with the UI's Python Results tab so transformed df and plots appear immediately
   if (context.onPythonResult && result) {
     try {
       context.onPythonResult(result)
     } catch {
       // Ignore UI callback errors
     }
+  }
+
+  if (result && !result.error) {
+    const hasImages = Array.isArray(result.images) && result.images.length > 0
+    const cleanStdout = result.stdout?.trim() || undefined
+    const dfWasModified = result.dfInfo?.dfChanged !== false
+    const includeTable =
+      result.dfPreview &&
+      Array.isArray(result.dfPreview.columns) &&
+      result.dfPreview.columns.length > 0 &&
+      (dfWasModified || (!hasImages && !cleanStdout))
+
+    context.onCodeStep?.({
+      id: stepId,
+      language: 'python',
+      code: cleanPy,
+      purpose,
+      status: 'done',
+      elapsedMs: result.elapsedMs,
+      images: hasImages ? result.images : undefined,
+      table: includeTable
+        ? {
+            headers: result.dfPreview!.columns,
+            rows: result.dfPreview!.rows,
+            totalRows: result.dfPreview!.totalRows,
+            totalCols: result.dfPreview!.totalCols,
+          }
+        : undefined,
+      stdout: cleanStdout,
+    })
   }
 
   return compactPythonToolResult(result)
@@ -377,9 +473,9 @@ export async function executeTool(
     if (toolName === 'inspect_schema') {
       result = await inspectSchema(args, context)
     } else if (toolName === 'run_sql') {
-      result = await runSql(args, context)
+      result = await runSql(args, context, traceId)
     } else {
-      result = await runPythonTool(args, context)
+      result = await runPythonTool(args, context, traceId)
     }
 
     if (result.error && !result.availableTables) {

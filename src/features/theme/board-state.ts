@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react';
+import { clampPromptInput, countWords } from '../../core/utils/promptGuard';
 import { NOTE_COLORS } from './colors';
 import { clampPoint, type Size } from './geometry';
 import {
@@ -8,6 +9,44 @@ import {
   type NoteItem,
   type StickerItem,
 } from './types';
+
+export const MAX_NOTE_WORDS = 200;
+
+/**
+ * Strips Markdown symbols (fences, tables, headings, bold/italic markers, backticks, rules)
+ * so sticky notes only show clean, readable plain text.
+ */
+export function stripNoteMarkdown(raw: string): string {
+  const withoutFences = raw.replace(/```[\s\S]*?```/g, '').trim();
+  const base = withoutFences.length > 0 ? withoutFences : raw;
+  return base
+    .replace(/^\s*\|.*\|\s*$/gm, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-*_]{3,}\s*$/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s.,;:!?)]|$)/g, '$1$2')
+    .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/g, '$1$2')
+    .replace(/[*`~#_]{2,}/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Cleans and clamps note text to a strict 200-word maximum.
+ * Strips fenced code/chart blocks and Markdown symbols so notes stay clean prose.
+ */
+export function clampNoteText(raw: string): string {
+  return clampPromptInput(stripNoteMarkdown(raw), MAX_NOTE_WORDS);
+}
+
+export { countWords as countNoteWords };
 
 /* ------------------------------------------------------------------ */
 /* Factories                                                           */
@@ -21,6 +60,7 @@ const createId = (): string =>
 const randomTilt = (): number => Math.round((Math.random() * 7 - 3.5) * 10) / 10;
 
 export function createNote(overrides: Partial<Omit<NoteItem, 'kind' | 'id'>> = {}): NoteItem {
+  const rawText = typeof overrides.text === 'string' ? overrides.text : '';
   return {
     id: createId(),
     kind: 'note',
@@ -29,8 +69,8 @@ export function createNote(overrides: Partial<Omit<NoteItem, 'kind' | 'id'>> = {
     z: 0,
     rotate: randomTilt(),
     color: 'butter',
-    text: '',
     ...overrides,
+    text: clampNoteText(rawText),
   };
 }
 
@@ -90,10 +130,12 @@ function reducer(state: BoardState, action: Action): BoardState {
       const z = state.topZ + 1;
       return { items: [...state.items, { ...action.item, z }], topZ: z };
     }
-    case 'text':
+    case 'text': {
+      const clamped = clampNoteText(action.text);
       return patch(state, action.id, (item) =>
-        item.kind === 'note' && item.text !== action.text ? { ...item, text: action.text } : item,
+        item.kind === 'note' && item.text !== clamped ? { ...item, text: clamped } : item,
       );
+    }
     case 'color':
       return patch(state, action.id, (item) =>
         item.kind === 'note' && item.color !== action.color
@@ -156,7 +198,12 @@ function loadItems(key: string): BoardItem[] | null {
     const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isBoardItem) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(isBoardItem)
+      .map((item) =>
+        item.kind === 'note' ? { ...item, text: clampNoteText(item.text) } : item,
+      );
   } catch {
     return [];
   }

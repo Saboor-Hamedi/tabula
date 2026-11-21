@@ -1,15 +1,37 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import type { SeriesChartData } from '../../core/types'
-import { formatCompact } from '../../core/utils/format'
 import { annotationBackground, CHART_COLORS, niceMax } from './chartTheme'
 
-/** Bar, line and scatter figures with an optional highlighted point/category. */
-const WIDTH = 760
-const HEIGHT = 420
-const MARGIN = { top: 64, right: 32, bottom: 64, left: 76 }
+/** Bar, line, pie, and scatter figures with direct bar labels and optional highlight. */
+const WIDTH = 680
+const HEIGHT = 342
+const MARGIN = { top: 56, right: 28, bottom: 74, left: 64 }
 
-function shortenLabel(label: string): string {
-  return label.length > 15 ? `${label.slice(0, 14)}…` : label
+function cleanChartText(raw: string | undefined): string {
+  if (!raw) return ''
+  return raw
+    .replace(/\s*[([][nN]\s*=\s*\d+\s*[)\]]/g, '')
+    .replace(/(-?\d+)\.(\d{2,})(%?)/g, (_m, intP: string, decP: string, pct: string) => {
+      const n = Number.parseFloat(`${intP}.${decP}`)
+      if (!Number.isFinite(n)) return _m
+      const r = Math.round(n * 10) / 10
+      return `${Number.isInteger(r) ? String(r) : r.toFixed(1)}${pct}`
+    })
+    .trim()
+}
+
+function formatChartNum(val: number): string {
+  if (!Number.isFinite(val)) return '0'
+  const abs = Math.abs(val)
+  if (abs >= 1_000_000) return `${(val / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (abs >= 10_000) return `${(val / 1_000).toFixed(1).replace(/\.0$/, '')}k`
+  const rounded = Math.round(val * 10) / 10
+  return Number.isInteger(rounded) ? rounded.toLocaleString('en-US') : rounded.toFixed(1)
+}
+
+function shortenLabel(label: string, maxLen = 15): string {
+  const clean = cleanChartText(label)
+  return clean.length > maxLen ? `${clean.slice(0, maxLen - 1)}…` : clean
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -44,14 +66,24 @@ function describeArcSlice(
 }
 
 export function SeriesChart({ data }: { data: SeriesChartData }) {
+  const uid = useId().replace(/:/g, '')
+  const barGradId = `bar-grad-${uid}`
+  const hiGradId = `hi-grad-${uid}`
+  const areaGradId = `area-grad-${uid}`
+
   const textColor = data.textColor ?? 'var(--text)'
   const highlightColor = data.textColor ?? CHART_COLORS.highlight
+  const cleanTitle = cleanChartText(data.title)
+  const cleanNote = cleanChartText(data.note)
+  const cleanXLabel = cleanChartText(data.xLabel)
+  const cleanYLabel = cleanChartText(data.yLabel)
+  const isPercentAxis = /%|percent|rate|share/i.test(`${cleanTitle} ${cleanYLabel}`)
 
   const pieSlices = useMemo(() => {
     const rawPoints = Array.isArray(data?.points) ? data.points : []
     const positive = rawPoints
       .map((p, idx) => ({
-        label: p?.label ?? `Item ${idx + 1}`,
+        label: cleanChartText(p?.label) || `Item ${idx + 1}`,
         value: Math.max(0, Number(p?.value) || 0),
         index: idx,
       }))
@@ -84,12 +116,12 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
     const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom
     const rawMax = Math.max(...pointsList.map((point) => point?.value ?? 0), 0)
     const rawMin = Math.min(...pointsList.map((point) => point?.value ?? 0), 0)
-    const yMax = niceMax(rawMax)
+    const yMax = niceMax(rawMax * 1.08)
     const yMin = rawMin < 0 ? -niceMax(-rawMin) : 0
     const ySpan = yMax - yMin || 1
     const count = Math.max(pointsList.length, 1)
     const slot = plotWidth / count
-    const barWidth = Math.max(4, Math.min(54, slot * 0.62))
+    const barWidth = Math.max(8, Math.min(44, slot * 0.56))
 
     const y = (value: number) =>
       MARGIN.top + plotHeight - ((value - yMin) / ySpan) * plotHeight
@@ -97,6 +129,7 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
 
     const points = pointsList.map((point, index) => ({
       ...point,
+      label: cleanChartText(point?.label),
       index,
       x: centerX(index),
       y: y(point?.value ?? 0),
@@ -104,67 +137,73 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
     const line = points
       .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`)
       .join(' ')
+    const area =
+      points.length > 1
+        ? `${line} L${points[points.length - 1].x},${MARGIN.top + plotHeight} L${points[0].x},${MARGIN.top + plotHeight} Z`
+        : ''
     const yTicks = Array.from({ length: 5 }, (_, index) => {
       const value = yMin + (ySpan * index) / 4
       return { value, y: y(value) }
     })
 
-    return { plotWidth, plotHeight, points, line, yTicks, barWidth, slot }
+    return { plotWidth, plotHeight, points, line, area, yTicks, barWidth, slot }
   }, [data?.points])
 
   const highlighted =
     data?.highlightIndex !== undefined && geometry.points[data.highlightIndex]
       ? geometry.points[data.highlightIndex]
       : undefined
-  const calloutLabel =
+  const calloutLabel = cleanChartText(
     data?.highlightLabel ??
-    (highlighted ? `${highlighted.label ?? ''}: ${formatCompact(highlighted.value ?? 0)}` : '')
-  const calloutWidth = Math.max(112, (calloutLabel?.length ?? 0) * 7.4 + 26)
+      (highlighted
+        ? `${highlighted.label ?? ''}: ${formatChartNum(highlighted.value ?? 0)}${isPercentAxis ? '%' : ''}`
+        : ''),
+  )
+  const calloutWidth = Math.max(96, (calloutLabel?.length ?? 0) * 6.8 + 22)
   const calloutX = highlighted
     ? Math.min(
         WIDTH - MARGIN.right - calloutWidth / 2,
         Math.max(MARGIN.left + calloutWidth / 2, highlighted.x),
       )
     : 0
-  const calloutY = highlighted
-    ? Math.max(MARGIN.top + 18, highlighted.y - 30)
-    : 0
+  const calloutY = highlighted ? Math.max(MARGIN.top + 16, highlighted.y - 26) : 0
   const labelStep = Math.ceil(Math.max(geometry.points.length, 1) / 12)
+  const rotateLabels = geometry.points.length >= 2
 
   if (data.kind === 'pie') {
-    const cx = 240
-    const cy = 236
-    const rOuter = 132
-    const rInner = 56
+    const cx = 210
+    const cy = 186
+    const rOuter = 104
+    const rInner = 46
     return (
       <div className="series-chart">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           role="img"
-          aria-label={`${data.title}. pie chart.`}
+          aria-label={`${cleanTitle}. pie chart.`}
           data-export-text-color={data.textColor ?? undefined}
         >
           <text
             className="series-chart-text"
             x={WIDTH / 2}
-            y={30}
+            y={26}
             textAnchor="middle"
             style={{ fill: textColor }}
-            fontSize="18"
+            fontSize="15"
             fontWeight="700"
           >
-            {data.title}
+            {cleanTitle}
           </text>
-          {data.note ? (
+          {cleanNote ? (
             <text
               className="series-chart-text"
               x={WIDTH / 2}
-              y={50}
+              y={44}
               textAnchor="middle"
-              style={{ fill: textColor }}
-              fontSize="12"
+              style={{ fill: textColor, opacity: 0.75 }}
+              fontSize="11.5"
             >
-              {data.note}
+              {cleanNote}
             </text>
           ) : null}
 
@@ -179,29 +218,31 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
           ))}
 
           {pieSlices.map((slice, idx) => {
-            const legendY = 92 + idx * 28
+            const legendY = 78 + idx * 24
+            const pctText = `${Number.isInteger(slice.pct) ? slice.pct : slice.pct.toFixed(1)}%`
             return (
-              <g key={`legend-${slice.index}`} transform={`translate(430, ${legendY})`}>
-                <rect x={0} y={-10} width={12} height={12} rx={3} fill={slice.color} />
+              <g key={`legend-${slice.index}`} transform={`translate(370, ${legendY})`}>
+                <rect x={0} y={-9} width={11} height={11} rx={3} fill={slice.color} />
                 <text
                   className="series-chart-text"
-                  x={20}
+                  x={18}
                   y={0}
                   style={{ fill: textColor }}
-                  fontSize="12"
+                  fontSize="11.5"
                   fontWeight="600"
                 >
-                  {shortenLabel(slice.label)}
+                  {shortenLabel(slice.label, 20)}
                 </text>
                 <text
                   className="series-chart-text"
-                  x={280}
+                  x={260}
                   y={0}
                   textAnchor="end"
                   style={{ fill: textColor }}
-                  fontSize="12"
+                  fontSize="11.5"
+                  fontWeight="600"
                 >
-                  {formatCompact(slice.value)} ({slice.pct}%)
+                  {pctText}
                 </text>
               </g>
             )
@@ -216,30 +257,45 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label={`${data.title}. ${data.kind} chart.`}
+        aria-label={`${cleanTitle}. ${data.kind} chart.`}
         data-export-text-color={data.textColor ?? undefined}
       >
+        <defs>
+          <linearGradient id={barGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#1d4ed8" />
+          </linearGradient>
+          <linearGradient id={hiGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f43f5e" />
+            <stop offset="100%" stopColor="#e11d48" />
+          </linearGradient>
+          <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={CHART_COLORS.line} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={CHART_COLORS.line} stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+
         <text
           className="series-chart-text"
           x={WIDTH / 2}
-          y={30}
+          y={24}
           textAnchor="middle"
           style={{ fill: textColor }}
-          fontSize="18"
+          fontSize="15"
           fontWeight="700"
         >
-          {data.title}
+          {cleanTitle}
         </text>
-        {data.note ? (
+        {cleanNote ? (
           <text
             className="series-chart-text"
             x={WIDTH / 2}
-            y={50}
+            y={42}
             textAnchor="middle"
-            style={{ fill: textColor }}
-            fontSize="12"
+            style={{ fill: textColor, opacity: 0.75 }}
+            fontSize="11"
           >
-            {data.note}
+            {cleanNote}
           </text>
         ) : null}
 
@@ -252,65 +308,76 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
               y2={tick.y}
               stroke={CHART_COLORS.grid}
               strokeWidth="1"
+              strokeDasharray="3 3"
             />
             <text
               className="series-chart-text"
-              x={MARGIN.left - 12}
+              x={MARGIN.left - 10}
               y={tick.y + 4}
               textAnchor="end"
-              style={{ fill: textColor }}
-              fontSize="11"
+              style={{ fill: textColor, opacity: 0.78 }}
+              fontSize="10.5"
             >
-              {formatCompact(tick.value)}
+              {formatChartNum(tick.value)}
             </text>
           </g>
         ))}
 
         <line
           x1={MARGIN.left}
-          y1={MARGIN.top}
-          x2={MARGIN.left}
-          y2={HEIGHT - MARGIN.bottom}
-          stroke={CHART_COLORS.axis}
-          strokeWidth="1.5"
-        />
-        <line
-          x1={MARGIN.left}
           y1={HEIGHT - MARGIN.bottom}
           x2={WIDTH - MARGIN.right}
           y2={HEIGHT - MARGIN.bottom}
           stroke={CHART_COLORS.axis}
-          strokeWidth="1.5"
+          strokeWidth="1.2"
         />
 
         {data.kind === 'bar'
           ? geometry.points.map((point) => {
               const top = Math.min(point.y, HEIGHT - MARGIN.bottom)
-              const height = Math.max(1, HEIGHT - MARGIN.bottom - point.y)
+              const height = Math.max(2, HEIGHT - MARGIN.bottom - point.y)
               const active = point.index === data.highlightIndex
+              const valLabel = `${formatChartNum(point.value ?? 0)}${isPercentAxis ? '%' : ''}`
               return (
-                <rect
-                  key={`${point.label}-${point.index}`}
-                  x={point.x - geometry.barWidth / 2}
-                  y={top}
-                  width={geometry.barWidth}
-                  height={height}
-                  rx="4"
-                  fill={active ? highlightColor : CHART_COLORS.palette[point.index % CHART_COLORS.palette.length]}
-                />
+                <g key={`${point.label}-${point.index}`}>
+                  <rect
+                    x={point.x - geometry.barWidth / 2}
+                    y={top}
+                    width={geometry.barWidth}
+                    height={height}
+                    rx="4"
+                    fill={active ? `url(#${hiGradId})` : `url(#${barGradId})`}
+                  />
+                  {geometry.points.length <= 14 && !active ? (
+                    <text
+                      className="series-chart-text"
+                      x={point.x}
+                      y={Math.max(MARGIN.top - 4, top - 6)}
+                      textAnchor="middle"
+                      style={{ fill: textColor }}
+                      fontSize="10"
+                      fontWeight="600"
+                    >
+                      {valLabel}
+                    </text>
+                  ) : null}
+                </g>
               )
             })
           : null}
 
         {data.kind === 'line' ? (
-          <path
-            d={geometry.line}
-            fill="none"
-            stroke={CHART_COLORS.line}
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
+          <>
+            {geometry.area ? <path d={geometry.area} fill={`url(#${areaGradId})`} /> : null}
+            <path
+              d={geometry.line}
+              fill="none"
+              stroke={CHART_COLORS.line}
+              strokeWidth="2.4"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </>
         ) : null}
 
         {data.kind !== 'bar'
@@ -319,7 +386,7 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
                 key={`${point.label}-${point.index}`}
                 cx={point.x}
                 cy={point.y}
-                r={data.kind === 'scatter' ? 5 : 4}
+                r={data.kind === 'scatter' ? 4.5 : 3.5}
                 fill="#ffffff"
                 stroke={CHART_COLORS.point}
                 strokeWidth="2"
@@ -329,42 +396,23 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
 
         {highlighted ? (
           <>
-            <line
-              x1={highlighted.x}
-              y1={highlighted.y}
-              x2={highlighted.x}
-              y2={HEIGHT - MARGIN.bottom}
-              stroke={CHART_COLORS.highlight}
-              strokeWidth="1.5"
-              strokeDasharray="4 4"
-              opacity="0.6"
-            />
-            <circle
-              cx={highlighted.x}
-              cy={highlighted.y}
-              r="15"
-              fill={CHART_COLORS.highlightSoft}
-              fillOpacity="0.3"
-              stroke={CHART_COLORS.highlight}
-              strokeWidth="2.5"
-            />
             <rect
               x={calloutX - calloutWidth / 2}
-              y={calloutY - 22}
+              y={calloutY - 20}
               width={calloutWidth}
-              height="26"
-              rx="13"
+              height="22"
+              rx="11"
               fill={annotationBackground(highlightColor)}
               stroke={highlightColor}
-              strokeWidth="1.5"
+              strokeWidth="1.4"
             />
             <text
               className="series-chart-annotation"
               x={calloutX}
-              y={calloutY - 4}
+              y={calloutY - 5}
               textAnchor="middle"
               style={{ fill: highlightColor }}
-              fontSize="12"
+              fontSize="11"
               fontWeight="700"
             >
               {calloutLabel}
@@ -378,12 +426,17 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
               key={`label-${point.index}`}
               className="series-chart-text"
               x={point.x}
-              y={HEIGHT - MARGIN.bottom + 20}
-              textAnchor="middle"
+              y={HEIGHT - MARGIN.bottom + 14}
+              textAnchor={rotateLabels ? 'end' : 'middle'}
+              transform={
+                rotateLabels
+                  ? `rotate(-25 ${point.x} ${HEIGHT - MARGIN.bottom + 14})`
+                  : undefined
+              }
               style={{ fill: textColor }}
-              fontSize="11"
+              fontSize="10.5"
             >
-              {shortenLabel(point.label)}
+              {shortenLabel(point.label, 16)}
             </text>
           ) : null,
         )}
@@ -391,25 +444,25 @@ export function SeriesChart({ data }: { data: SeriesChartData }) {
         <text
           className="series-chart-text"
           x={(MARGIN.left + WIDTH - MARGIN.right) / 2}
-          y={HEIGHT - 18}
+          y={HEIGHT - 8}
           textAnchor="middle"
-          style={{ fill: textColor }}
-          fontSize="12"
+          style={{ fill: textColor, opacity: 0.85 }}
+          fontSize="11"
           fontWeight="600"
         >
-          {data.xLabel}
+          {cleanXLabel}
         </text>
         <text
           className="series-chart-text"
-          x={18}
+          x={16}
           y={(MARGIN.top + HEIGHT - MARGIN.bottom) / 2}
           textAnchor="middle"
-          style={{ fill: textColor }}
-          fontSize="12"
+          style={{ fill: textColor, opacity: 0.85 }}
+          fontSize="11"
           fontWeight="600"
-          transform={`rotate(-90 18 ${(MARGIN.top + HEIGHT - MARGIN.bottom) / 2})`}
+          transform={`rotate(-90 16 ${(MARGIN.top + HEIGHT - MARGIN.bottom) / 2})`}
         >
-          {data.yLabel}
+          {cleanYLabel}
         </text>
       </svg>
     </div>

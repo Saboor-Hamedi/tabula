@@ -66,11 +66,39 @@ export const XY_COLORS = [
 ]
 
 /**
+ * Cleans and repairs Mermaid diagram source before parsing/rendering:
+ * - Removes `(n=12)` sample count noise from labels and titles
+ * - Rounds long decimal numbers (`94.44443`) to 1 decimal place (`94.4`)
+ * - Auto-quotes unquoted flowchart node labels containing special chars (`()`, `%`, `:`)
+ */
+export function sanitizeMermaidCode(raw: string): string {
+  if (!raw) return ''
+  let cleaned = raw
+    .replace(/\s*[([][nN]\s*=\s*\d+\s*[)\]]/g, '')
+    .replace(/(-?\d+)\.(\d{2,})(%?)/g, (_m, intP: string, decP: string, pct: string) => {
+      const num = Number.parseFloat(`${intP}.${decP}`)
+      if (!Number.isFinite(num)) return _m
+      const rounded = Math.round(num * 10) / 10
+      return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)}${pct}`
+    })
+
+  // Auto-quote unquoted flowchart node labels that contain parentheses, colons, or %
+  if (/^\s*(?:flowchart|graph)\b/im.test(cleaned)) {
+    cleaned = cleaned.replace(
+      /\b([A-Za-z0-9_]+)\[([^"\]\n]*[()%:][^"\]\n]*)\]/g,
+      (_m, id: string, label: string) => `${id}["${label.replace(/"/g, "'").trim()}"]`,
+    )
+  }
+
+  return cleaned
+}
+
+/**
  * Extracts structured series points from Mermaid `xychart-beta` or `pie` code
  * so the user can toggle between Bar, Line, Pie, and Table in 1 click.
  */
 export function extractSeriesFromMermaid(code: string): SeriesChartData | null {
-  const trimmed = (code || '').trim()
+  const trimmed = sanitizeMermaidCode((code || '').trim())
   if (!trimmed) return null
 
   const titleMatch = /title\s+"?([^"\n]+)"?/i.exec(trimmed)
@@ -79,8 +107,10 @@ export function extractSeriesFromMermaid(code: string): SeriesChartData | null {
   if (/^\s*(?:%%\{[\s\S]*?\}%%\s*)?xychart(?:-beta)?\b/i.test(trimmed)) {
     const xAxisBracket = /x-axis\s+(?:"([^"]+)"\s+)?\[([^\]]+)\]/i.exec(trimmed)
     const yAxisMatch = /y-axis\s+"([^"]+)"/i.exec(trimmed)
-    const seriesMatch = /^\s*(bar|line)\s+\[([^\]]+)\]/im.exec(trimmed)
-    if (!xAxisBracket || !seriesMatch) return null
+    const allSeriesMatches = Array.from(trimmed.matchAll(/^\s*(bar|line)\s+\[([^\]]+)\]/gim))
+    // Keep multi-series combo charts (e.g. bar + line together) in native Mermaid renderer
+    if (!xAxisBracket || allSeriesMatches.length !== 1) return null
+    const seriesMatch = allSeriesMatches[0]
 
     const labels = Array.from(xAxisBracket[2].matchAll(/"([^"]+)"|'([^']+)'|([^,\s]+)/g)).map(
       (m) => (m[1] ?? m[2] ?? m[3] ?? '').trim(),

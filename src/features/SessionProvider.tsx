@@ -16,6 +16,7 @@ import { closeDuckDB } from "../core/duckdb/closeDuckDB";
 import { ingestCSV } from "../core/duckdb/ingestCSV";
 import { ingestExcel } from "../core/duckdb/ingestExcel";
 import { tableColumns, tableToRows } from "../core/duckdb/result";
+import { runSQL } from "../core/duckdb/runSQL";
 import { buildSchemaName, quoteIdent, quoteString } from "../core/duckdb/sql";
 import { parseCsvToGrid } from "./spreadsheet/utils";
 import { buildDatasetDigest } from "../core/profiling/buildDigest";
@@ -31,7 +32,7 @@ import { buildExtraDatasets } from "../core/python/extraDatasets";
 import {
   buildLocalSuggestions,
 } from "../core/agent/suggestions";
-import { runAgentTurn } from "../core/agent/runAgentTurn";
+import { runAgentTurn, stripLeadingPreamble } from "../core/agent/runAgentTurn";
 import { buildTraceExport, traceExportFileName } from "../core/agent/trace";
 import {
   editFigure as editFigureContent,
@@ -75,6 +76,7 @@ import { downloadFile } from "../core/storage/fileAccess";
 import { inspectWorkbookInWorker } from "../core/workers/excelClient";
 import {
   ACCEPTED_EXTENSIONS,
+  MAX_RESULT_ROWS,
   MAX_UPLOAD_BYTES,
 } from "../core/constants";
 import { recordMetric } from "../core/metrics";
@@ -95,6 +97,8 @@ import { useWorkspacePersistence } from "./session/useWorkspacePersistence";
 import type {
   ChatMessage,
   DatasetDigest,
+  ExecutedCodeStep,
+  ExecutedCodeTable,
   FileKind,
   ModelId,
   PanelTab,
@@ -905,7 +909,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const sendMessage = useCallback(
-    async (rawText: string) => {
+    async (rawText: string, options?: { hiddenContext?: string }) => {
       const text = rawText.trim();
       if (text.length === 0) return;
 
@@ -995,6 +999,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       };
 
       const turnImages: string[] = [];
+      const turnCodeSteps: ExecutedCodeStep[] = [];
 
       try {
         const result = await runAgentTurn({
@@ -1005,9 +1010,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           digestBySession,
           history,
           userText: text,
+          hiddenContext: options?.hiddenContext,
           signal: controller.signal,
           onDelta: scheduleDelta,
           onTrace: (entry) => upsertTrace(sessionId, entry),
+          onCodeStep: (step) => {
+            const existingIdx = turnCodeSteps.findIndex(
+              (s) =>
+                s.id === step.id ||
+                (s.id === 'live-stream-step' && s.language === step.language) ||
+                (s.language === step.language && s.code.trim() === step.code.trim()),
+            );
+            if (existingIdx >= 0) {
+              turnCodeSteps[existingIdx] = step;
+            } else {
+              turnCodeSteps.push(step);
+            }
+            setMessagesBySession((previous) => {
+              const list = previous[sessionId];
+              if (!list) return previous;
+              return {
+                ...previous,
+                [sessionId]: list.map((message) => {
+                  if (message.id !== assistantId) return message;
+                  const stripped = stripLeadingPreamble(message.content);
+                  return {
+                    ...message,
+                    content: stripped.length === 0 ? '' : message.content,
+                    codeSteps: [...turnCodeSteps],
+                  };
+                }),
+              };
+            });
+          },
           onPythonResult: (pyResult) => {
             if (pyResult.error) return;
             setPythonResult(pyResult);
@@ -1017,8 +1052,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               }
               return [pyResult, ...prev.slice(0, 4)];
             });
-            setPanelOpenState(true);
-            setPanelTabState('python');
             if (Array.isArray(pyResult.images) && pyResult.images.length > 0) {
               for (const img of pyResult.images) {
                 if (typeof img === 'string' && !turnImages.includes(img)) {
@@ -1036,6 +1069,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           content: result.text,
           usage: result.usage,
           ...(turnImages.length > 0 ? { images: turnImages } : {}),
+          ...(turnCodeSteps.length > 0 ? { codeSteps: [...turnCodeSteps] } : {}),
         });
 
         // Follow-ups are derived from the question, the answer, and the data.
@@ -1452,12 +1486,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const runPythonCode = useCallback(
-    async (code: string, options?: { openPanel?: boolean }): Promise<PythonExecutionResult> => {
-      if (options?.openPanel) {
-        setPanelOpenState(true);
-        setPanelTabState('python');
-      }
-
+    async (code: string, _options?: { openPanel?: boolean }): Promise<PythonExecutionResult> => {
       const session = activeSession;
       const primaryTable = session?.primaryTable ?? session?.tables?.[0]?.name;
       const extraDatasets = buildExtraDatasets(
@@ -1503,6 +1532,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     },
     [activeSession, sessions],
+  );
+
+  const runSqlCode = useCallback(
+    async (
+      sql: string,
+    ): Promise<{ table?: ExecutedCodeTable; elapsedMs: number; error?: string }> => {
+      try {
+        const handle = await ensureDuckDBHandle();
+        const res = await runSQL({
+          handle,
+          sql,
+          schemaName: activeSession?.schemaName,
+          maxRows: MAX_RESULT_ROWS,
+          readOnly: true,
+        });
+        const rows = res.rows.map((r) =>
+          res.columns.map((c) => {
+            const v = r[c];
+            return v === null || v === undefined ? '' : String(v);
+          }),
+        );
+        return {
+          elapsedMs: res.elapsedMs,
+          table: {
+            headers: res.columns,
+            rows,
+            totalRows: res.rowCount,
+            totalCols: res.columns.length,
+          },
+        };
+      } catch (error) {
+        return {
+          elapsedMs: 0,
+          error: error instanceof Error ? error.message : 'SQL execution failed.',
+        };
+      }
+    },
+    [activeSession?.schemaName, ensureDuckDBHandle],
   );
 
   const removePythonRun = useCallback((index: number) => {
@@ -1611,6 +1678,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       cancelSheetSelection,
       openActiveFile,
       runPythonCode,
+      runSqlCode,
       clearPythonResult,
       removePythonRun,
       saveToNotes,
@@ -1646,6 +1714,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       openSpreadsheet,
       requestClearChat,
       runPythonCode,
+      runSqlCode,
       saveToNotes,
       selectSession,
       sendMessage,

@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import type { FigureChanges } from '../../../core/parsing/editFigure'
 import { parseMessageContent } from '../../../core/parsing/parseMessage'
+import type { ExecutedCodeStep } from '../../../core/types'
 import { ContentBlocks } from '../../render/ContentBlocks'
 
 /**
@@ -17,6 +18,7 @@ export interface MessageRendererProps {
   streaming?: boolean
   onEditFigure?: (figureIndex: number, changes: FigureChanges) => void
   images?: string[]
+  codeSteps?: ExecutedCodeStep[]
   onOpenImage?: (index: number) => void
 }
 
@@ -25,6 +27,7 @@ export const Renderer = memo(function Renderer({
   streaming = false,
   onEditFigure,
   images,
+  codeSteps,
   onOpenImage,
 }: MessageRendererProps) {
   const blocks = useMemo(() => parseMessageContent(content), [content])
@@ -36,6 +39,7 @@ export const Renderer = memo(function Renderer({
         streaming={streaming}
         onEditFigure={onEditFigure}
         images={images}
+        codeSteps={codeSteps}
         onOpenImage={onOpenImage}
       />
     </div>
