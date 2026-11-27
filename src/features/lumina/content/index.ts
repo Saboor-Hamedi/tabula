@@ -16,6 +16,20 @@ export { LUMINA_SHORTCUTS }
  * All other documentation pages (Overview prose, Features, Architecture, Guides, etc.)
  * are 100% database-driven from `public.lumina_docs` via the CRUD modal!
  */
+export const LUMINA_POSTS_PAGE_DEFAULT: LuminaDocPageDef = {
+  slug: 'posts',
+  path: '/lumina/posts',
+  section: 'Prologue',
+  title: 'Release Updates & Posts',
+  navLabel: 'Release Updates & Posts',
+  subtitle:
+    'Official release notes, engineering guides, feature spotlights, and announcements for the Lumina desktop workspace.',
+  summary: '',
+  sortOrder: 25,
+  isStaticBaseline: true,
+  content: '',
+}
+
 export const STATIC_BASELINE_DOCS: LuminaDocPageDef[] = [
   {
     slug: 'overview',
@@ -33,14 +47,15 @@ export const STATIC_BASELINE_DOCS: LuminaDocPageDef[] = [
     slug: 'installation',
     path: '/lumina/installation',
     section: 'Prologue',
-    title: 'Download & Installation',
-    navLabel: 'Download & Installation',
+    title: 'Download',
+    navLabel: 'Download',
     subtitle: 'Official native desktop installers fetched dynamically from GitHub Releases.',
     summary: 'Download Lumina for Windows, macOS, and Linux.',
     sortOrder: 20,
     isStaticBaseline: true,
     content: '',
   },
+  LUMINA_POSTS_PAGE_DEFAULT,
   SHORTCUTS_DOC,
   ...LEGAL_DOCS.map((d) => ({ ...d, isStaticBaseline: true })),
 ]
@@ -78,26 +93,52 @@ export function findLuminaDocBySlug(slug: string): LuminaDocPageDef | null {
  * Dynamically builds the left sidebar navigation groups by combining the core
  * routes with all published documentation pages stored in `public.lumina_docs`.
  */
+function navLabel(
+  dbDocsMap: Record<string, LuminaDocRecord>,
+  slug: string,
+): string {
+  return (
+    dbDocsMap[slug]?.title ||
+    STATIC_BASELINE_DOCS.find((page) => page.slug === slug)?.navLabel ||
+    slug
+  )
+}
+
+/** A section's display label lives in `lumina_docs` under its lowercase slug. */
+export function sectionLabel(
+  dbDocsMap: Record<string, LuminaDocRecord>,
+  section: LuminaDocSection,
+): string {
+  return dbDocsMap[section.toLowerCase()]?.title || section
+}
+
 export function buildSidebarGroups(
   dbDocsMap: Record<string, LuminaDocRecord>,
 ): LuminaSidebarGroup[] {
   const sections: Record<LuminaDocSection, Array<{ label: string; to: string; order: number; slug?: string }>> = {
     Prologue: [
-      { label: dbDocsMap.overview?.title || 'Overview', to: '/lumina', order: 10, slug: 'overview' },
-      { label: 'Download & Installation', to: '/lumina/installation', order: 20, slug: 'installation' },
-      { label: 'Release Updates & Posts', to: '/lumina/posts', order: 25 },
+      { label: navLabel(dbDocsMap, 'overview'), to: '/lumina', order: 10, slug: 'overview' },
+      { label: navLabel(dbDocsMap, 'installation'), to: '/lumina/installation', order: 20, slug: 'installation' },
+      { label: navLabel(dbDocsMap, 'posts'), to: '/lumina/posts', order: 25 },
     ],
     Features: [],
     Reference: [
-      { label: 'Keyboard Shortcuts', to: '/lumina/shortcuts', order: 40, slug: 'shortcuts' },
+      { label: navLabel(dbDocsMap, 'shortcuts'), to: '/lumina/shortcuts', order: 40, slug: 'shortcuts' },
     ],
     Legal: [
-      { label: 'Privacy Policy', to: '/lumina/privacy', order: 70, slug: 'privacy' },
-      { label: 'Terms of Service', to: '/lumina/terms', order: 80, slug: 'terms' },
+      { label: navLabel(dbDocsMap, 'privacy'), to: '/lumina/privacy', order: 70, slug: 'privacy' },
+      { label: navLabel(dbDocsMap, 'terms'), to: '/lumina/terms', order: 80, slug: 'terms' },
     ],
   }
 
-  const fixedSlugs = new Set(['overview', 'installation', 'shortcuts', 'privacy', 'terms'])
+  const fixedSlugs = new Set([
+    'overview',
+    'installation',
+    'posts',
+    'shortcuts',
+    'privacy',
+    'terms',
+  ])
 
   for (const doc of Object.values(dbDocsMap)) {
     if (!doc || !doc.slug || fixedSlugs.has(doc.slug)) continue
@@ -120,6 +161,7 @@ export function buildSidebarGroups(
   return orderedGroups
     .map((group) => ({
       group,
+      label: sectionLabel(dbDocsMap, group),
       items: sections[group]
         .sort((a, b) => a.order - b.order)
         .map(({ label, to, slug }) => ({ label, to, slug })),

@@ -1105,6 +1105,168 @@ export function isSameOriginRequest(request) {
   }
 }
 
+let luminaReleaseServerCache = { ts: 0, payload: null }
+
+async function handleLuminaReleaseProxy(request, response) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    sendJson(response, 405, { error: 'Method not allowed.' }, request)
+    return
+  }
+
+  const now = Date.now()
+  if (luminaReleaseServerCache.payload && now - luminaReleaseServerCache.ts < 10 * 60 * 1000) {
+    sendJson(response, 200, luminaReleaseServerCache.payload, request)
+    return
+  }
+
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'LuminaTabula-ReleaseFetcher/1.0',
+  }
+  const ghToken = (process.env.GITHUB_TOKEN ?? '').trim()
+  if (ghToken) headers.Authorization = `Bearer ${ghToken}`
+
+  let stars = null
+  let releasePayload = null
+
+  try {
+    const [repoRes, latestRes] = await Promise.all([
+      fetch('https://api.github.com/repos/Saboor-Hamedi/lumina', { headers }).catch(() => null),
+      fetch('https://api.github.com/repos/Saboor-Hamedi/lumina/releases/latest', { headers }).catch(() => null),
+    ])
+
+    if (repoRes && repoRes.ok) {
+      const repoJson = await repoRes.json()
+      if (typeof repoJson?.stargazers_count === 'number') {
+        stars = repoJson.stargazers_count
+      }
+    }
+
+    if (latestRes && latestRes.ok) {
+      releasePayload = await latestRes.json()
+    } else {
+      const listRes = await fetch('https://api.github.com/repos/Saboor-Hamedi/lumina/releases?per_page=1', { headers }).catch(() => null)
+      if (listRes && listRes.ok) {
+        const listJson = await listRes.json()
+        if (Array.isArray(listJson) && listJson.length > 0) {
+          releasePayload = listJson[0]
+        }
+      }
+      if (!releasePayload) {
+        const tagsRes = await fetch('https://api.github.com/repos/Saboor-Hamedi/lumina/tags?per_page=1', { headers }).catch(() => null)
+        if (tagsRes && tagsRes.ok) {
+          const tagsJson = await tagsRes.json()
+          if (Array.isArray(tagsJson) && tagsJson.length > 0 && tagsJson[0]?.name) {
+            releasePayload = {
+              tag_name: tagsJson[0].name,
+              name: tagsJson[0].name,
+              html_url: 'https://github.com/Saboor-Hamedi/lumina/releases/latest',
+              assets: [],
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore upstream fetch errors
+  }
+
+  const payload = {
+    ok: true,
+    stars: typeof stars === 'number' ? stars : 0,
+    release: releasePayload,
+  }
+  luminaReleaseServerCache = { ts: now, payload }
+  sendJson(response, 200, payload, request)
+}
+
+async function handleLuminaDonateProxy(request, response, rootDir) {
+  if (request.method !== 'POST') {
+    sendJson(response, 405, { error: 'Method not allowed.' }, request)
+    return
+  }
+
+  const config = getServerConfig(rootDir)
+  if (!config.stripeSecretKey) {
+    sendJson(
+      response,
+      503,
+      { error: 'Stripe donations are not configured on this server yet.', code: 'STRIPE_NOT_CONFIGURED' },
+      request,
+    )
+    return
+  }
+
+  const { tooLarge, buffer } = await readBodyBuffer(request)
+  if (tooLarge) {
+    sendJson(response, 413, { error: 'Request is too large.' }, request)
+    return
+  }
+
+  let body = {}
+  try {
+    body = JSON.parse(buffer.toString('utf8') || '{}')
+  } catch {
+    body = {}
+  }
+
+  const rawAmount = Number(body?.amountUsd ?? 15)
+  const amountUsd = Number.isFinite(rawAmount) ? Math.max(2, Math.min(5000, Math.round(rawAmount))) : 15
+  const frequency = body?.frequency === 'monthly' ? 'monthly' : 'once'
+  const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 200) : ''
+
+  const proto =
+    Boolean(request.socket?.encrypted) ||
+    String(request.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https'
+      ? 'https'
+      : 'http'
+  const host = String(request.headers['x-forwarded-host'] || request.headers.host || 'localhost:8787')
+    .split(',')[0]
+    .trim()
+  const origin = `${proto}://${host}`
+
+  const form = new URLSearchParams()
+  form.set('mode', frequency === 'monthly' ? 'subscription' : 'payment')
+  form.set('success_url', `${origin}/lumina?donation=success`)
+  form.set('cancel_url', `${origin}/lumina?donation=canceled`)
+  form.set('line_items[0][quantity]', '1')
+  form.set('line_items[0][price_data][currency]', 'usd')
+  form.set('line_items[0][price_data][unit_amount]', String(amountUsd * 100))
+  form.set(
+    'line_items[0][price_data][product_data][name]',
+    frequency === 'monthly'
+      ? `Lumina Monthly Sponsor ($${amountUsd}/mo)`
+      : `Support Lumina Open-Source Development ($${amountUsd})`,
+  )
+  form.set(
+    'line_items[0][price_data][product_data][description]',
+    note || 'Supports native Tauri 2.0 + Rust development, installers, and open-source maintenance.',
+  )
+  if (frequency === 'monthly') {
+    form.set('line_items[0][price_data][recurring][interval]', 'month')
+  }
+
+  try {
+    const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    })
+
+    const data = await stripeRes.json().catch(() => null)
+    if (!stripeRes.ok || !data?.url) {
+      sendJson(response, 502, { error: data?.error?.message || 'Could not start Stripe donation checkout.' }, request)
+      return
+    }
+    sendJson(response, 200, { url: data.url }, request)
+  } catch {
+    sendJson(response, 502, { error: 'Could not reach Stripe Checkout.' }, request)
+  }
+}
+
 /**
  * Handles `/api/health`, `/api/usage`, `/api/admin/key*`, `/api/billing/*`, and
  * `/api/deepseek/*` requests in both Node production and Vite dev middleware.
@@ -1145,6 +1307,10 @@ export function handleApiRequest(request, response, rootDir = process.cwd()) {
   }
   if (pathname === '/api/billing/portal') {
     void handleBillingPortal(request, response, rootDir)
+    return true
+  }
+  if (pathname === '/api/lumina-release') {
+    void handleLuminaReleaseProxy(request, response)
     return true
   }
   if (pathname.startsWith('/api/deepseek')) {

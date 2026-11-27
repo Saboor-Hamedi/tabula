@@ -11,7 +11,12 @@ import {
   LUMINA_SHORTCUTS,
   pathToDocSlug,
 } from './content'
-import { deriveMarkdownSummary, slugifyLuminaTitle } from './api/posts'
+import {
+  buildLuminaPostTree,
+  deriveMarkdownSummary,
+  slugifyLuminaTitle,
+  type LuminaPost,
+} from './api/posts'
 import {
   detectVisitorPlatform,
   formatBytes,
@@ -109,5 +114,55 @@ describe('Lumina documentation, security & release utilities', () => {
     expect(formatStarCount(1250)).toBe('1.3k')
     expect(formatStarCount(null)).toBeNull()
     expect(['windows', 'macos', 'linux']).toContain(detectVisitorPlatform())
+  })
+})
+
+function makePost(slug: string, overrides: Partial<LuminaPost> = {}): LuminaPost {
+  return {
+    id: slug,
+    slug,
+    title: slug,
+    category: 'Guide',
+    status: 'published',
+    version: null,
+    summary: '',
+    content: '',
+    cover_image_url: null,
+    tags: [],
+    featured: false,
+    parent_slug: null,
+    sort_order: 100,
+    published: true,
+    reading_time_minutes: 1,
+    view_count: 0,
+    author_name: 'Saboor Hamedi',
+    author_avatar_url: null,
+    published_at: '2026-01-01T00:00:00.000Z',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('Lumina nested posts', () => {
+  it('nests sub-topics under their parent and orders siblings by sort_order', () => {
+    const tree = buildLuminaPostTree([
+      makePost('install', { title: 'Install', parent_slug: 'intro', sort_order: 20 }),
+      makePost('roadmap', { title: 'Roadmap', sort_order: 30 }),
+      makePost('intro', { title: 'Introduction', sort_order: 10 }),
+      makePost('vault', { title: 'Create a vault', parent_slug: 'intro', sort_order: 5 }),
+    ])
+
+    expect(tree.map((node) => node.post.slug)).toEqual(['intro', 'roadmap'])
+    expect(tree[0].children.map((node) => node.post.slug)).toEqual(['vault', 'install'])
+  })
+
+  it('promotes orphaned or cyclic posts to roots so no post disappears', () => {
+    const tree = buildLuminaPostTree([
+      makePost('child', { parent_slug: 'missing' }),
+      makePost('a', { parent_slug: 'b' }),
+      makePost('b', { parent_slug: 'a' }),
+    ])
+    expect(tree.map((node) => node.post.slug)).toEqual(['a', 'b', 'child'])
   })
 })

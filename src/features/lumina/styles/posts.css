@@ -1,6 +1,8 @@
 /* ==========================================================================
-   Lumina Posts & Changelogs (`styles/posts.css`)
+   Lumina Posts & Studio (`styles/posts.css`)
    ========================================================================== */
+
+/* ---------- Posts Filter & Search Controls ---------- */
 
 .lumina-posts-controls {
   display: flex;
@@ -65,10 +67,16 @@
   font-family: inherit;
 }
 
+/* ---------- Posts Feed Cards ---------- */
+
 .lumina-posts-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.lumina-post-card-wrap {
+  position: relative;
 }
 
 .lumina-post-card {
@@ -88,12 +96,175 @@
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07);
 }
 
+.lumina-post-card-edit-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 140ms ease;
+}
+
+.lumina-post-card-edit-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
 .lumina-post-card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 8px;
+  padding-right: 132px;
+}
+
+.lumina-post-card-tools {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 2;
+}
+
+.lumina-post-move-btn,
+.lumina-post-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.lumina-post-move-btn:hover,
+.lumina-post-collapse-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.lumina-post-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.lumina-post-delete-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 8%, var(--surface));
+}
+
+.lumina-post-delete-confirm {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  z-index: 5;
+  max-width: 330px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong, var(--border));
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+.lumina-post-delete-confirm-title {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.lumina-post-delete-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lumina-edit-page-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.lumina-edit-page-header-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.lumina-posts-page-intro {
+  margin: -4px 0 24px;
+  padding: 16px 18px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.lumina-posts-page-intro .lumina-doc-h2:first-child {
+  margin-top: 0;
+}
+
+.lumina-post-children {
+  margin: 8px 0 0 22px;
+  padding-left: 14px;
+  border-left: 1px dashed var(--border-strong, var(--border));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lumina-post-children .lumina-post-card {
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+
+.lumina-post-children .lumina-post-card-title {
+  font-size: 16px;
 }
 
 .lumina-post-meta-bar {
@@ -123,6 +294,15 @@
   color: var(--text-secondary);
 }
 
+.lumina-post-featured-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #10b981 15%, transparent);
+  color: #10b981;
+}
+
 .lumina-post-draft-badge {
   font-size: 10.5px;
   font-weight: 700;
@@ -131,6 +311,15 @@
   border-radius: 999px;
   background: color-mix(in srgb, #f59e0b 16%, transparent);
   color: #f59e0b;
+}
+
+.lumina-post-sub-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #8b5cf6 14%, transparent);
+  color: #8b5cf6;
 }
 
 .lumina-post-date,
@@ -178,6 +367,68 @@
   margin-bottom: 18px;
 }
 
+.lumina-post-back-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lumina-post-parent-link {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, #8b5cf6 30%, var(--border));
+  background: color-mix(in srgb, #8b5cf6 7%, var(--surface-2));
+  color: #8b5cf6;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lumina-post-parent-link:hover {
+  background: color-mix(in srgb, #8b5cf6 14%, var(--surface-2));
+}
+
+.lumina-post-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lumina-post-breadcrumb a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.lumina-post-breadcrumb a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lumina-post-breadcrumb-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lumina-post-breadcrumb-sep {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.lumina-post-breadcrumb .is-current {
+  color: var(--text);
+  font-weight: 650;
+}
+
 .lumina-empty-card {
   padding: 36px 24px;
   border-radius: 12px;
@@ -185,4 +436,208 @@
   background: var(--surface);
   text-align: center;
   color: var(--text-secondary);
+}
+
+/* ---------- Studio Templates & Auto-Draft ---------- */
+
+.post-studio-overlay {
+  z-index: 100000 !important;
+}
+
+.lumina-studio-modal {
+  max-width: 1120px !important;
+  width: 95vw !important;
+}
+
+.lumina-draft-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lumina-draft-clear-btn {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.lumina-draft-clear-btn:hover {
+  text-decoration: underline;
+}
+
+.lumina-post-modal-hint {
+  margin: 0 22px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.lumina-post-modal-hint strong {
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.lumina-post-children-section {
+  margin-top: 34px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.lumina-post-children-section .lumina-doc-h2 {
+  margin-top: 18px;
+}
+
+.lumina-post-children-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lumina-post-children-list li a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.lumina-post-children-list li a:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.lumina-post-child-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.lumina-post-child-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.post-studio-grid-1 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.lumina-new-parent-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.lumina-new-parent-row .btn {
+  white-space: nowrap;
+}
+
+.lumina-hierarchy-warning {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  color: #f59e0b;
+}
+
+.lumina-hierarchy-warning code {
+  font-family: var(--font-mono, monospace);
+  font-weight: 650;
+}
+
+.lumina-advanced-wrap {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.lumina-advanced-toggle {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lumina-advanced-toggle:hover {
+  color: var(--accent);
+}
+
+.lumina-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 12px;
+}
+
+.lumina-featured-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+
+.lumina-featured-check input {
+  appearance: auto;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.lumina-studio-editor-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 280px;
+}
+
+@media (max-width: 860px) {
+  .lumina-post-card-top {
+    padding-right: 0;
+  }
+  .lumina-post-card-tools {
+    position: static;
+    margin-top: 10px;
+    justify-content: flex-end;
+  }
+  .lumina-post-delete-confirm {
+    position: static;
+    max-width: none;
+    margin-top: 10px;
+    box-shadow: none;
+  }
 }

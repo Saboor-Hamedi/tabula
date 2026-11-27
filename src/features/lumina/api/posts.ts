@@ -16,6 +16,10 @@ export interface LuminaPost {
   cover_image_url: string | null
   tags: string[]
   featured: boolean
+  /** Slug of the parent post; null means this is a top-level post. */
+  parent_slug: string | null
+  /** Position among siblings — lower numbers appear first. */
+  sort_order: number
   published: boolean
   reading_time_minutes: number
   view_count: number
@@ -38,9 +42,26 @@ export interface SaveLuminaPostInput {
   tags?: string[]
   featured?: boolean
   published?: boolean
+  parentSlug?: string | null
+  sortOrder?: number
 }
 
 const TABLE = 'lumina_posts'
+
+let hierarchyColumnsReady: boolean | null = null
+
+/**
+ * Nested-post columns are additive. Older databases (or a schema cache that
+ * has not reloaded yet) must keep working, so feature-detect once and omit the
+ * new columns from writes when they are unavailable.
+ */
+export async function hasLuminaPostHierarchy(): Promise<boolean> {
+  if (!supabase) return false
+  if (hierarchyColumnsReady !== null) return hierarchyColumnsReady
+  const { error } = await supabase.from(TABLE).select('parent_slug').limit(1)
+  hierarchyColumnsReady = !error
+  return hierarchyColumnsReady
+}
 
 export function slugifyLuminaTitle(raw: string): string {
   return raw
@@ -76,6 +97,70 @@ export function deriveMarkdownSummary(markdown: string): string {
   return first.slice(0, 260)
 }
 
+/** True when `candidate` sits somewhere below `ancestorSlug` in the post tree. */
+export function isLuminaPostDescendant(
+  candidate: { slug: string; parent_slug: string | null },
+  ancestorSlug: string,
+  bySlug: Map<string, { slug: string; parent_slug: string | null }>,
+): boolean {
+  let cursor = candidate.parent_slug
+  const visited = new Set<string>()
+  while (cursor && !visited.has(cursor)) {
+    if (cursor === ancestorSlug) return true
+    visited.add(cursor)
+    cursor = bySlug.get(cursor)?.parent_slug ?? null
+  }
+  return false
+}
+
+export interface LuminaPostTreeNode {
+  post: LuminaPost
+  children: LuminaPostTreeNode[]
+}
+
+/**
+ * Builds a nested post tree. Posts whose parent is missing, filtered out, or
+ * would create a cycle are promoted to roots so no post is ever hidden.
+ */
+export function buildLuminaPostTree(posts: LuminaPost[]): LuminaPostTreeNode[] {
+  const bySlug = new Map(posts.map((post) => [post.slug, post]))
+  const nodes = new Map<string, LuminaPostTreeNode>()
+  for (const post of posts) {
+    nodes.set(post.slug, { post, children: [] })
+  }
+
+  const roots: LuminaPostTreeNode[] = []
+  for (const post of posts) {
+    const node = nodes.get(post.slug)!
+    const parentNode = post.parent_slug ? nodes.get(post.parent_slug) : undefined
+    const parentPost = post.parent_slug ? bySlug.get(post.parent_slug) : undefined
+    if (!parentNode || !parentPost) {
+      roots.push(node)
+      continue
+    }
+    if (parentNode === node || isLuminaPostDescendant(parentPost, post.slug, bySlug)) {
+      roots.push(node)
+      continue
+    }
+    parentNode.children.push(node)
+  }
+
+  const compare = (a: LuminaPostTreeNode, b: LuminaPostTreeNode) =>
+    a.post.sort_order - b.post.sort_order ||
+    Number(b.post.featured) - Number(a.post.featured) ||
+    (b.post.published_at || b.post.created_at).localeCompare(
+      a.post.published_at || a.post.created_at,
+    ) ||
+    a.post.title.localeCompare(b.post.title)
+
+  const sortTree = (list: LuminaPostTreeNode[]) => {
+    list.sort(compare)
+    for (const node of list) sortTree(node.children)
+  }
+  sortTree(roots)
+  return roots
+}
+
 function normalizePostRow(row: Record<string, unknown>): LuminaPost {
   const published = Boolean(row.published ?? row.status === 'published')
   const rawStatus = row.status as LuminaPostStatus | undefined
@@ -98,6 +183,13 @@ function normalizePostRow(row: Record<string, unknown>): LuminaPost {
     cover_image_url: row.cover_image_url ? String(row.cover_image_url) : null,
     tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
     featured: Boolean(row.featured),
+    parent_slug: row.parent_slug ? String(row.parent_slug) : null,
+    sort_order:
+      row.sort_order == null
+        ? 100
+        : Number.isFinite(Number(row.sort_order))
+          ? Number(row.sort_order)
+          : 100,
     published: status === 'published',
     reading_time_minutes: Number(row.reading_time_minutes ?? 1),
     view_count: Number(row.view_count ?? 0),
@@ -142,6 +234,10 @@ export async function listLuminaPosts(options?: {
     .from(TABLE)
     .select('*')
     .order('featured', { ascending: false })
+  if (await hasLuminaPostHierarchy()) {
+    query = query.order('sort_order', { ascending: true })
+  }
+  query = query
     .order('published_at', { ascending: false })
     .order('created_at', { ascending: false })
 
@@ -191,11 +287,28 @@ export async function fetchLuminaPostBySlug(slug: string): Promise<LuminaPost | 
   return normalizePostRow(data as Record<string, unknown>)
 }
 
+/** Lists the direct sub-topics of a post, in display order. */
+export async function listLuminaPostChildren(parentSlug: string): Promise<LuminaPost[]> {
+  if (!supabase) return []
+  const cleanSlug = slugifyLuminaTitle(parentSlug)
+  if (!cleanSlug) return []
+  if (!(await hasLuminaPostHierarchy())) return []
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('parent_slug', cleanSlug)
+    .order('sort_order', { ascending: true })
+    .order('published_at', { ascending: false })
+  if (error || !Array.isArray(data)) return []
+  return data.map((row) => normalizePostRow(row as Record<string, unknown>))
+}
+
 /** Creates or updates a Lumina post in `public.lumina_posts`. */
 export async function saveLuminaPost(input: SaveLuminaPostInput): Promise<LuminaPost> {
   if (!supabase) {
     throw new Error('Supabase is not configured.')
   }
+  const hierarchyReady = await hasLuminaPostHierarchy()
 
   const cleanTitle = sanitizeMarkdownInput(input.title).trim()
   if (cleanTitle.length < 3) {
@@ -208,6 +321,41 @@ export async function saveLuminaPost(input: SaveLuminaPostInput): Promise<Lumina
   const cleanSlug = slugifyLuminaTitle(input.slug || cleanTitle)
   if (!cleanSlug) {
     throw new Error('A valid URL slug is required.')
+  }
+
+  const cleanParent = input.parentSlug ? slugifyLuminaTitle(input.parentSlug) : ''
+  const parentSlug =
+    hierarchyReady && cleanParent && cleanParent !== cleanSlug ? cleanParent : null
+  const rawSortOrder = input.sortOrder
+  const sortOrder =
+    rawSortOrder != null && Number.isFinite(Number(rawSortOrder))
+      ? Math.max(-1000, Math.min(1000, Math.round(Number(rawSortOrder))))
+      : 100
+
+  let previousSlug: string | null = null
+  if (input.id) {
+    const { data: existing } = await supabase
+      .from(TABLE)
+      .select('slug')
+      .eq('id', input.id)
+      .maybeSingle()
+    previousSlug = existing?.slug ? String(existing.slug) : null
+
+    if (hierarchyReady && parentSlug && parentSlug === (previousSlug ?? cleanSlug)) {
+      throw new Error('A post cannot be its own parent.')
+    }
+    if (hierarchyReady && parentSlug) {
+      const { data: minimalRows } = await supabase.from(TABLE).select('slug, parent_slug')
+      const minimal = (minimalRows ?? []) as Array<{
+        slug: string
+        parent_slug: string | null
+      }>
+      const bySlug = new Map(minimal.map((row) => [row.slug, row]))
+      const selectedParent = bySlug.get(parentSlug)
+      if (selectedParent && isLuminaPostDescendant(selectedParent, previousSlug ?? cleanSlug, bySlug)) {
+        throw new Error('Choose a parent that is not nested under this post.')
+      }
+    }
   }
 
   const cleanContent = sanitizeMarkdownInput(input.content).trim()
@@ -236,6 +384,7 @@ export async function saveLuminaPost(input: SaveLuminaPostInput): Promise<Lumina
     content: cleanContent,
     tags: cleanTags,
     featured: Boolean(input.featured),
+    ...(hierarchyReady ? { parent_slug: parentSlug, sort_order: sortOrder } : {}),
     reading_time_minutes: estimateMarkdownReadingTime(cleanContent),
     published_at: isPublished ? new Date().toISOString() : null,
   }
@@ -251,6 +400,12 @@ export async function saveLuminaPost(input: SaveLuminaPostInput): Promise<Lumina
     if (error) {
       const denied = error.code === '42501' || /row-level security/i.test(error.message)
       throw new Error(denied ? 'Only administrators can update Lumina posts.' : error.message)
+    }
+    if (hierarchyReady && previousSlug && previousSlug !== cleanSlug) {
+      await supabase
+        .from(TABLE)
+        .update({ parent_slug: cleanSlug })
+        .eq('parent_slug', previousSlug)
     }
     return normalizePostRow(data as Record<string, unknown>)
   }
@@ -287,11 +442,79 @@ export async function setLuminaPostStatus(
   if (error) throw new Error(error.message)
 }
 
-/** Deletes a Lumina post by ID. */
-export async function deleteLuminaPost(id: string): Promise<void> {
+/**
+ * Deletes a Lumina post. By default its children are promoted to its own
+ * parent level; with `cascade` they are deleted recursively instead.
+ */
+export async function deleteLuminaPost(
+  id: string,
+  options: { cascade?: boolean; _seen?: Set<string> } = {},
+): Promise<void> {
   if (!supabase) throw new Error('Supabase is not configured.')
+  const hierarchyReady = await hasLuminaPostHierarchy()
+  const { data: existing } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  const row = existing as Record<string, unknown> | null
+  const slug = row?.slug ? String(row.slug) : null
+  const parentSlug = hierarchyReady && row?.parent_slug ? String(row.parent_slug) : null
+
+  const seen = options._seen ?? new Set<string>()
+  if (slug) {
+    if (seen.has(slug)) return
+    seen.add(slug)
+  }
+
+  if (hierarchyReady && options.cascade && slug) {
+    const children = await listLuminaPostChildren(slug)
+    for (const child of children) {
+      await deleteLuminaPost(child.id, { cascade: true, _seen: seen })
+    }
+  } else if (hierarchyReady && slug) {
+    await supabase.from(TABLE).update({ parent_slug: parentSlug }).eq('parent_slug', slug)
+  }
+
   const { error } = await supabase.from(TABLE).delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+/** Swaps a post's sort order with the sibling directly above or below it. */
+export async function moveLuminaPost(
+  postId: string,
+  direction: 'up' | 'down',
+): Promise<void> {
+  if (!supabase || !(await hasLuminaPostHierarchy())) return
+  const { data: current } = await supabase
+    .from(TABLE)
+    .select('parent_slug')
+    .eq('id', postId)
+    .maybeSingle()
+  if (!current) return
+
+  let query = supabase
+    .from(TABLE)
+    .select('id, sort_order')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  query = current.parent_slug
+    ? query.eq('parent_slug', current.parent_slug)
+    : query.is('parent_slug', null)
+
+  const { data: siblings } = await query
+  if (!Array.isArray(siblings)) return
+  const rows = siblings as Array<{ id: string; sort_order: number }>
+  const index = rows.findIndex((row) => row.id === postId)
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  if (index < 0 || targetIndex < 0 || targetIndex >= rows.length) return
+
+  const source = rows[index]
+  const target = rows[targetIndex]
+  await Promise.all([
+    supabase.from(TABLE).update({ sort_order: target.sort_order }).eq('id', source.id),
+    supabase.from(TABLE).update({ sort_order: source.sort_order }).eq('id', target.id),
+  ])
 }
 
 /** Increments view count safely via RPC. */

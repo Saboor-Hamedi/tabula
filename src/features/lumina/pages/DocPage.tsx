@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useRouter } from '../../../core/router'
 import { useIsAdmin } from '../../auth/useProfile'
-import { PlusIcon } from '../../common/Icons'
-import { fetchLuminaDocsMap, type LuminaDocRecord } from '../api/docs'
+import { PencilIcon, PlusIcon, TrashIcon } from '../../common/Icons'
+import { deleteLuminaDoc, fetchLuminaDocsMap, type LuminaDocRecord } from '../api/docs'
 import { useLuminaRelease } from '../api/release'
 import { DocModal } from '../components/DocModal'
 import { InstallerGrid } from '../components/Installers'
@@ -12,15 +12,18 @@ import {
   buildSidebarGroups,
   findLuminaDocByPath,
   pathToDocSlug,
+  sectionLabel,
 } from '../content'
 
 export function DocPage() {
-  const { path } = useRouter()
+  const { path, navigate } = useRouter()
   const isAdmin = useIsAdmin()
   const release = useLuminaRelease()
   const [dbDocsMap, setDbDocsMap] = useState<Record<string, LuminaDocRecord>>({})
   const [loading, setLoading] = useState(true)
   const [editingModalOpen, setEditingModalOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -46,6 +49,7 @@ export function DocPage() {
   const activeSubtitle = dbDoc?.subtitle ?? staticBaseline?.subtitle ?? ''
   const activeContent = dbDoc?.content || staticBaseline?.content || ''
   const activeSortOrder = dbDoc?.sort_order ?? staticBaseline?.sortOrder ?? 100
+  const activeKicker = dbDoc?.summary?.trim() || sectionLabel(dbDocsMap, activeSection)
 
   const headings = useMemo(() => extractDocHeadings(activeContent), [activeContent])
 
@@ -69,8 +73,24 @@ export function DocPage() {
       ? flatNavItems[currentNavIdx + 1]
       : null
 
-  const showInstallers = slug === 'overview' || slug === 'installation'
+  const showInstallers = slug === 'installation'
   const hasProseContent = activeContent.trim().length > 0
+
+  const handleDeleteDoc = async () => {
+    setDeleting(true)
+    try {
+      await deleteLuminaDoc(slug)
+      setDbDocsMap((prev) => {
+        const next = { ...prev }
+        delete next[slug]
+        return next
+      })
+      setConfirmDeleteOpen(false)
+      if (slug !== 'overview') navigate('/lumina')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <Shell
@@ -82,7 +102,7 @@ export function DocPage() {
         section: activeSection,
         title: activeTitle,
         subtitle: activeSubtitle,
-        summary: activeSubtitle,
+        summary: dbDoc?.summary ?? null,
         content: activeContent,
         sort_order: activeSortOrder,
         published: true,
@@ -94,10 +114,57 @@ export function DocPage() {
       <article className="lumina-doc-article">
         <header className="lumina-doc-header">
           <div className="lumina-doc-header-top">
-            <span className="lumina-doc-kicker">{activeSection}</span>
+            <span className="lumina-doc-kicker">{activeKicker}</span>
+            {isAdmin ? (
+              <div className="lumina-doc-admin-actions">
+                <button
+                  type="button"
+                  className="lumina-doc-action-btn"
+                  onClick={() => setEditingModalOpen(true)}
+                  title="Edit this documentation page"
+                >
+                  <PencilIcon size={12} />
+                  <span>Edit</span>
+                </button>
+                {dbDoc ? (
+                  <button
+                    type="button"
+                    className="lumina-doc-action-btn is-danger"
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    title="Delete this documentation page"
+                  >
+                    <TrashIcon size={12} />
+                    <span>Delete</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <h1 className="lumina-doc-title">{activeTitle}</h1>
           {activeSubtitle ? <p className="lumina-doc-subtitle">{activeSubtitle}</p> : null}
+          {confirmDeleteOpen && dbDoc ? (
+            <div className="lumina-doc-delete-confirm" role="alertdialog" aria-label="Delete documentation page">
+              <span>Delete “{activeTitle}”? This cannot be undone.</span>
+              <div className="lumina-doc-delete-actions">
+                <button
+                  type="button"
+                  className="btn btn-small btn-danger"
+                  disabled={deleting}
+                  onClick={() => void handleDeleteDoc()}
+                >
+                  {deleting ? 'Deleting…' : 'Delete page'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  disabled={deleting}
+                  onClick={() => setConfirmDeleteOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
         </header>
 
         {showInstallers ? <InstallerGrid release={release} /> : null}
@@ -154,7 +221,7 @@ export function DocPage() {
             section: activeSection,
             title: activeTitle,
             subtitle: activeSubtitle,
-            summary: activeSubtitle,
+            summary: dbDoc?.summary ?? null,
             content: activeContent,
             sort_order: activeSortOrder,
             published: true,

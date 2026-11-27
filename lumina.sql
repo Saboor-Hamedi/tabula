@@ -375,6 +375,34 @@ create table if not exists public.lumina_posts (
 alter table public.lumina_posts
   add column if not exists status public.lumina_post_status not null default 'published';
 
+-- Nested posts: a post may be a sub-topic of another post, ordered among siblings.
+alter table public.lumina_posts
+  add column if not exists parent_slug text,
+  add column if not exists sort_order int not null default 100;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'lumina_posts_parent_slug_check') then
+    alter table public.lumina_posts add constraint lumina_posts_parent_slug_check
+      check (
+        parent_slug is null
+        or (
+          char_length(parent_slug) between 1 and 140
+          and parent_slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        )
+      );
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'lumina_posts_parent_not_self') then
+    alter table public.lumina_posts add constraint lumina_posts_parent_not_self
+      check (parent_slug is null or parent_slug <> slug);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'lumina_posts_parent_slug_fkey') then
+    alter table public.lumina_posts add constraint lumina_posts_parent_slug_fkey
+      foreign key (parent_slug) references public.lumina_posts(slug)
+      on delete set null on update cascade;
+  end if;
+end $$;
+
 alter table public.lumina_posts
   drop constraint if exists lumina_posts_safe_content;
 alter table public.lumina_posts
@@ -479,6 +507,9 @@ create index if not exists idx_lumina_posts_status
 create index if not exists idx_lumina_posts_category
   on public.lumina_posts (category, published_at desc);
 
+create index if not exists idx_lumina_posts_parent_order
+  on public.lumina_posts (parent_slug, sort_order asc);
+
 create index if not exists idx_lumina_posts_tags
   on public.lumina_posts using gin (tags);
 
@@ -495,6 +526,7 @@ create index if not exists idx_lumina_posts_content_trgm
   on public.lumina_posts using gin (content gin_trgm_ops);
 
 -- Pure `pg_trgm` posts search RPC (no ILIKE)
+drop function if exists public.lumina_search_posts(text, public.lumina_post_category, boolean, int, int);
 create or replace function public.lumina_search_posts(
   p_query text default null,
   p_category public.lumina_post_category default null,
@@ -514,6 +546,8 @@ returns table (
   cover_image_url text,
   tags text[],
   featured boolean,
+  parent_slug text,
+  sort_order int,
   published boolean,
   reading_time_minutes int,
   view_count bigint,
@@ -546,6 +580,8 @@ as $$
       p.cover_image_url,
       p.tags,
       p.featured,
+      p.parent_slug,
+      p.sort_order,
       p.published,
       p.reading_time_minutes,
       p.view_count,
@@ -599,6 +635,8 @@ as $$
     m.cover_image_url,
     m.tags,
     m.featured,
+    m.parent_slug,
+    m.sort_order,
     m.published,
     m.reading_time_minutes,
     m.view_count,
@@ -613,6 +651,7 @@ as $$
   order by
     case when (select term from q) is not null then m.rank else 0 end desc,
     m.featured desc,
+    coalesce(m.sort_order, 100) asc,
     m.published_at desc nulls last,
     m.created_at desc
   limit greatest(1, least(coalesce(p_limit, 24), 50))

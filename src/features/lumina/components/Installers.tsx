@@ -1,7 +1,6 @@
 import {
   detectVisitorPlatform,
   formatBytes,
-  LUMINA_RELEASES_URL,
   recordLuminaDownload,
   type LuminaInstallerAsset,
   type LuminaPlatform,
@@ -67,8 +66,24 @@ function DownloadIcon() {
 export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
   const detectedOs: LuminaPlatform = detectVisitorPlatform()
 
-  const handleDownload = (asset: LuminaInstallerAsset) => {
+  const triggerDirectDownload = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    asset: LuminaInstallerAsset,
+  ) => {
+    event.preventDefault()
     recordLuminaDownload(asset, release.version)
+
+    if (typeof document !== 'undefined') {
+      const link = document.createElement('a')
+      link.href = asset.url
+      link.setAttribute('download', asset.name)
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (typeof window !== 'undefined') {
+      window.location.assign(asset.url)
+    }
   }
 
   return (
@@ -83,18 +98,6 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
             Download for Windows, macOS &amp; Linux
           </h3>
         </div>
-
-        <a
-          href={release.htmlUrl || LUMINA_RELEASES_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="lumina-installers-gh-link"
-        >
-          <span>All release assets</span>
-          {release.version ? (
-            <span className="lumina-release-live-pill">{release.version}</span>
-          ) : null}
-        </a>
       </div>
 
       <div className="lumina-installers-grid">
@@ -128,10 +131,9 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
           <div className="lumina-installer-actions">
             <a
               href={release.windows.exe.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              download={release.windows.exe.name}
               className="lumina-installer-btn is-primary"
-              onClick={() => handleDownload(release.windows.exe)}
+              onClick={(e) => triggerDirectDownload(e, release.windows.exe)}
             >
               <DownloadIcon />
               <span className="lumina-installer-btn-label">Download Windows (.exe)</span>
@@ -140,16 +142,6 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
                   {formatBytes(release.windows.exe.sizeBytes)}
                 </span>
               ) : null}
-            </a>
-
-            <a
-              href={release.windows.msi.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="lumina-installer-btn is-secondary"
-              onClick={() => handleDownload(release.windows.msi)}
-            >
-              <span className="lumina-installer-btn-label">Windows MSI Installer (.msi)</span>
             </a>
           </div>
         </div>
@@ -185,10 +177,9 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
           <div className="lumina-installer-actions">
             <a
               href={release.macos.dmg.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              download={release.macos.dmg.name}
               className="lumina-installer-btn is-primary"
-              onClick={() => handleDownload(release.macos.dmg)}
+              onClick={(e) => triggerDirectDownload(e, release.macos.dmg)}
             >
               <DownloadIcon />
               <span className="lumina-installer-btn-label">Download macOS (.dmg)</span>
@@ -197,15 +188,6 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
                   {formatBytes(release.macos.dmg.sizeBytes)}
                 </span>
               ) : null}
-            </a>
-
-            <a
-              href={release.htmlUrl || LUMINA_RELEASES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="lumina-installer-btn is-secondary"
-            >
-              <span className="lumina-installer-btn-label">View macOS Tarball &amp; Checksums</span>
             </a>
           </div>
         </div>
@@ -241,10 +223,9 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
           <div className="lumina-installer-actions">
             <a
               href={release.linux.appImage.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              download={release.linux.appImage.name}
               className="lumina-installer-btn is-primary"
-              onClick={() => handleDownload(release.linux.appImage)}
+              onClick={(e) => triggerDirectDownload(e, release.linux.appImage)}
             >
               <DownloadIcon />
               <span className="lumina-installer-btn-label">Download Linux (.AppImage)</span>
@@ -253,16 +234,6 @@ export function InstallerGrid({ release }: { release: LuminaReleaseInfo }) {
                   {formatBytes(release.linux.appImage.sizeBytes)}
                 </span>
               ) : null}
-            </a>
-
-            <a
-              href={release.linux.deb.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="lumina-installer-btn is-secondary"
-              onClick={() => handleDownload(release.linux.deb)}
-            >
-              <span className="lumina-installer-btn-label">Debian / Ubuntu Package (.deb)</span>
             </a>
           </div>
         </div>

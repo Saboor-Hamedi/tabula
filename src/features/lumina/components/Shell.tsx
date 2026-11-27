@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from '../../../core/router'
+import { useQuery, useRouter } from '../../../core/router'
 import { useIsAdmin } from '../../auth/useProfile'
-import { FileIcon, PlusIcon, SparklesIcon } from '../../common/Icons'
+import { CheckIcon, FileIcon, PlusIcon, SparklesIcon } from '../../common/Icons'
 import { fetchLuminaDocsMap, type LuminaDocRecord } from '../api/docs'
 import type { LuminaPost } from '../api/posts'
 import type { LuminaReleaseInfo } from '../api/release'
 import { docSlugToPath } from '../content'
 import { DocModal } from './DocModal'
+import { DonationModal } from './DonationModal'
 import { Header } from './Header'
 import type { DocHeading } from './Markdown'
 import { PostModal } from './PostModal'
@@ -33,8 +34,10 @@ export function Shell({
   children,
 }: ShellProps) {
   const { path, navigate } = useRouter()
+  const query = useQuery()
   const isAdmin = useIsAdmin()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [donateOpen, setDonateOpen] = useState(false)
   const [internalDocsMap, setInternalDocsMap] = useState<Record<string, LuminaDocRecord>>({})
   const [fabOpen, setFabOpen] = useState(false)
   const [creatingPost, setCreatingPost] = useState(false)
@@ -42,6 +45,7 @@ export function Shell({
   const [editingActiveDoc, setEditingActiveDoc] = useState(false)
   const fabRef = useRef<HTMLDivElement>(null)
 
+  const donationSuccess = query.get('donation') === 'success'
   const effectiveDocsMap = externalDocsMap ?? internalDocsMap
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export function Shell({
   useEffect(() => {
     setMobileNavOpen(false)
     setFabOpen(false)
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+    window.scrollTo(0, 0)
   }, [path])
 
   useEffect(() => {
@@ -83,7 +87,9 @@ export function Shell({
     <div className="lumina-docs-root">
       <Header
         release={release}
+        dbDocsMap={effectiveDocsMap}
         onToggleMobileNav={() => setMobileNavOpen((prev) => !prev)}
+        onOpenDonate={() => setDonateOpen(true)}
       />
 
       {mobileNavOpen ? (
@@ -99,6 +105,16 @@ export function Shell({
 
         <main className="lumina-main">
           <div className="lumina-main-inner">
+            {donationSuccess ? (
+              <div className="lumina-callout is-tip" style={{ marginTop: 0, marginBottom: 20 }}>
+                <div className="lumina-callout-badge">
+                  <CheckIcon size={12} /> THANK YOU FOR SUPPORTING LUMINA
+                </div>
+                <div className="lumina-callout-body">
+                  Your contribution directly supports Lumina’s open-source Rust &amp; Tauri development!
+                </div>
+              </div>
+            ) : null}
             <MobileInlineToc headings={headings} />
             {children}
           </div>
@@ -122,7 +138,7 @@ export function Shell({
                 }}
               >
                 <SparklesIcon size={13} />
-                <span>Create Lumina Post</span>
+                <span>Write a Post</span>
               </button>
 
               {activeDocForEdit ? (
@@ -167,6 +183,8 @@ export function Shell({
           </button>
         </div>
       ) : null}
+
+      <DonationModal open={donateOpen} onClose={() => setDonateOpen(false)} />
 
       {creatingPost ? (
         <PostModal

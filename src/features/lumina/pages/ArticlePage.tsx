@@ -6,6 +6,7 @@ import {
   deleteLuminaPost,
   fetchLuminaPostBySlug,
   incrementLuminaPostView,
+  listLuminaPostChildren,
   type LuminaPost,
 } from '../api/posts'
 import { useLuminaRelease } from '../api/release'
@@ -21,6 +22,8 @@ export function ArticlePage() {
   const isAdmin = useIsAdmin()
   const release = useLuminaRelease()
   const [post, setPost] = useState<LuminaPost | null>(null)
+  const [ancestors, setAncestors] = useState<LuminaPost[]>([])
+  const [childPosts, setChildPosts] = useState<LuminaPost[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
 
@@ -43,6 +46,43 @@ export function ArticlePage() {
     }
   }, [slugParam])
 
+  const parentSlug = post?.parent_slug ?? null
+
+  useEffect(() => {
+    if (!parentSlug) return
+    let active = true
+    void (async () => {
+      const chain: LuminaPost[] = []
+      const seen = new Set<string>()
+      let cursor: string | null = parentSlug
+      while (cursor && !seen.has(cursor) && chain.length < 6) {
+        seen.add(cursor)
+        const found = await fetchLuminaPostBySlug(cursor)
+        if (!found) break
+        chain.unshift(found)
+        cursor = found.parent_slug
+      }
+      if (active) setAncestors(chain)
+    })()
+    return () => {
+      active = false
+    }
+  }, [parentSlug])
+
+  const resolvedAncestors = parentSlug ? ancestors : []
+  const articleSlug = post?.slug ?? null
+
+  useEffect(() => {
+    if (!articleSlug) return
+    let active = true
+    listLuminaPostChildren(articleSlug).then((rows) => {
+      if (active) setChildPosts(rows)
+    })
+    return () => {
+      active = false
+    }
+  }, [articleSlug])
+
   const headings = useMemo(
     () => (post ? extractDocHeadings(post.content) : []),
     [post],
@@ -52,9 +92,31 @@ export function ArticlePage() {
     <Shell release={release} headings={headings}>
       <article className="lumina-doc-article">
         <div className="lumina-post-back-row">
-          <Link to="/lumina/posts" className="lumina-back-pill">
-            ← All Release Updates &amp; Posts
-          </Link>
+          <div className="lumina-post-back-left">
+            {post ? (
+              <nav className="lumina-post-breadcrumb" aria-label="Breadcrumb">
+                <Link to="/lumina">Overview</Link>
+                <span className="lumina-post-breadcrumb-step">
+                  <span className="lumina-post-breadcrumb-sep">/</span>
+                  <Link to="/lumina/posts">{post.category}</Link>
+                </span>
+                {resolvedAncestors.map((ancestor) => (
+                  <span key={ancestor.id} className="lumina-post-breadcrumb-step">
+                    <span className="lumina-post-breadcrumb-sep">/</span>
+                    <Link to={`/lumina/posts/${ancestor.slug}`}>{ancestor.title}</Link>
+                  </span>
+                ))}
+                <span className="lumina-post-breadcrumb-step">
+                  <span className="lumina-post-breadcrumb-sep">/</span>
+                  <span className="is-current">{post.title}</span>
+                </span>
+              </nav>
+            ) : (
+              <Link to="/lumina/posts" className="lumina-back-pill">
+                ← All Release Updates &amp; Posts
+              </Link>
+            )}
+          </div>
           {isAdmin && post ? (
             <button
               type="button"
@@ -89,6 +151,9 @@ export function ArticlePage() {
                     {post.version.startsWith('v') ? post.version : `v${post.version}`}
                   </span>
                 ) : null}
+                {post.parent_slug ? (
+                  <span className="lumina-post-sub-badge">↳ Sub-topic</span>
+                ) : null}
                 {post.status !== 'published' ? (
                   <span className="lumina-post-draft-badge">{post.status}</span>
                 ) : null}
@@ -104,6 +169,25 @@ export function ArticlePage() {
             </header>
 
             <Markdown content={post.content} />
+
+            {childPosts.length > 0 ? (
+              <section className="lumina-post-children-section" aria-label="Sub-topics">
+                <h2 className="lumina-doc-h2">Sub-topics in this series</h2>
+                <ol className="lumina-post-children-list">
+                  {childPosts.map((child) => (
+                    <li key={child.id}>
+                      <Link to={`/lumina/posts/${child.slug}`}>
+                        <span className="lumina-post-child-title">{child.title}</span>
+                        <span className="lumina-post-child-meta">
+                          {child.reading_time_minutes} min read ·{' '}
+                          {formatLuminaDate(child.published_at || child.created_at)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
           </>
         )}
       </article>
@@ -120,8 +204,8 @@ export function ArticlePage() {
               navigate(`/lumina/posts/${updated.slug}`)
             }
           }}
-          onDelete={async (toDelete) => {
-            await deleteLuminaPost(toDelete.id)
+          onDelete={async (toDelete, options) => {
+            await deleteLuminaPost(toDelete.id, { cascade: options?.cascade ?? false })
             navigate('/lumina/posts')
           }}
         />

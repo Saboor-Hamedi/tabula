@@ -62,20 +62,6 @@
   letter-spacing: -0.02em;
 }
 
-.lumina-brand-mark {
-  width: 25px;
-  height: 25px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #ef4444));
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 800;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
 .lumina-version-badge {
   display: inline-flex;
   align-items: center;
@@ -96,112 +82,56 @@
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-/* ---------- Header Search ---------- */
+/* ---------- Header Search (Matches HeroSearch in Lumina Tabula, Flat & Transparent) ---------- */
 
 .lumina-topbar-center {
   position: relative;
   flex: 1;
-  max-width: 370px;
+  max-width: 410px;
 }
 
-.lumina-search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 33px;
-  padding: 0 11px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+.lumina-hero-search-box,
+.lumina-hero-search-box:hover,
+.lumina-hero-search-box:focus-within,
+.lumina-hero-search-box.is-open {
+  height: 31px !important;
+  padding: 0 10px 0 12px !important;
+  background: color-mix(in srgb, var(--surface-2) 65%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
-.lumina-search-box:focus-within,
-.lumina-search-box.is-open {
-  border-color: var(--accent);
-  background: var(--surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+.lumina-hero-search-box:focus-within,
+.lumina-hero-search-box.is-open {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+  background: color-mix(in srgb, var(--surface) 75%, transparent) !important;
 }
 
-.lumina-search-box input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  outline: none;
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
+.lumina-hero-search-box .hero-search-input {
+  font-size: 12.5px !important;
 }
 
-.lumina-search-kbd {
-  font-family: var(--font-mono, monospace);
-  font-size: 10px;
-  padding: 2px 5px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
-  flex-shrink: 0;
+.lumina-hero-search-dropdown {
+  z-index: 300 !important;
+  background-color: var(--surface, #ffffff) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid var(--border-strong, var(--border)) !important;
+  box-shadow: 0 20px 44px -10px rgba(0, 0, 0, 0.38) !important;
+  isolation: isolate;
 }
 
-.lumina-search-clear {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  padding: 2px;
-}
-
-.lumina-search-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
-  padding: 6px;
-  z-index: 280;
-  max-height: 340px;
-  overflow-y: auto;
-}
-
-.lumina-search-result {
-  width: 100%;
-  text-align: left;
-  padding: 8px 11px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  display: block;
-  transition: background 140ms ease;
-}
-
-.lumina-search-result:hover {
-  background: var(--surface-hover);
-}
-
-.lumina-search-result-top {
+.lumina-search-item-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.lumina-search-result-title {
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--text);
-}
-
 .lumina-search-result-section {
-  font-size: 10px;
+  flex-shrink: 0;
+  font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -211,35 +141,47 @@
   color: var(--accent);
 }
 
-.lumina-search-result-sub {
-  margin: 2px 0 0;
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.lumina-search-empty {
-  padding: 14px;
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-
-/* ---------- Header Right Controls (GitHub Star Badge, Theme, Admin) ---------- */
+/* ---------- Header Right Controls (Compact Donate, GitHub Star Badge, Admin) ---------- */
 
 .lumina-topbar-right {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
+}
+
+.lumina-donate-header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 27px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, #ec4899 30%, var(--border));
+  background: color-mix(in srgb, #ec4899 7%, var(--surface-2));
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+.lumina-donate-header-btn svg {
+  color: #ec4899;
+}
+
+.lumina-donate-header-btn:hover {
+  color: var(--text);
+  border-color: #ec4899;
+  background: color-mix(in srgb, #ec4899 13%, var(--surface-hover));
 }
 
 .lumina-gh-icon-btn {
   position: relative;
-  width: 33px;
-  height: 33px;
-  border-radius: 8px;
+  width: 27px;
+  height: 27px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-secondary);
@@ -259,59 +201,37 @@
 
 .lumina-gh-star-badge {
   position: absolute;
-  top: -5px;
-  right: -6px;
-  min-width: 17px;
-  height: 15px;
-  padding: 0 4.5px;
+  top: -4px;
+  right: -5px;
+  min-width: 14px;
+  height: 13px;
+  padding: 0 3.5px;
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-contrast, #fff);
   border: 1.5px solid var(--surface);
   font-family: var(--font-mono, monospace);
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 750;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-}
-
-.lumina-theme-btn {
-  width: 33px;
-  height: 33px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-secondary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 150ms ease;
-}
-
-.lumina-theme-btn:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
 }
 
 .lumina-admin-header-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 33px;
-  padding: 0 11px;
-  border-radius: 8px;
+  gap: 5px;
+  height: 27px;
+  padding: 0 9px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
@@ -319,7 +239,7 @@
 }
 
 .lumina-admin-header-btn.is-icon-only {
-  width: 33px;
+  width: 27px;
   padding: 0;
 }
 
@@ -407,11 +327,13 @@
   flex: 1;
   max-width: 1360px;
   width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 228px minmax(0, 1fr) 168px;
   gap: 32px;
   padding: 0 24px;
+  align-items: start;
 }
 
 /* ---------- Left Sidebar ---------- */
@@ -504,6 +426,7 @@
 
 .lumina-main {
   min-width: 0;
+  min-height: calc(100vh - 54px);
   padding: 30px 0 72px;
 }
 
@@ -684,15 +607,199 @@
 
 @media (max-width: 520px) {
   .lumina-search-kbd,
-  .lumina-admin-header-btn span {
+  .lumina-admin-header-btn span,
+  .lumina-donate-header-btn span {
     display: none;
   }
-  .lumina-admin-header-btn {
+  .lumina-admin-header-btn,
+  .lumina-donate-header-btn {
     width: 33px;
     padding: 0;
   }
   .lumina-fab-wrap {
     right: 16px;
     bottom: 16px;
+  }
+}
+
+/* ---------- Clean PayPal Donation Modal (`paypal.me/saboor10`) ---------- */
+
+.lumina-paypal-modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
+}
+
+.lumina-paypal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.lumina-paypal-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #0070ba 13%, transparent);
+  color: #0070ba;
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+[data-theme='dark'] .lumina-paypal-brand-badge {
+  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  color: #38bdf8;
+}
+
+.lumina-paypal-title {
+  margin: 0 0 6px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.lumina-paypal-desc {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.lumina-paypal-amounts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 1.25fr;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.lumina-paypal-amt-pill {
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.lumina-paypal-amt-pill:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.lumina-paypal-amt-pill.is-active {
+  border-color: #0070ba;
+  background: color-mix(in srgb, #0070ba 12%, var(--surface));
+  color: #0070ba;
+}
+
+[data-theme='dark'] .lumina-paypal-amt-pill.is-active {
+  border-color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 14%, var(--surface));
+  color: #38bdf8;
+}
+
+.lumina-paypal-custom-box {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 9px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.lumina-paypal-custom-box.is-active {
+  border-color: #0070ba;
+  background: var(--surface);
+}
+
+.lumina-paypal-custom-box input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding-left: 3px;
+}
+
+.lumina-paypal-cta-btn {
+  width: 100%;
+  height: 42px;
+  border-radius: 10px;
+  border: none;
+  background: #0070ba;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 18px rgba(0, 112, 186, 0.28);
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.lumina-paypal-cta-btn:hover {
+  background: #005ea6;
+  transform: translateY(-1px);
+}
+
+.lumina-paypal-link-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.lumina-paypal-link-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.lumina-paypal-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.lumina-paypal-copy-btn:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 460px) {
+  .lumina-paypal-amounts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .lumina-paypal-custom-box {
+    grid-column: span 2;
   }
 }

@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertIcon, CheckIcon, EyeIcon, PencilIcon } from '../../common/Icons'
 import {
+  fetchLuminaDocsMap,
   saveLuminaDoc,
   type LuminaDocRecord,
   type LuminaDocSection,
 } from '../api/docs'
 import { slugifyLuminaTitle } from '../api/posts'
+import { sectionLabel } from '../content'
 import { Markdown } from './Markdown'
 
 export interface DocModalProps {
@@ -23,12 +25,15 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
   const [slugTouched, setSlugTouched] = useState(() => Boolean(doc?.slug))
   const [section, setSection] = useState<LuminaDocSection>(() => doc?.section ?? 'Features')
   const [subtitle, setSubtitle] = useState(() => doc?.subtitle ?? '')
+  const [summary, setSummary] = useState(() => doc?.summary ?? '')
   const [sortOrder, setSortOrder] = useState(() => doc?.sort_order ?? 100)
   const [published, setPublished] = useState(() => doc?.published ?? true)
   const [content, setContent] = useState(() => doc?.content ?? '')
   const [activeTab, setActiveTab] = useState<'edit' | 'review'>('edit')
+  const [sectionTitles, setSectionTitles] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!slugTouched) {
@@ -37,17 +42,36 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
   }, [title, slugTouched])
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) onClose()
+    let active = true
+    fetchLuminaDocsMap().then((map) => {
+      if (!active) return
+      const titles: Record<string, string> = {}
+      for (const section of SECTIONS) titles[section] = sectionLabel(map, section)
+      setSectionTitles(titles)
+    })
+    return () => {
+      active = false
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose, saving])
+  }, [])
+
+  const insertBlock = (snippet: string) => {
+    const el = textareaRef.current
+    if (!el) {
+      setContent((prev) => `${prev.trimEnd()}\n\n${snippet.trim()}\n`)
+      return
+    }
+    const pos = el.selectionEnd ?? content.length
+    const prefix = content.slice(0, pos).trimEnd()
+    const suffix = content.slice(pos).trimStart()
+    const next = `${prefix ? `${prefix}\n\n` : ''}${snippet.trim()}\n${suffix ? `\n${suffix}` : ''}`
+    setContent(next)
+    requestAnimationFrame(() => el.focus())
+  }
 
   const handleSave = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!title.trim() || !content.trim()) {
-      setError('Title and Markdown content are required.')
+    if (!title.trim()) {
+      setError('A title is required.')
       return
     }
     setSaving(true)
@@ -58,7 +82,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
         section,
         title: title.trim(),
         subtitle: subtitle.trim() || null,
-        summary: subtitle.trim() || null,
+        summary: summary.trim() || null,
         content,
         sort_order: Number(sortOrder) || 100,
         published,
@@ -72,6 +96,21 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
     }
   }
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) {
+        onClose()
+        return
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        if (!saving) void handleSave()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
   return (
     <div
       className="post-studio-overlay"
@@ -82,7 +121,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
         if (event.target === event.currentTarget && !saving) onClose()
       }}
     >
-      <div className="post-studio-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="post-studio-modal lumina-studio-modal" onClick={(e) => e.stopPropagation()}>
         <header className="post-studio-head">
           <div className="post-studio-head-titles">
             <h2 className="post-studio-title">
@@ -100,7 +139,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
                 onClick={() => setActiveTab('edit')}
               >
                 <PencilIcon size={12} />
-                <span>Edit</span>
+                <span>Write</span>
               </button>
               <button
                 type="button"
@@ -123,7 +162,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
           </div>
         ) : null}
 
-        {activeTab === 'edit' ? (
+        {activeTab !== 'review' ? (
           <form className="post-studio-body" onSubmit={(e) => void handleSave(e)} noValidate>
             <div className="post-studio-grid-2">
               <div className="post-studio-field">
@@ -133,12 +172,18 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
                   className="post-studio-input"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. 2D & 3D Knowledge Graph"
                   required
                 />
               </div>
 
               <div className="post-studio-field">
-                <label className="post-studio-label">Doc Slug *</label>
+                <div className="post-studio-label-row">
+                  <label className="post-studio-label">Doc Slug *</label>
+                  <span className="post-studio-counter">
+                    {slug === 'overview' ? '/lumina' : `/lumina/${slug || '…'}`}
+                  </span>
+                </div>
                 <input
                   type="text"
                   className="post-studio-input"
@@ -154,7 +199,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
 
             <div className="post-studio-grid-2">
               <div className="post-studio-field">
-                <label className="post-studio-label">Sidebar Section &amp; Order</label>
+                <label className="post-studio-label">Sidebar Section &amp; Sort Order</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
                   <select
                     className="post-studio-select"
@@ -163,7 +208,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
                   >
                     {SECTIONS.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {sectionTitles[s] || s}
                       </option>
                     ))}
                   </select>
@@ -178,36 +223,97 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
               </div>
 
               <div className="post-studio-field">
-                <label className="post-studio-label">Visibility</label>
-                <select
-                  className="post-studio-select"
-                  value={published ? 'published' : 'draft'}
-                  onChange={(e) => setPublished(e.target.value === 'published')}
-                >
-                  <option value="published">Published (Public)</option>
-                  <option value="draft">Draft (Hidden)</option>
-                </select>
+                <label className="post-studio-label">Visibility &amp; Subtitle</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '135px 1fr', gap: 8 }}>
+                  <select
+                    className="post-studio-select"
+                    value={published ? 'published' : 'draft'}
+                    onChange={(e) => setPublished(e.target.value === 'published')}
+                  >
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                  <input
+                    type="text"
+                    className="post-studio-input"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="Short subtitle under heading…"
+                  />
+                </div>
               </div>
             </div>
 
             <div className="post-studio-field">
-              <label className="post-studio-label">Subtitle</label>
+              <label className="post-studio-label" htmlFor="lumina-doc-summary">
+                Kicker / Summary (overrides the section label above the title)
+              </label>
               <input
+                id="lumina-doc-summary"
                 type="text"
                 className="post-studio-input"
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="Optional custom section label"
               />
             </div>
 
             <div className="post-studio-field post-studio-field-grow">
-              <label className="post-studio-label">Markdown Content *</label>
-              <textarea
-                className="post-studio-textarea"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                required
-              />
+              <div className="post-studio-editor-bar">
+                <label className="post-studio-label">
+                  Markdown Content <small style={{ fontWeight: 400 }}>(optional · ## headings appear in the TOC)</small>
+                </label>
+
+                <div className="post-studio-snippets">
+                  <button
+                    type="button"
+                    className="post-studio-snippet-btn"
+                    onClick={() => insertBlock('## Section Heading\n\nWrite documentation here.')}
+                  >
+                    + H2
+                  </button>
+                  <button
+                    type="button"
+                    className="post-studio-snippet-btn"
+                    onClick={() => insertBlock('### Subsection\n\nWrite details here.')}
+                  >
+                    + H3
+                  </button>
+                  <button
+                    type="button"
+                    className="post-studio-snippet-btn"
+                    onClick={() => insertBlock('> [!NOTE]\n> Key architectural note or tip.')}
+                  >
+                    + Callout
+                  </button>
+                  <button
+                    type="button"
+                    className="post-studio-snippet-btn"
+                    onClick={() => insertBlock('```bash\nnpm run tauri dev\n```')}
+                  >
+                    + Code
+                  </button>
+                  <button
+                    type="button"
+                    className="post-studio-snippet-btn"
+                    onClick={() =>
+                      insertBlock('| Shortcut | Action |\n| --- | --- |\n| `Ctrl + Space` | Open Spotlight |')
+                    }
+                  >
+                    + Table
+                  </button>
+                </div>
+              </div>
+
+              <div className="lumina-studio-editor-grid">
+                <textarea
+                  ref={textareaRef}
+                  className="post-studio-textarea"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Write documentation in Markdown…"
+                />
+              </div>
             </div>
           </form>
         ) : (
@@ -228,7 +334,7 @@ export function DocModal({ doc = null, onClose, onSaved }: DocModalProps) {
         <footer className="post-studio-foot">
           <div className="post-studio-foot-left">
             <span className="post-studio-foot-status">
-              Table: public.lumina_docs · Slug: {slug || 'auto'}
+              Table: public.lumina_docs · Slug: {slug || 'auto'} · Shortcut: Ctrl+S
             </span>
           </div>
           <div className="post-studio-foot-actions">

@@ -26,10 +26,10 @@ export interface LuminaReleaseInfo {
   publishedAt: string | null
   htmlUrl: string
   notes: string | null
-  /** Live GitHub repository star count (`stargazers_count`), or null if not fetched yet. */
+  /** Live GitHub repository star count (`stargazers_count`). */
   stars: number | null
   loading: boolean
-  source: 'github' | 'cache' | 'supabase' | 'shields' | 'fallback'
+  source: 'api' | 'github' | 'cache' | 'supabase' | 'shields' | 'fallback'
   windows: {
     exe: LuminaInstallerAsset
     msi: LuminaInstallerAsset
@@ -68,8 +68,8 @@ interface PersistedReleaseCache {
   data: LuminaReleaseInfo
 }
 
-const STORAGE_KEY = 'lumina:release_cache:v3'
-const FRESH_TTL_MS = 30 * 60 * 1000 // 30 minutes fresh
+const STORAGE_KEY = 'lumina:release_cache:v4'
+const FRESH_TTL_MS = 20 * 60 * 1000 // 20 minutes fresh
 const STALE_MAX_MS = 7 * 24 * 60 * 60 * 1000 // 7 days stale fallback
 
 let memoryCache: PersistedReleaseCache | null = null
@@ -176,11 +176,19 @@ export function buildEmptyRelease(loading = false): LuminaReleaseInfo {
 }
 
 function parseGithubReleasePayload(
-  payload: GithubReleasePayload,
+  payload: GithubReleasePayload | null | undefined,
   stars: number | null,
   source: LuminaReleaseInfo['source'] = 'github',
 ): LuminaReleaseInfo {
   const base = buildEmptyRelease(false)
+  if (!payload) {
+    return {
+      ...base,
+      stars: typeof stars === 'number' ? stars : 0,
+      source,
+    }
+  }
+
   const tagName = payload.tag_name?.trim() || null
   const version = normalizeVersionLabel(tagName) ?? normalizeVersionLabel(payload.name)
   const htmlUrl = isSafeGithubUrl(payload.html_url) ? payload.html_url!.trim() : LUMINA_RELEASES_URL
@@ -268,7 +276,7 @@ function parseGithubReleasePayload(
     publishedAt: payload.published_at || null,
     htmlUrl,
     notes: payload.body?.trim() || null,
-    stars,
+    stars: typeof stars === 'number' ? stars : 0,
     loading: false,
     source,
     windows: {
@@ -294,7 +302,32 @@ function parseGithubReleasePayload(
   }
 }
 
-async function fetchRepoStarCount(): Promise<number | null> {
+async function fetchFromSameOriginApi(): Promise<LuminaReleaseInfo | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    const res = await fetch('/api/lumina-release', {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) return null
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) return null
+    const data = (await res.json()) as {
+      ok?: boolean
+      stars?: number
+      release?: GithubReleasePayload | null
+    }
+    if (!data || !data.ok) return null
+    return parseGithubReleasePayload(
+      data.release,
+      typeof data.stars === 'number' ? data.stars : 0,
+      'api',
+    )
+  } catch {
+    return null
+  }
+}
+
+async function fetchRepoStarCountDirect(): Promise<number | null> {
   try {
     const res = await fetch(
       `https://api.github.com/repos/${LUMINA_GITHUB_OWNER}/${LUMINA_GITHUB_REPO}`,
@@ -435,7 +468,7 @@ async function fetchReleaseFromSupabaseCache(): Promise<LuminaReleaseInfo | null
       publishedAt: (data.published_at as string) || null,
       htmlUrl,
       notes: (data.notes as string) || null,
-      stars: typeof data.stars_count === 'number' ? data.stars_count : null,
+      stars: typeof data.stars_count === 'number' ? data.stars_count : 0,
       loading: false,
       source: 'supabase',
     }
@@ -459,7 +492,7 @@ async function fetchVersionFromShieldsCdn(stars: number | null): Promise<LuminaR
       version,
       tagName: version,
       releaseName: version,
-      stars,
+      stars: typeof stars === 'number' ? stars : 0,
       loading: false,
       source: 'shields',
     }
@@ -472,7 +505,12 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
   const cached = readLocalCache()
   const now = Date.now()
 
-  if (!forceRefresh && cached && now - cached.ts < FRESH_TTL_MS && cached.data.version) {
+  if (
+    !forceRefresh &&
+    cached &&
+    now - cached.ts < FRESH_TTL_MS &&
+    typeof cached.data.stars === 'number'
+  ) {
     return { ...cached.data, loading: false, source: 'cache' }
   }
 
@@ -481,6 +519,15 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
   }
 
   const run = async (): Promise<LuminaReleaseInfo> => {
+    // 1. Try same-origin Edge-cached `/api/lumina-release` first (immune to browser CSP & rate limits)
+    const apiRelease = await fetchFromSameOriginApi()
+    if (apiRelease && (apiRelease.version || typeof apiRelease.stars === 'number')) {
+      writeLocalCache(apiRelease)
+      syncReleaseToSupabase(apiRelease)
+      return apiRelease
+    }
+
+    // 2. Direct GitHub API fetch (`https://api.github.com/repos/Saboor-Hamedi/lumina`)
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
     }
@@ -488,7 +535,7 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
       headers['If-None-Match'] = cached.etag
     }
 
-    const starsPromise = fetchRepoStarCount()
+    const starsPromise = fetchRepoStarCountDirect()
 
     try {
       const res = await fetch(
@@ -496,10 +543,10 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
         { headers },
       )
 
-      const stars = (await starsPromise) ?? cached?.data?.stars ?? null
+      const stars = (await starsPromise) ?? cached?.data?.stars ?? 0
 
       if (res.status === 304 && cached?.data) {
-        const refreshed = { ...cached.data, stars: stars ?? cached.data.stars }
+        const refreshed = { ...cached.data, stars }
         writeLocalCache(refreshed, cached.etag)
         return { ...refreshed, loading: false, source: 'cache' }
       }
@@ -508,11 +555,9 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
         const etag = res.headers.get('etag')
         const data = (await res.json()) as GithubReleasePayload
         const parsed = parseGithubReleasePayload(data, stars, 'github')
-        if (parsed.version) {
-          writeLocalCache(parsed, etag)
-          syncReleaseToSupabase(parsed)
-          return parsed
-        }
+        writeLocalCache(parsed, etag)
+        syncReleaseToSupabase(parsed)
+        return parsed
       }
 
       if (res.status === 404) {
@@ -524,11 +569,9 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
           const list = (await listRes.json()) as GithubReleasePayload[]
           if (Array.isArray(list) && list.length > 0) {
             const parsed = parseGithubReleasePayload(list[0], stars, 'github')
-            if (parsed.version) {
-              writeLocalCache(parsed, listRes.headers.get('etag'))
-              syncReleaseToSupabase(parsed)
-              return parsed
-            }
+            writeLocalCache(parsed, listRes.headers.get('etag'))
+            syncReleaseToSupabase(parsed)
+            return parsed
           }
         }
 
@@ -548,11 +591,9 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
               stars,
               'github',
             )
-            if (parsed.version) {
-              writeLocalCache(parsed)
-              syncReleaseToSupabase(parsed)
-              return parsed
-            }
+            writeLocalCache(parsed)
+            syncReleaseToSupabase(parsed)
+            return parsed
           }
         }
       }
@@ -560,32 +601,34 @@ export async function fetchLuminaLatestRelease(forceRefresh = false): Promise<Lu
       // Network or rate limit error — fall through to multi-tier fallbacks
     }
 
-    const stars = (await starsPromise) ?? cached?.data?.stars ?? null
+    const stars = (await starsPromise) ?? cached?.data?.stars ?? 0
 
     const dbRelease = await fetchReleaseFromSupabaseCache()
-    if (dbRelease && dbRelease.version) {
-      const merged = { ...dbRelease, stars: stars ?? dbRelease.stars }
+    if (dbRelease) {
+      const merged = { ...dbRelease, stars: stars || dbRelease.stars || 0 }
       writeLocalCache(merged)
       return merged
     }
 
-    if (cached && now - cached.ts < STALE_MAX_MS && cached.data.version) {
+    if (cached && now - cached.ts < STALE_MAX_MS) {
       return {
         ...cached.data,
-        stars: stars ?? cached.data.stars,
+        stars,
         loading: false,
         source: 'cache',
       }
     }
 
     const shieldsRelease = await fetchVersionFromShieldsCdn(stars)
-    if (shieldsRelease && shieldsRelease.version) {
+    if (shieldsRelease) {
       writeLocalCache(shieldsRelease)
       return shieldsRelease
     }
 
     const empty = buildEmptyRelease(false)
-    return { ...empty, stars }
+    const fallbackWithStars = { ...empty, stars }
+    writeLocalCache(fallbackWithStars)
+    return fallbackWithStars
   }
 
   inflightPromise = run().finally(() => {

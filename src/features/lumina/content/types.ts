@@ -16,6 +16,7 @@ export interface LuminaDocPageDef {
 
 export interface LuminaSidebarGroup {
   group: LuminaDocSection
+  label: string
   items: Array<{
     label: string
     to: string

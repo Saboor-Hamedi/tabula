@@ -32,7 +32,7 @@ export function Sidebar({ mobileOpen, dbDocsMap = {} }: SidebarProps) {
                 onClick={() => toggleGroup(section.group)}
                 aria-expanded={!isCollapsed}
               >
-                <span>{section.group}</span>
+                <span>{section.label}</span>
                 <span className={`lumina-nav-chevron ${isCollapsed ? 'is-collapsed' : ''}`}>
                   ▾
                 </span>
