@@ -31,6 +31,11 @@ export const NAV_PAGES = [
       p === '/insights' ||
       p.startsWith('/insights/'),
   },
+  {
+    to: ROUTES.lumina,
+    label: 'Lumina',
+    match: (p: string) => p === '/lumina' || p.startsWith('/lumina/'),
+  },
 ] as const
 
 export function Nav(_props: NavProps) {

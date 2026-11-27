@@ -14,6 +14,7 @@ import { PricingModal } from './features/billing/PricingModal'
 import { Analyse } from './features/dashboard'
 import { Header, PublicHeaderProvidedContext } from './features/header/Header'
 import { FeaturesPage, Landing, PricingPage } from './features/landing'
+import { LuminaArticlePage, LuminaDocPage, LuminaPostsPage } from './features/lumina'
 import { Article, Insights } from './features/posts'
 import { SourcesPage } from './features/sources'
 import { SuspendedPage } from './features/suspend'
@@ -150,6 +151,11 @@ export function AppRoutes() {
             <Route path={ROUTES.post} element={<Article />} />
             <Route path={ROUTES.insights} element={<Insights />} />
             <Route path={ROUTES.insight} element={<Article />} />
+            <Route path={ROUTES.lumina} element={<LuminaDocPage />} />
+            <Route path={ROUTES.luminaPosts} element={<LuminaPostsPage />} />
+            <Route path={ROUTES.luminaPostNew} element={<LuminaPostsPage openCreateInitially />} />
+            <Route path={ROUTES.luminaPost} element={<LuminaArticlePage />} />
+            <Route path={ROUTES.luminaDocsWildcard} element={<LuminaDocPage />} />
             <Route path={ROUTES.signIn} element={<AuthScreen initialMode="signin" />} />
             <Route path={ROUTES.signUp} element={<AuthScreen initialMode="signup" />} />
             <Route path={ROUTES.verify} element={<VerifyEmailScreen />} />

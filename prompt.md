@@ -1,964 +1,172 @@
-WebCheck
-luminatabula.com
-Finished 43 lookups in 9.7s · 7 issues
-Show Load State
-Dismiss
-Server Location
-SSL Certificate
-Whois Lookup
-Domain Info
-Quality Metrics
-Tech Stack
-Associated Hosts
-Server Info
-Vulnerabilities
-Cookies
-Trackers & Third Parties
-Headers
-DNS Records
-HTTP Security
-Mixed Content & SRI
-TLS Connection
-TLS Security Audit
-TLS Client Compatibility
-Subdomains
-Traceroute
-Security.txt
-DNS Server
-Firewall
-DNSSEC
-CAA Records
-HSTS
-Malware & Phishing
-Data Breaches
-Email Configuration
-Archive History
-Global Ranking
-Redirect Chain
-Linked Pages
-Crawl Rules
-Server Status
-Open Ports
-TXT Records
-Block Detection
-Sitemap
-Screenshot
-Social Tags
-Social Presence
-Carbon Footprint
-Crunching data
-43 / 43 checks
-It may take up to a minute for all jobs to complete
-You can view preliminary results as they come in below
-
-Advisory
-Issues
-(3)
-Missing Content-Security-Policy
-Set the Content-Security-Policy response header
-Missing X-Content-Type-Options
-Set the X-Content-Type-Options response header
-Missing X-Frame-Options
-Set the X-Frame-Options response header
-Warnings
-(10)
-Informational
-(3)
-Passes
-(19)
-
-Server Location
-City
-
-91789, Walnut, California
-Country
-United States
-Timezone
-
-America/Los_Angeles
-Network
-
-Amazon.com, Inc.
-ASN
-
-AS16509
-Server (Amazon.com, Inc.)
-Latitude: 34.0233, Longitude: -117.8512
-
-Domain Info
-Created
-
-12 November 2026
-Updated
-
-12 November 2026
-Expires
-
-12 November 2027
-Name Servers
-aurora.dns-parking.com
-nebula.dns-parking.com
-
-Server Info
-Organization
-
-Vercel, Inc
-Service Provider
-
-Amazon.com, Inc.
-ASN Code
-
-AS16509
-Ports
-
-80,443
-IP
-
-76.76.21.98
-Type
-
-pqc
-Location
-
-Walnut, United States
-
-Headers
-access-control-allow-origin
-
-- age
-
-147
-cache-control
-
-public, max-age=0, must-revalidate
-content-disposition
-
-inline
-content-encoding
-
-br
-content-type
-
-text/html; charset=utf-8
-date
-
-20 November 2026
-etag
-
-W/"27d14c491e0b52ec517761cfdf6f1932"
-last-modified
-
-20 November 2026
-server
-
-Vercel
-strict-transport-security
-
-max-age=63072000
-x-vercel-cache
-
-HIT
-x-vercel-id
-
-sin1:lhr1::l7v4j-1795141730438-3f17b0574709
-
-Mixed Content & SRI
-Page
-
-https://www.luminatabula.com/
-Mixed Content
-
-None
-Third-Party Scripts in HTML
-
-0
-
-TLS Client Compatibility
-Android 2.3.7
-Fails
-Android 4.0.4
-Fails
-Android 4.1.1
-Fails
-Android 4.2.2
-Fails
-Android 4.3
-Fails
-Android 4.4.2
-Connects
-Android 5.0.0
-Connects
-Android 6.0
-Connects
-Android 7.0
-Connects
-Android 8.0
-Connects
-Android 8.1
-Connects
-Android 9.0
-Connects
-Baidu Jan 2015
-Fails
-BingPreview Jan 2015
-Connects
-Chrome (XP SP3) 49
-Connects
-Chrome (Win 7) 69 _
-Connects
-Chrome (Win 10) 70
-Connects
-Chrome (Win 10) 80 _
-Connects
-Chrome (Win 10) 131 _
-Connects
-Firefox (Win 7) 31.3.0 ESR
-Connects
-Firefox (Win 7) 47 _
-Connects
-Firefox (XP SP3) 49
-Connects
-Firefox (Win 7) 62 _
-Connects
-Firefox (Win 10) 73 _
-Connects
-Firefox (Win 10) 135 _
-Connects
-Googlebot Feb 2018
-Connects
-IE (XP) 6
-Fails
-IE (Vista) 7
-Fails
-IE (XP) 8
-Fails
-IE (Win 7) 8-10 _
-Fails
-IE (Win 7) 11 _
-Fails
-IE (Win 8.1) 11 _
-Fails
-IE (Win Phone 8.0) 10
-Fails
-IE (Win Phone 8.1) 11 _
-Fails
-IE (Win Phone 8.1 Update) 11 _
-Fails
-IE (Win 10) 11 _
-Connects
-Edge (Win 10) 15 _
-Connects
-Edge (Win 10) 16 _
-Connects
-Edge (Win 10) 18 _
-Connects
-Edge (Win 10) 131 _
-Connects
-Edge (Win Phone 10) 13 _
-Connects
-Java 6u45
-Fails
-Java 7u25
-Fails
-Java 8u161
-Connects
-Java 11.0.3
-Connects
-Java 12.0.1
-Connects
-OpenSSL 0.9.8y
-Fails
-OpenSSL 1.0.1l _
-Connects
-OpenSSL 1.0.2s _
-Connects
-OpenSSL 1.1.0k _
-Connects
-OpenSSL 1.1.1c _
-Connects
-Opera (Win 10) 117 _
-Connects
-Safari (OS X 10.6.8) 5.1.9
-Fails
-Safari (iOS 6.0.1) 6
-Fails
-Safari (OS X 10.8.4) 6.0.4 _
-Fails
-Safari (iOS 7.1) 7 _
-Fails
-Safari (OS X 10.9) 7 _
-Fails
-Safari (iOS 8.4) 8 _
-Fails
-Safari (OS X 10.10) 8 _
-Fails
-Safari (iOS 9) 9 _
-Connects
-Safari (OS X 10.11) 9 _
-Connects
-Safari (iOS 10) 10 _
-Connects
-Safari (OS X 10.12) 10 _
-Connects
-Safari (MacOS 10.14.6 Beta) 12.1.2 _
-Connects
-Safari (iOS 12.3.1) 12.1.1 _
-Connects
-Apple ATS (iOS 9) 9 \*
-Connects
-Yahoo Slurp Jan 2015
-Connects
-YandexBot Jan 2015
-Connects
-
-Firewall
-Firewall
-
-No\*
-\*The domain may be protected with a proprietary or custom WAF which we were unable to identify automatically
-
-HSTS
-HSTS Enabled?
-Yes
-max-age
-
-730 days
-includeSubDomains
-No
-preload
-No
-HSTS header does not include all subdomains.
-
-Archive History
-First Scan
-
-12 November 2026
-Last Scan
-
-12 November 2026
-Days Archived
-
-1
-Change Count
-
-0
-Avg Size
-
-721 bytes
-Avg Days between Archives
-
-0
-View historical versions of this page here, via the Internet Archive's Wayback Machine.
-
-Server Status
-Is Up?
-Online
-Status Code
-
-200
-Response Time
-
-69ms
-DNS Lookup
-
-38ms
-TLS Handshake
-
-24ms
-Server Response
-
-7ms
-
-Sitemap
-/
-/
-/
-
-Carbon Footprint
-HTML Initial Size
-
-7.29 KB
-Adjusted Transfer Size
-
-1.93 KB
-CO2 for Initial Load
-
-0.27 mg
-Energy Usage for Load
-
-0.55 mWh
-Cleaner than average page (est.)
-
-78%
-Calculated using the Sustainable Web Model v4
-
-SSL Certificate
-Subject
-
-www.luminatabula.com
-Issuer
-
-Let's Encrypt
-Trusted
-Yes
-Public Key
-
-RSA 2048-bit
-Expires
-
-10 February 2027
-Renewed
-
-12 November 2026
-Lifetime
-
-90 days
-Serial Num
-
-05736D0FC756E5FD0FB70DFD43205DC107A4
-Fingerprint
-
-03:25:60:D2:1D:EC:76:2F:F2:03:42:9B:56:34:92:E9:53:5A:1D:4B
-Alternative Names
-
-1
-Certificate Chain
-www.luminatabula.com
-YR1
-Root YR
-ISRG Root X1
-Extended Key Usage
-TLS Web Server Authentication
-
-Quality Metrics
-Performance
-
-64%
-Accessibility
-
-95%
-Best Practices
-
-92%
-SEO
-
-100%
-
-Vulnerabilities
-Known CVEs
-
-None
-
-DNS Records
-A
-76.76.21.22
-66.33.60.129
-CNAME
-cname.vercel-dns.com
-NS
-ns2.vercel-dns-3.com
-ns3.vercel-dns-3.com
-ns4.vercel-dns-3.com
-ns1.vercel-dns-3.com
-SOA
-ns1.vercel-dns-3.com (awsdns-hostmaster.amazon.com)
-
-TLS Connection
-Protocol
-
-TLSv1.3
-Cipher Suite
-
-TLS_AES_128_GCM_SHA256
-Cipher Version
-
-TLSv1.3
-Ephemeral Key
-
-ECDH (X25519) 253-bit
-ALPN
-
-h2
-Forward Secrecy
-Yes
-Session Resumption
-Yes
-OCSP Stapling
-
-Not Present
-Certificate Trust
-Trusted
-TLS Versions
-TLS 1.3
-
-Enabled
-TLS 1.2
-
-Enabled
-TLS 1.1
-
-Disabled
-TLS 1.0
-
-Disabled
-
-Security.txt
-Present
-No
-Having a security.txt ensures security researchers know how and where to safely report vulnerabilities.
-
-DNSSEC
-DNSKEY
-DNSKEY - Present?
-Yes
-Record #1
-
-DNSKEY
-Domain
-
-www.luminatabula.com.
-Type
-
-CNAME (5)
-TTL
-
-3600
-DS
-DS - Present?
-Yes
-Record #1
-
-DS
-Domain
-
-www.luminatabula.com.
-Type
-
-CNAME (5)
-TTL
-
-3452
-RRSIG
-RRSIG - Validated?
-No
-
-Malware & Phishing
-Google Safe Browsing
-Safe
-Phishing Status
-No Phishing Found
-NetAPI Compromised Feed
-Not Listed
-
-Redirect Chain
-Redirects Followed
-
-None
-
-Open Ports
-80
-
-HTTP
-443
-
-HTTPS
-Unable to establish connections to:
-20, 21, 22, 23, 25, 53, 67, 68, 69, 110, 119, 123, 143, 156, 161, 162, 179, 194, 389, 587, 993, 995, 3000, 3306, 3389, 5060, 5900, 8000, 8080, 8888
-
-Screenshot
-
-Whois Lookup
-Registered Domain
-
-LUMINATABULA.COM
-Creation Date
-
-12 November 2026
-Updated Date
-
-12 November 2026
-Registry Expiry Date
-
-12 November 2027
-Registry Domain ID
-
-3167350929_DOMAIN_COM-VRSN
-Registrar
-
-HOSTINGER operations, UAB
-Registrar IANA ID
-
-1636
-DNSSEC
-
-unsigned
-
-Associated Hosts
-Domains
-hightouch.com
-Hosts
-hightouch-git-ap-pendo-upsert.vercel.hightouch.com
-site.vercel.hightouch.com
-
-Trackers & Third Parties
-Requests Made
-
-45
-Companies
-
-1
-Hosting
-Google Fonts
-
-Google
-Google Static
-
-Google
-
-HTTP Security
-Content-Security-Policy
-
-No
-Strict-Transport-Security
-
-max-age=63072000
-X-Content-Type-Options
-
-No
-X-Frame-Options
-
-No
-Referrer-Policy
-
-No
-Permissions-Policy
-
-No
-Cross-Origin-Opener-Policy
-
-No
-Cross-Origin-Resource-Policy
-
-No
-Cross-Origin-Embedder-Policy
-
-No
-
-TLS Security Audit
-Grade
-
-A+
-Protocols
-
-TLS 1.2, TLS 1.3
-Forward Secrecy
-
-With all browsers
-HSTS
-
-730 days
-Session Resumption
-
-Not enabled
-OCSP Stapling
-No
-Renegotiation
-
-secure
-Fallback SCSV (downgrade protection)
-Yes
-Certificate Transparency
-Yes
-ChaCha20 Preferred
-Yes
-AEAD Cipher Support
-Yes
-Legacy CBC Cipher Support
-No
-TLS Compression
-
-Disabled
-Static DH Key Reuse
-No
-Weak DH Primes
-No
-Static ECDH Parameter Reuse
-No
-Heartbleed
-Safe
-POODLE (SSLv3)
-Safe
-POODLE (TLS)
-Safe
-Zombie POODLE
-Safe
-GOLDENDOODLE
-Safe
-Sleeping POODLE
-Safe
-Zero-Length Padding Oracle
-Safe
-FREAK
-Safe
-LOGJAM
-Safe
-OpenSSL CCS Injection
-Safe
-OpenSSL Padding Oracle
-Safe
-ROBOT (Bleichenbacher)
-Safe
-Ticketbleed
-Safe
-
-DNS Server
-Zone
-
-luminatabula.com
-DNS Server #1
-Hostname
-
-nebula.dns-parking.com
-IP Address
-
-172.64.53.231
-DNS Server #2
-Hostname
-
-aurora.dns-parking.com
-IP Address
-
-172.64.52.197
-
-CAA Records
-Domain
-
-www.luminatabula.com
-CAA Records
-
-4
-Allowed CAs
-pki.goog
-sectigo.com
-globalsign.com
-letsencrypt.org
-
-Data Breaches
-Domain
-
-luminatabula.com
-Breaches
-
-None
-Source: Have I Been Pwned
-
-Crawl Rules
-Google Search
-
-Allowed
-AI Crawlers Blocked
-
-0 of 8
-llms.txt
-
-Not found
-User-agent
-
-- Allow
-
-/
-Sitemap
-
-https://tabula.app/sitemap.xml
-
-Block Detection
-AdGuard
-Not Blocked
-AdGuard Family
-Not Blocked
-CleanBrowsing Adult
-Not Blocked
-CleanBrowsing Family
-Not Blocked
-CleanBrowsing Security
-Not Blocked
-CloudFlare
-Not Blocked
-CloudFlare Family
-Not Blocked
-Comodo Secure
-Not Blocked
-Google DNS
-Not Blocked
-OpenDNS
-Not Blocked
-OpenDNS Family
-Not Blocked
-Quad9
-Not Blocked
-
-Social Tags
-Title
-
-Lumina Tabula — Private In-Browser Spreadsheet Analysis with DuckDB
-Description
-
-Lumina Tabula — Private, in-browser spreadsheet analysis powered by DuckDB WebAssembly. Query millions of rows in seconds, chat with your data, and generate instant charts without uploading a single byte.
-Keywords
-
-DuckDB, DuckDB WASM, spreadsheet analysis, CSV analysis, local-first, in-browser SQL, private AI, Excel analyzer
-Canonical URL
-
-https://www.luminatabula.com/
-OpenGraph Title
-
-Lumina Tabula — Private In-Browser Spreadsheet Analysis with DuckDB
-OpenGraph Description
-
-Query millions of rows in seconds. 100% private in-browser DuckDB WebAssembly. Chat with your CSV or Excel spreadsheets and generate charts without uploading your files.
-OpenGraph Image
-
-https://www.luminatabula.com/og-preview.png
-Twitter Card
-
-summary_large_image
-Theme Color
-#0f766e
-Author
-
-Lumina Tabula
-View / Download Raw Data
-Download Results
-View Results
-These are the raw results generated from your URL, and in JSON format. You can import these into your own program, for further analysis.
-External Tools for Further Research
-Hudson Rock
-
-hudsonrock.com
-Identify Infostealer infection data related to domains and emails
-
-SSL Labs Test
-
-ssllabs.com
-Analyzes the SSL configuration of a server and grades it
-
-Virus Total
-
-virustotal.com
-Checks a URL against multiple antivirus engines
-
-Shodan
-
-shodan.io
-Search engine for Internet-connected devices
-
-Archive
-
-archive.org
-View previous versions of a site via the Internet Archive
-
-URLScan
-
-urlscan.io
-Scans a URL and provides information about the page
-
-Sucuri SiteCheck
-
-sitecheck.sucuri.net
-Checks a URL against blacklists and known threats
-
-Domain Tools
-
-whois.domaintools.com
-Run a WhoIs lookup on a domain
-
-NS Lookup
-
-nslookup.io
-View DNS records for a domain
-
-DNS Checker
-
-dnschecker.org
-Check global DNS propagation across multiple servers
-
-Censys
-
-search.censys.io
-Lookup hosts associated with a domain
-
-Page Speed Insights
-
-developers.google.com
-Checks the performance, accessibility and SEO of a page on mobile + desktop
-
-Built With
-
-builtwith.com
-View the tech stack of a website
-
-DNS Dumpster
-
-dnsdumpster.com
-DNS recon tool, to map out a domain from it's DNS records
-
-BGP Tools
-
-bgp.tools
-View realtime BGP data for any ASN, Prefix or DNS
-
-Similar Web
-
-similarweb.com
-View approx traffic and engagement stats for a website
-
-Blacklist Checker
-
-blacklistchecker.com
-Check if a domain, IP or email is present on the top blacklists
-
-Cloudflare Radar
-
-radar.cloudflare.com
-View traffic source locations for a domain through Cloudflare
-
-Mozilla HTTP Observatory
-
-developer.mozilla.org
-Assesses website security posture by analyzing various security headers and practices
-
-AbuseIPDB
-
-abuseipdb.com
-Check if a domain or IP has been reported for abusive activity
-
-IBM X-Force Exchange
-
-exchange.xforce.ibmcloud.com
-View shared human and machine generated threat intelligence
-
-URLVoid
-
-urlvoid.com
-Checks a website across 30+ blocklist engines and website reputation services
-
-URLhaus
-
-urlhaus.abuse.ch
-Checks if the site is in URLhaus's malware URL exchange
-
-ANY.RUN
-
-any.run
-An interactive malware and web sandbox
-
-Blacklight
-
-themarkup.org
-Reveals the trackers, cookies and fingerprinting a site uses on its visitors
-
-These tools are not affiliated with Web-Check. Please use them at your own risk.
-At the time of listing, all of the above were available and free to use - if this changes, please report it via GitHub (lissy93/web-check).
-View source at github.com/lissy93/web-check
-
-Web Check is licensed under MIT - © Alicia Sykes 2026
+# Build Lumina Documentation & Posts Section (`/lumina`) in `luminatabula.com`
+
+## 1. What is Lumina?
+
+**Lumina** (`v2.3.0`, MIT License, by Saboor Hamedi) is a local-first desktop knowledge workspace that combines a Markdown editor, spatial infinite canvas, 2D/3D knowledge graph, AI copilot, and native terminal in one application.
+
+- **Repository:** `https://github.com/Saboor-Hamedi/lumina`
+- **Releases / Downloads:** `https://github.com/Saboor-Hamedi/lumina/releases/latest`
+- **Contact Email:** `saboorhamedi49@gmail.com`
+- **Platforms:** Windows (`.exe` / `.msi`), macOS Universal Apple Silicon + Intel (`.dmg`), Linux (`.deb` / `.AppImage`)
+- **Tech Stack:**
+  - **Desktop Runtime:** Tauri 2.0 + Rust (`src-tauri`) using native OS WebViews (WebView2 on Windows, WebKit on macOS/Linux)
+  - **Native Core:** `crates/lumina_core` (Rust + Rayon multithreaded disk scanner, sub-millisecond fuzzy search, knowledge graph builder)
+  - **Frontend:** React 19, TypeScript, Vite 7, Zustand, Tailwind CSS, CodeMirror 6, xterm.js (`portable-pty` / ConPTY), `react-force-graph-2d`, `react-force-graph-3d` (Three.js), Mermaid, KaTeX, `@xenova/transformers` (local embeddings), Dexie (IndexedDB)
+- **Storage Model:** 100% local-first plain-text `.md` notes (with YAML frontmatter preserving `createdAt`) and `.canvas` JSON files stored directly on the user's disk. Zero proprietary cloud lock-in and no tracking servers.
+
+---
+
+## 2. Core Features of Lumina
+
+Document every feature below accurately in the **Features** documentation:
+
+1. **Local-First Markdown Editor (CodeMirror 6)**
+   - Plain-text `.md` files with YAML frontmatter, wikilinks (`[[note]]`), backlinks, tags, slash commands (`/`), tables, LaTeX math (KaTeX), Mermaid diagrams, syntax-highlighted code blocks, and voice input.
+   - Multi-pane split views (horizontal `Ctrl + \`, vertical `Ctrl + Alt + \`) with drag-and-drop tabs and persistent layouts.
+   - Zen Mode (`Ctrl + .`) hides toolbars and chrome while keeping running terminal sessions alive.
+   - Preserves original note creation timestamp (`createdAt`) independently of edits.
+
+2. **Spatial Infinite Canvas (`.canvas`)**
+   - Freeform 2D whiteboard saved as `.canvas` JSON files.
+   - Supports cards, frameless resizable text labels, shapes, magnetic connection ports, orthogonal edge routing, snap-to-grid toggle, zoom/pan viewport, and templates.
+
+3. **2D & 3D Knowledge Graph**
+   - Interactive force-directed 2D Canvas and 3D WebGL (`Three.js`) graph views built from wikilinks and note relationships, with cluster physics and persistent node positions.
+
+4. **AI Copilot & Local Semantic Memory**
+   - Works offline with **Ollama** and local on-device embeddings (`@xenova/transformers`), or with cloud providers (**DeepSeek**, **OpenAI**, **Claude**).
+   - 3 focused modes: *Planning & Strategy*, *Execution & Action*, and *Research & Analysis*.
+   - Inline AI editing (`Ctrl + K`), Global Spotlight (`Ctrl + Space`), and safety controls including inline **Approve / Reject** diff cards and **multi-file Undo**.
+
+5. **Integrated Native Terminal (`Ctrl + J`)**
+   - Real pseudoterminal powered by Rust `portable-pty` (ConPTY on Windows, PTY on macOS/Linux) and `xterm.js` with WebGL acceleration.
+   - Supports PowerShell, CMD, Git Bash, Zsh, Bash, `vim`, `ssh`, `python`, interactive CLIs, `Tab` completion, `Ctrl + C`, and live resizing.
+
+6. **Theme-Accurate Exports (50 Curated Themes)**
+   - Export notes to self-contained **HTML**, **Markdown**, **Plain Text**, print-ready **PDF** (with auto-generated Table of Contents), **Word (`.doc`)**, or **ZIP** archives across 50 themes.
+
+7. **Workspace Tools**
+   - **Global Spotlight (`Ctrl + Space`)** & **Command Palette (`Ctrl + P`)** for instant fuzzy search and commands.
+   - **Calendar & Daily Notes**, **Templates**, **Media / Image Viewer**, **Inspector / Outline / Metadata**, **Breadcrumbs**, and **Roadmap** views.
+
+8. **Optional Google Integrations (OAuth 2.0 Loopback)**
+   - **Google Drive Backup:** Push a single note, bulk folder mirror, or compressed ZIP workspace backup directly to Google Drive.
+   - **Gmail Integration:** Read, organize, and send emails directly inside Lumina at the user's explicit direction.
+   - Direct local HTTPS calls to Google APIs; no intermediate Lumina backend server ever sees user data.
+
+---
+
+## 3. Keyboard Shortcuts Reference
+
+Include this reference table in the documentation:
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl + Space` | Global Spotlight (Search notes & AI command palette) |
+| `Ctrl + P` | Quick note & command search palette |
+| `Ctrl + N` | Create new note |
+| `Ctrl + J` | Toggle integrated ConPTY / PTY terminal |
+| `Ctrl + .` | Toggle Zen Mode |
+| `Ctrl + B` | Toggle Left Sidebar |
+| `Ctrl + \` | Split editor right |
+| `Ctrl + Alt + \` | Split editor down |
+| `Ctrl + K` | Inline AI edit / prompt inside editor |
+| `F2` / `Ctrl + R` | Rename active note or folder |
+| `Ctrl + W` | Close active tab |
+| `Double-click Tab` | Rename note from tab bar |
+
+---
+
+## 4. What to Build in `luminatabula.com`
+
+### A. Main Site Header Change (Minimal)
+- Add **only one navigation link** in the `luminatabula.com` top header: **`Lumina`** (linking to `/lumina`).
+- Do **not** alter existing `luminatabula.com` data analysis pages, posts, or Supabase tables.
+
+### B. Dedicated Laravel-Style Documentation Architecture (`/lumina`)
+Create a `docs/` (or `lumina-docs/`) module inside the `luminatabula.com` project that renders a full **Laravel-style documentation experience** under `/lumina`:
+
+- **Dedicated Layout Shell (when on `/lumina/*`):**
+  - **Top Docs Bar:** Lumina brand mark + version badge (`v2.3.0`), quick docs search input, GitHub link, Download button, and a subtle link back to `luminatabula.com`.
+  - **Left Collapsible Sidebar (grouped navigation, Laravel-style):**
+    - **Prologue**
+      - Overview (`/lumina`)
+      - Download & Installation (`/lumina/installation`)
+      - Release Updates & Posts (`/lumina/posts`)
+    - **Features** (`/lumina/features` + anchored or sub-pages)
+      - Markdown Editor & Split Panes
+      - Infinite Canvas (`.canvas`)
+      - 2D & 3D Knowledge Graph
+      - AI Copilot & Local Models
+      - Integrated Terminal (ConPTY/PTY)
+      - Exports & 50 Themes
+      - Google Drive & Gmail Sync
+    - **Reference**
+      - Keyboard Shortcuts (`/lumina/shortcuts`)
+      - Architecture & Tech Stack (`/lumina/architecture`)
+      - Build from Source (`/lumina/build`)
+    - **Legal** *(Required for Google Cloud Console OAuth Verification)*
+      - Privacy Policy (`/lumina/privacy`)
+      - Terms of Service (`/lumina/terms`)
+  - **Main Content Area:** Clean typography, callout boxes (info/warning/tip), copyable code blocks, feature cards, and **Previous / Next page navigation** at the bottom of every doc page.
+  - **Right "On This Page" Table of Contents:** Auto-highlighted heading links (`h2`/`h3`) for the active doc page.
+  - **Mobile Responsive:** Collapsible drawer for the sidebar on smaller screens.
+
+### C. Lumina Updates / Posts Form (Connected to Existing Supabase)
+- Inside `/lumina/posts` (and an admin/create route such as `/lumina/posts/new` or gated behind the existing Supabase auth used in `luminatabula.com`), create a **form to publish posts/articles/changelogs about Lumina**.
+- Form fields:
+  - `title` (string, required)
+  - `slug` (auto-generated from title, editable)
+  - `category` (`Release`, `Guide`, `Feature`, `Announcement`)
+  - `version` (optional, e.g. `2.3.0`)
+  - `summary` (short excerpt)
+  - `content` (Markdown body with live preview)
+  - `published` (boolean toggle)
+- Reuse `luminatabula.com`'s existing Supabase client. Store Lumina posts either in a dedicated `lumina_posts` table (provide the SQL migration) or tag them cleanly so they never mix with data-analysis posts.
+- Display published Lumina posts at `/lumina/posts` and individual post pages at `/lumina/posts/[slug]`.
+
+---
+
+## 5. Required Legal Pages (Google Cloud Console OAuth Compliance)
+
+Google Cloud Console OAuth verification requires publicly accessible, clean URLs on `luminatabula.com`:
+- **App Home Page:** `https://luminatabula.com/lumina`
+- **Privacy Policy:** `https://luminatabula.com/lumina/privacy`
+- **Terms of Service:** `https://luminatabula.com/lumina/terms`
+
+### Privacy Policy (`/lumina/privacy`) — Required Content
+Must include all of the following sections verbatim in substance:
+1. **Overview:** Lumina is a local-first desktop application developed by Saboor Hamedi.
+2. **Local Storage First:** All notes, vaults, canvases, tags, and snippets are stored directly on the user's personal computer. Lumina does not operate proprietary tracking servers or centralized databases storing personal notes.
+3. **Google User Data & Limited Use Disclosure:**
+   - Optional Google Account connection for **Google Drive** (storing vault backups directly in the user's Google Drive) and **Gmail** (reading, organizing, and sending emails directly from the Lumina desktop interface at the user's explicit direction).
+   - Prominent callout box stating:
+     > **Google API Services User Data Policy Compliance:** Lumina's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+4. **How Google Data is Handled:**
+   - **No Third-Party Sharing:** Never sold, rented, or transferred to third parties, advertisers, or data brokers.
+   - **No Human Access:** No person or developer has access to private emails or Drive files. All API calls happen locally on the user's machine over HTTPS directly to Google's official endpoints.
+   - **Secure Local Token Storage:** OAuth tokens are stored securely on the local device and only refreshed directly with Google's OAuth 2.0 servers.
+5. **Data Deletion & Revoking Access:** Users can revoke access at any time by logging out inside Lumina Settings or removing Lumina at `https://myaccount.google.com/permissions`.
+6. **Contact:** `saboorhamedi49@gmail.com` and `https://github.com/Saboor-Hamedi/lumina`.
+
+### Terms of Service (`/lumina/terms`) — Required Content
+Must include:
+1. **Acceptance of Terms** (downloading, installing, or using Lumina).
+2. **Description of Service** (local-first desktop app for Markdown notes, spatial canvas, knowledge graph, AI assistance, terminal, and optional cloud backup/email integrations).
+3. **User Responsibilities** (confidentiality of notes, API keys, encryption keys, and OAuth tokens; lawful use only).
+4. **Third-Party Integrations** (Google Drive, Gmail, and user-configured AI providers are subject to their respective terms and privacy policies).
+5. **Disclaimer of Warranties** ("AS IS" and "AS AVAILABLE", no express or implied warranties).
+6. **Limitation of Liability** (authors/copyright holders not liable for claims or damages arising from software use).
+7. **Contact Information:** `saboorhamedi49@gmail.com` and `https://github.com/Saboor-Hamedi/lumina`.
+
+---
+
+## 6. Deliverables Checklist
+
+- [ ] Single `Lumina` nav link added to `luminatabula.com` header → `/lumina`.
+- [ ] Dedicated `docs/` folder structure inside `luminatabula.com` for all Lumina documentation pages and components.
+- [ ] Laravel-style documentation layout with collapsible left sidebar, right "On This Page" TOC, search, code blocks with copy button, callouts, and prev/next footer navigation.
+- [ ] Complete **Features** section covering all 8 feature areas + Download/Install + Shortcuts + Architecture + Build from Source.
+- [ ] Public **Privacy Policy** (`/lumina/privacy`) and **Terms of Service** (`/lumina/terms`) pages ready for Google Cloud Console OAuth verification.
+- [ ] **Lumina Posts / Updates** list + creation form wired to existing Supabase with SQL schema for `lumina_posts`.
+- [ ] Zero regressions to existing `luminatabula.com` data analysis pages and posts.

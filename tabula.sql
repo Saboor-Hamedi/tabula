@@ -1492,7 +1492,6 @@ as $$
               similarity(coalesce(p.dataset_name, ''), (select term from q)) * 1.5,
               similarity(left(coalesce(p.content, ''), 2000), (select term from q)) * 0.6
             )
-            + case when p.title ilike '%' || (select term from q) || '%' then 1.0 else 0.0 end
           )::real
         end
       ) as rank
@@ -1502,16 +1501,15 @@ as $$
       and (p_tag is null or p.tags @> array[p_tag])
       and (
         q.term is null
-        or p.title ilike '%' || q.term || '%'
-        or p.subtitle ilike '%' || q.term || '%'
-        or p.excerpt ilike '%' || q.term || '%'
-        or p.dataset_name ilike '%' || q.term || '%'
-        or p.content ilike '%' || q.term || '%'
         or p.title % q.term
         or q.term <% p.title
         or coalesce(p.subtitle, '') % q.term
         or coalesce(p.excerpt, '') % q.term
         or coalesce(p.dataset_name, '') % q.term
+        or word_similarity(q.term, p.title) >= 0.25
+        or word_similarity(q.term, coalesce(p.subtitle, '')) >= 0.25
+        or word_similarity(q.term, coalesce(p.excerpt, '')) >= 0.25
+        or word_similarity(q.term, left(coalesce(p.content, ''), 3000)) >= 0.3
       )
   )
   select

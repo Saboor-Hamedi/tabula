@@ -28,12 +28,14 @@ import {
   SettingsIcon,
   SheetIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   SunIcon,
   TrashIcon,
   UserIcon,
   ZapIcon,
 } from '../../common/Icons'
 import { Insights } from '../components/Insights'
+import { LuminaManager } from '../components/LuminaManager'
 import { Members } from '../components/Members'
 import { Metric } from '../components/Metric'
 import { ResearchSources, type ReadyDatasetFile } from '../../sources'
@@ -64,7 +66,7 @@ const EXIT_REASONS = [
  * - Administrator accounts are strictly protected from self-deletion (both UI & DB)
  */
 
-type DashSection = 'overview' | 'sources' | 'members' | 'stories' | 'account'
+type DashSection = 'overview' | 'sources' | 'members' | 'stories' | 'lumina' | 'account'
 type MemberFilter = 'all' | 'subscribers' | 'trialing' | 'suspended' | 'admins'
 
 interface LocalDatasetItem {
@@ -106,7 +108,7 @@ export function Analyse() {
   const [section, setSection] = useState<DashSection>(() => {
     if (
       urlSection &&
-      ['overview', 'sources', 'members', 'stories', 'account'].includes(urlSection)
+      ['overview', 'sources', 'members', 'stories', 'lumina', 'account'].includes(urlSection)
     ) {
       return urlSection
     }
@@ -116,7 +118,7 @@ export function Analyse() {
   useEffect(() => {
     if (
       urlSection &&
-      ['overview', 'sources', 'members', 'stories', 'account'].includes(urlSection)
+      ['overview', 'sources', 'members', 'stories', 'lumina', 'account'].includes(urlSection)
     ) {
       setSection(urlSection)
     }
@@ -177,7 +179,7 @@ export function Analyse() {
   }
 
   const handleSelectSection = (next: DashSection) => {
-    if (!isAdmin && (next === 'members' || next === 'stories')) {
+    if (!isAdmin && (next === 'members' || next === 'stories' || next === 'lumina')) {
       setSection('overview')
       return
     }
@@ -200,7 +202,7 @@ export function Analyse() {
 
   // Ensure non-admins cannot land on admin-only tabs
   useEffect(() => {
-    if (!isAdmin && (section === 'members' || section === 'stories')) {
+    if (!isAdmin && (section === 'members' || section === 'stories' || section === 'lumina')) {
       setSection('overview')
     }
   }, [isAdmin, section])
@@ -414,7 +416,9 @@ export function Analyse() {
         : (profile?.tier ?? 'Pro').toUpperCase()
 
   const activeSection: DashSection =
-    !isAdmin && (section === 'members' || section === 'stories') ? 'overview' : section
+    !isAdmin && (section === 'members' || section === 'stories' || section === 'lumina')
+      ? 'overview'
+      : section
 
   const navItems: { id: DashSection; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: <ActivityIcon size={14} /> },
@@ -431,6 +435,11 @@ export function Analyse() {
             id: 'stories' as const,
             label: 'Published',
             icon: <FileIcon size={14} />,
+          },
+          {
+            id: 'lumina' as const,
+            label: 'Lumina',
+            icon: <SparklesIcon size={14} />,
           },
         ]
       : []),
@@ -534,6 +543,7 @@ export function Analyse() {
                   {activeSection === 'sources' && 'Open Research & Datasets'}
                   {activeSection === 'members' && 'Directory'}
                   {activeSection === 'stories' && 'Editorial'}
+                  {activeSection === 'lumina' && 'Lumina Desktop Sub-Project'}
                   {activeSection === 'account' && 'Account & Security'}
                 </span>
                 {!isAdmin ? (
@@ -546,6 +556,7 @@ export function Analyse() {
                 {activeSection === 'sources' && 'Research Sources & Open Data'}
                 {activeSection === 'members' && 'Members & Subscriptions'}
                 {activeSection === 'stories' && 'Published'}
+                {activeSection === 'lumina' && 'Lumina Posts & Documentation'}
                 {activeSection === 'account' && 'Profile, Preferences & Security'}
               </h1>
               <p className="dash-subtitle">
@@ -559,6 +570,8 @@ export function Analyse() {
                   'Filter accounts by plan, trial status, or administrator role.'}
                 {activeSection === 'stories' &&
                   'Review, edit, or unpublish stories shared from your workspace.'}
+                {activeSection === 'lumina' &&
+                  'Create, update, publish, and manage Lumina release updates, guides, and documentation pages.'}
                 {activeSection === 'account' &&
                   'Manage your profile details, theme, and account security.'}
               </p>
@@ -1033,6 +1046,9 @@ export function Analyse() {
 
           {/* SECTION: PUBLISHED STORIES (ADMIN ONLY) */}
           {activeSection === 'stories' && isAdmin && <Insights />}
+
+          {/* SECTION: LUMINA SUB-PROJECT (ADMIN ONLY) */}
+          {activeSection === 'lumina' && isAdmin && <LuminaManager />}
 
           {/* SECTION: ACCOUNT & SECURITY */}
           {activeSection === 'account' && (

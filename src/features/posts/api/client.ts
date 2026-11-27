@@ -114,13 +114,6 @@ export async function listPublishedPostsPage(
     query = query.contains('tags', [options.tag])
   }
 
-  if (searchTerm.length > 0) {
-    const term = searchTerm.replace(/[%,()]/g, ' ')
-    query = query.or(
-      `title.ilike.*${term}*,excerpt.ilike.*${term}*,subtitle.ilike.*${term}*,dataset_name.ilike.*${term}*`,
-    )
-  }
-
   const { data, count, error } = await query
   if (error) throw new PostError(error.message, error)
   const posts = (data ?? []) as PostSummary[]

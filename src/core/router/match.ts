@@ -94,7 +94,7 @@ export function joinPath(base: string, path: string): string {
 }
 
 const KNOWN_BARE_HASHES =
-  /^#\/|^#(landing|features|sources|pricing|app|workspace|posts|insights|login|signup|verify)(\/|\?|$)/
+  /^#\/|^#(landing|features|sources|pricing|app|workspace|posts|insights|lumina|login|signup|verify)(\/|\?|$)/
 
 /** Reads either a legacy `#/route` fragment (ignoring OAuth tokens) or clean `pathname + search`. */
 export function parseBrowserLocation(
