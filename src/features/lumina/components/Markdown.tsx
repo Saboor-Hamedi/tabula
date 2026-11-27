@@ -14,6 +14,19 @@ export function slugifyHeading(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+/**
+ * Strips executable HTML tags (`<script>`, `<iframe>`, `<object>`, `<embed>`),
+ * inline DOM event handlers (`onerror=`, `onload=`, etc.), and dangerous protocols.
+ */
+export function sanitizeMarkdownInput(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/<\s*\/?\s*(script|iframe|object|embed|applet|meta|base|form)\b[^>]*>/gi, '')
+    .replace(/\bon[a-z]+\s*=\s*(['"][^'"]*['"]|[^\s>]+)/gi, '')
+    .replace(/(javascript|vbscript)\s*:/gi, 'blocked:')
+    .replace(/data\s*:\s*text\/html/gi, 'blocked:text/html')
+}
+
 export function extractDocHeadings(markdown: string): DocHeading[] {
   const headings: DocHeading[] = []
   const lines = markdown.split(/\r?\n/)
@@ -46,7 +59,7 @@ export function extractDocHeadings(markdown: string): DocHeading[] {
 
 /** Blocks `javascript:`, `data:`, `vbscript:` or unsafe schemes in user-authored Markdown links. */
 export function sanitizeHref(rawHref: string): string {
-  const clean = rawHref.trim()
+  const clean = rawHref.trim().replace(/[\u0000-\u001F\u007F]/g, '')
   if (/^(https?:\/\/|mailto:|\/|#)/i.test(clean)) {
     return clean
   }
@@ -85,15 +98,16 @@ function CopyableCodeBlock({ language, code }: { language: string; code: string 
 }
 
 function renderInline(text: string): ReactNode[] {
+  const safeText = sanitizeMarkdownInput(text)
   const nodes: ReactNode[] = []
   const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*)/g
   let lastIndex = 0
   let match: RegExpExecArray | null
   let key = 0
 
-  while ((match = pattern.exec(text)) !== null) {
+  while ((match = pattern.exec(safeText)) !== null) {
     if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index))
+      nodes.push(safeText.slice(lastIndex, match.index))
     }
     const token = match[0]
     if (token.startsWith('**') && token.endsWith('**')) {
@@ -128,15 +142,16 @@ function renderInline(text: string): ReactNode[] {
     lastIndex = pattern.lastIndex
   }
 
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex))
+  if (lastIndex < safeText.length) {
+    nodes.push(safeText.slice(lastIndex))
   }
 
   return nodes
 }
 
 export function Markdown({ content }: { content: string }) {
-  const lines = content.split(/\r?\n/)
+  const safeContent = sanitizeMarkdownInput(content)
+  const lines = safeContent.split(/\r?\n/)
   const elements: ReactNode[] = []
   let i = 0
   let blockKey = 0
@@ -150,7 +165,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Fenced code block
     if (trimmed.startsWith('```')) {
       const lang = trimmed.slice(3).trim()
       const codeLines: string[] = []
@@ -170,7 +184,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Callout / Blockquote (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING])
     if (trimmed.startsWith('>')) {
       const quoteLines: string[] = []
       while (i < lines.length && lines[i].trim().startsWith('>')) {
@@ -196,7 +209,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Headings
     const h2 = /^##\s+(.+)$/.exec(trimmed)
     if (h2) {
       const rawText = h2[1].trim()
@@ -231,7 +243,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Markdown Table
     if (trimmed.startsWith('|') && i + 1 < lines.length && /^\|\s*[-:]+/.test(lines[i + 1].trim())) {
       const headerCells = trimmed
         .split('|')
@@ -273,7 +284,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Unordered list
     if (/^[-*]\s+/.test(trimmed)) {
       const items: string[] = []
       while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
@@ -290,7 +300,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Ordered list
     if (/^\d+\.\s+/.test(trimmed)) {
       const items: string[] = []
       while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
@@ -307,7 +316,6 @@ export function Markdown({ content }: { content: string }) {
       continue
     }
 
-    // Paragraph
     const paraLines: string[] = []
     while (
       i < lines.length &&

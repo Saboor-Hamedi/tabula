@@ -1,6 +1,6 @@
 /* Lumina Tabula service worker: app shell + heavy analysis assets after first use. */
-const CACHE = 'tabula-v3'
-const SHELL = ['/', '/index.html', '/manifest.webmanifest?v=3', '/favicon.png?v=3']
+const CACHE = 'tabula-v4'
+const SHELL = ['/', '/index.html', '/manifest.webmanifest?v=4', '/favicon.png?v=4']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

@@ -12,6 +12,21 @@ import { getTelemetryEnabled } from './storage/settings'
 
 const STORAGE_KEY = 'data-agent:diagnostics'
 
+const BENIGN_ERROR_PATTERNS = [
+  /ResizeObserver loop completed with undelivered notifications/i,
+  /ResizeObserver loop limit exceeded/i,
+]
+
+export function isBenignBrowserError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : String(error ?? '')
+  return BENIGN_ERROR_PATTERNS.some((pattern) => pattern.test(message))
+}
+
 export interface DiagnosticEvent {
   id: string
   at: string
@@ -44,7 +59,10 @@ export function reportDiagnostic(
   error: unknown,
   source: DiagnosticEvent['source'],
   context: Record<string, unknown> = {},
-): DiagnosticEvent {
+): DiagnosticEvent | null {
+  if (isBenignBrowserError(error)) {
+    return null
+  }
   const normalized = error instanceof Error ? error : new Error(String(error))
   const event: DiagnosticEvent = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -88,7 +106,12 @@ export function clearDiagnostics(): void {
 /** Installs global handlers once, from the app entry point. */
 export function installGlobalErrorHandlers(): () => void {
   const handleError = (event: ErrorEvent) => {
-    reportDiagnostic(event.error ?? event.message, 'window', {
+    const candidate = event.error ?? event.message
+    if (isBenignBrowserError(candidate) || isBenignBrowserError(event.message)) {
+      event.stopImmediatePropagation?.()
+      return
+    }
+    reportDiagnostic(candidate, 'window', {
       filename: event.filename,
       line: event.lineno,
       column: event.colno,
@@ -96,6 +119,9 @@ export function installGlobalErrorHandlers(): () => void {
   }
 
   const handleRejection = (event: PromiseRejectionEvent) => {
+    if (isBenignBrowserError(event.reason)) {
+      return
+    }
     reportDiagnostic(event.reason, 'promise')
   }
 

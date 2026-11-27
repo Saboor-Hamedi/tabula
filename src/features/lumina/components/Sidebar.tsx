@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link, useRouter } from '../../../core/router'
-import { LUMINA_SIDEBAR_GROUPS } from '../content'
+import type { LuminaDocRecord } from '../api/docs'
+import { buildSidebarGroups } from '../content'
 
 export interface SidebarProps {
   mobileOpen: boolean
+  dbDocsMap?: Record<string, LuminaDocRecord>
 }
 
-export function Sidebar({ mobileOpen }: SidebarProps) {
+export function Sidebar({ mobileOpen, dbDocsMap = {} }: SidebarProps) {
   const { path } = useRouter()
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
 
@@ -15,11 +17,12 @@ export function Sidebar({ mobileOpen }: SidebarProps) {
   }
 
   const normalizedPath = path.replace(/\/+$/, '') || '/lumina'
+  const groups = buildSidebarGroups(dbDocsMap)
 
   return (
     <aside className={`lumina-sidebar ${mobileOpen ? 'is-mobile-open' : ''}`}>
       <nav className="lumina-sidebar-nav" aria-label="Lumina documentation">
-        {LUMINA_SIDEBAR_GROUPS.map((section) => {
+        {groups.map((section) => {
           const isCollapsed = Boolean(collapsedGroups[section.group])
           return (
             <div key={section.group} className="lumina-nav-group">

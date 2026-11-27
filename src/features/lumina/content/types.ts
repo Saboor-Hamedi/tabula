@@ -10,6 +10,8 @@ export interface LuminaDocPageDef {
   summary: string
   sortOrder: number
   content: string
+  /** True for static reference pages (shortcuts, installation shell, OAuth legal baselines). */
+  isStaticBaseline?: boolean
 }
 
 export interface LuminaSidebarGroup {
@@ -17,5 +19,6 @@ export interface LuminaSidebarGroup {
   items: Array<{
     label: string
     to: string
+    slug?: string
   }>
 }

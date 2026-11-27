@@ -9,7 +9,7 @@ export function TableOfContents({ headings }: { headings: DocHeading[] }) {
     if (headings.length === 0) return
 
     const handleScroll = () => {
-      const offset = 112
+      const offset = 108
       let current = headings[0]?.id ?? ''
       for (const h of headings) {
         const el = document.getElementById(h.id)
@@ -32,7 +32,7 @@ export function TableOfContents({ headings }: { headings: DocHeading[] }) {
   return (
     <aside className="lumina-toc" aria-label="On this page">
       <div className="lumina-toc-sticky">
-        <div className="lumina-toc-title">On This Page</div>
+        <div className="lumina-toc-title">On this page</div>
         <ul className="lumina-toc-list">
           {headings.map((h) => (
             <li
@@ -59,5 +59,45 @@ export function TableOfContents({ headings }: { headings: DocHeading[] }) {
         </ul>
       </div>
     </aside>
+  )
+}
+
+export function MobileInlineToc({ headings }: { headings: DocHeading[] }) {
+  const [open, setOpen] = useState(false)
+  if (headings.length === 0) return null
+
+  return (
+    <div className="lumina-mobile-toc">
+      <button
+        type="button"
+        className="lumina-mobile-toc-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span>On this page ({headings.length})</span>
+        <span className={`lumina-nav-chevron ${open ? '' : 'is-collapsed'}`}>▾</span>
+      </button>
+      {open ? (
+        <ul className="lumina-mobile-toc-list">
+          {headings.map((h) => (
+            <li key={h.id} className={`is-level-${h.level}`}>
+              <a
+                href={`#${h.id}`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  setOpen(false)
+                  const target = document.getElementById(h.id)
+                  if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                }}
+              >
+                {h.text}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }

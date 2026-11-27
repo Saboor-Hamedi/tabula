@@ -1,4 +1,5 @@
 import { supabase } from '../../../core/supabase/client'
+import { sanitizeMarkdownInput } from '../components/Markdown'
 import { slugifyLuminaTitle } from './posts'
 
 export type LuminaDocSection = 'Prologue' | 'Features' | 'Reference' | 'Legal'
@@ -77,7 +78,7 @@ export async function saveLuminaDoc(doc: LuminaDocRecord): Promise<LuminaDocReco
     throw new Error('Supabase is not configured.')
   }
 
-  const cleanTitle = doc.title.trim()
+  const cleanTitle = sanitizeMarkdownInput(doc.title).trim()
   if (cleanTitle.length < 2) {
     throw new Error('Documentation title is required.')
   }
@@ -90,9 +91,9 @@ export async function saveLuminaDoc(doc: LuminaDocRecord): Promise<LuminaDocReco
     slug: cleanSlug,
     section: doc.section,
     title: cleanTitle,
-    subtitle: doc.subtitle?.trim() || null,
-    summary: doc.summary?.trim() || null,
-    content: doc.content,
+    subtitle: doc.subtitle ? sanitizeMarkdownInput(doc.subtitle).trim() : null,
+    summary: doc.summary ? sanitizeMarkdownInput(doc.summary).trim() : null,
+    content: sanitizeMarkdownInput(doc.content),
     sort_order: Number.isFinite(doc.sort_order) ? doc.sort_order : 100,
     published: doc.published ?? true,
   }

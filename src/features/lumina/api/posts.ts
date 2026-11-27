@@ -1,4 +1,5 @@
 import { supabase } from '../../../core/supabase/client'
+import { sanitizeMarkdownInput } from '../components/Markdown'
 
 export type LuminaPostCategory = 'Release' | 'Guide' | 'Feature' | 'Announcement'
 export type LuminaPostStatus = 'draft' | 'published' | 'archived'
@@ -196,7 +197,7 @@ export async function saveLuminaPost(input: SaveLuminaPostInput): Promise<Lumina
     throw new Error('Supabase is not configured.')
   }
 
-  const cleanTitle = input.title.trim()
+  const cleanTitle = sanitizeMarkdownInput(input.title).trim()
   if (cleanTitle.length < 3) {
     throw new Error('Post title must be at least 3 characters.')
   }
@@ -209,7 +210,7 @@ export async function saveLuminaPost(input: SaveLuminaPostInput): Promise<Lumina
     throw new Error('A valid URL slug is required.')
   }
 
-  const cleanContent = input.content.trim()
+  const cleanContent = sanitizeMarkdownInput(input.content).trim()
   if (cleanContent.length < 10) {
     throw new Error('Post content must be at least 10 characters.')
   }
@@ -296,5 +297,9 @@ export async function deleteLuminaPost(id: string): Promise<void> {
 /** Increments view count safely via RPC. */
 export async function incrementLuminaPostView(slug: string): Promise<void> {
   if (!supabase) return
-  await supabase.rpc('lumina_increment_post_view', { p_slug: slug }).then(() => {}).catch(() => {})
+  try {
+    await supabase.rpc('lumina_increment_post_view', { p_slug: slug })
+  } catch {
+    // Ignore view counter errors
+  }
 }

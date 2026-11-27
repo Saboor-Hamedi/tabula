@@ -2,19 +2,21 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from '../../../core/router'
 import { useIsAdmin } from '../../auth/useProfile'
 import { FileIcon, PlusIcon, SparklesIcon } from '../../common/Icons'
-import type { LuminaDocRecord } from '../api/docs'
+import { fetchLuminaDocsMap, type LuminaDocRecord } from '../api/docs'
 import type { LuminaPost } from '../api/posts'
 import type { LuminaReleaseInfo } from '../api/release'
+import { docSlugToPath } from '../content'
 import { DocModal } from './DocModal'
 import { Header } from './Header'
 import type { DocHeading } from './Markdown'
 import { PostModal } from './PostModal'
 import { Sidebar } from './Sidebar'
-import { TableOfContents } from './TableOfContents'
+import { MobileInlineToc, TableOfContents } from './TableOfContents'
 
 export interface ShellProps {
   release: LuminaReleaseInfo
   headings?: DocHeading[]
+  dbDocsMap?: Record<string, LuminaDocRecord>
   activeDocForEdit?: LuminaDocRecord | null
   onPostCreated?: (post: LuminaPost) => void
   onDocSaved?: (doc: LuminaDocRecord) => void
@@ -24,6 +26,7 @@ export interface ShellProps {
 export function Shell({
   release,
   headings = [],
+  dbDocsMap: externalDocsMap,
   activeDocForEdit = null,
   onPostCreated,
   onDocSaved,
@@ -32,11 +35,25 @@ export function Shell({
   const { path, navigate } = useRouter()
   const isAdmin = useIsAdmin()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [internalDocsMap, setInternalDocsMap] = useState<Record<string, LuminaDocRecord>>({})
   const [fabOpen, setFabOpen] = useState(false)
   const [creatingPost, setCreatingPost] = useState(false)
   const [creatingDoc, setCreatingDoc] = useState(false)
   const [editingActiveDoc, setEditingActiveDoc] = useState(false)
   const fabRef = useRef<HTMLDivElement>(null)
+
+  const effectiveDocsMap = externalDocsMap ?? internalDocsMap
+
+  useEffect(() => {
+    if (externalDocsMap) return
+    let mounted = true
+    fetchLuminaDocsMap().then((map) => {
+      if (mounted) setInternalDocsMap(map)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [externalDocsMap])
 
   useEffect(() => {
     setMobileNavOpen(false)
@@ -78,10 +95,13 @@ export function Shell({
       ) : null}
 
       <div className="lumina-layout">
-        <Sidebar mobileOpen={mobileNavOpen} />
+        <Sidebar mobileOpen={mobileNavOpen} dbDocsMap={effectiveDocsMap} />
 
         <main className="lumina-main">
-          <div className="lumina-main-inner">{children}</div>
+          <div className="lumina-main-inner">
+            <MobileInlineToc headings={headings} />
+            {children}
+          </div>
         </main>
 
         <TableOfContents headings={headings} />
@@ -165,7 +185,9 @@ export function Shell({
           doc={null}
           onClose={() => setCreatingDoc(false)}
           onSaved={(saved) => {
+            setInternalDocsMap((prev) => ({ ...prev, [saved.slug]: saved }))
             onDocSaved?.(saved)
+            navigate(docSlugToPath(saved.slug))
           }}
         />
       ) : null}
@@ -175,6 +197,7 @@ export function Shell({
           doc={activeDocForEdit}
           onClose={() => setEditingActiveDoc(false)}
           onSaved={(saved) => {
+            setInternalDocsMap((prev) => ({ ...prev, [saved.slug]: saved }))
             onDocSaved?.(saved)
           }}
         />

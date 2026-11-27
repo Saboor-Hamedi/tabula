@@ -379,8 +379,10 @@ function syncReleaseToSupabase(info: LuminaReleaseInfo): void {
       p_published_at: info.publishedAt,
       p_stars_count: info.stars ?? 0,
     })
-    .then(() => {})
-    .catch(() => {})
+    .then(
+      () => {},
+      () => {},
+    )
 }
 
 async function fetchReleaseFromSupabaseCache(): Promise<LuminaReleaseInfo | null> {
@@ -602,8 +604,10 @@ export function recordLuminaDownload(asset: LuminaInstallerAsset, version: strin
       p_version: version ?? 'latest',
       p_download_url: asset.url,
     })
-    .then(() => {})
-    .catch(() => {})
+    .then(
+      () => {},
+      () => {},
+    )
 }
 
 export function useLuminaRelease(): LuminaReleaseInfo & { refresh: () => Promise<void> } {

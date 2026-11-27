@@ -10,11 +10,14 @@
 --   2. Strict Row-Level Security (RLS): public visitors can only SELECT published
 --      rows; only active administrators (`public.is_admin()`) can INSERT, UPDATE,
 --      or DELETE.
---   3. Pure `pg_trgm` Trigram Search (`%`, `<%`, `similarity`, `word_similarity`)
---      for both `lumina_posts` and `lumina_docs` — no `ILIKE` sequential scans.
---   4. No hardcoded release version or hardcoded posts: versions and star counts
---      are fetched dynamically from GitHub (`Saboor-Hamedi/lumina`) and cached in
---      `public.lumina_releases`; posts and docs are managed via full CRUD.
+--   3. Defense-in-Depth XSS & Injection Guard (`public.lumina_is_safe_markdown`):
+--      Database CHECK constraints reject `<script`, `javascript:`, `vbscript:`,
+--      `data:text/html`, `<iframe`, `<object`, `<embed`, and inline `onerror=` /
+--      `onload=` payloads at the PostgreSQL engine level.
+--   4. Pure `pg_trgm` Trigram Search (`%`, `<%`, `similarity`, `word_similarity`)
+--      for both `lumina_posts` and `lumina_docs` — zero `ILIKE` queries.
+--   5. Immutable Admin Audit Trail: All admin mutations on `lumina_posts` and
+--      `lumina_docs` are logged to `public.admin_audit_logs` when present.
 --
 -- Safe to run on both a fresh or existing Supabase database via:
 --   Supabase Dashboard -> SQL Editor -> Paste & Run
@@ -64,6 +67,15 @@ begin
     $fn$;
   end if;
 end $$;
+
+-- Database-level XSS / dangerous URI guard for Markdown and text columns
+create or replace function public.lumina_is_safe_markdown(p_text text)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p_text, '') !~* '(<\s*script\b|javascript\s*:|vbscript\s*:|data\s*:\s*text/html|<\s*iframe\b|<\s*object\b|<\s*embed\b|\bon(error|load|click|mouseover)\s*=)';
+$$;
 
 
 -- ==============================================================================
@@ -126,8 +138,24 @@ create table if not exists public.lumina_docs (
     and slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
   ),
   constraint lumina_docs_title_length check (char_length(trim(title)) between 1 and 240),
-  constraint lumina_docs_content_length check (char_length(content) <= 250000)
+  constraint lumina_docs_content_length check (char_length(content) <= 250000),
+  constraint lumina_docs_safe_content check (
+    public.lumina_is_safe_markdown(title)
+    and public.lumina_is_safe_markdown(subtitle)
+    and public.lumina_is_safe_markdown(summary)
+    and public.lumina_is_safe_markdown(content)
+  )
 );
+
+alter table public.lumina_docs
+  drop constraint if exists lumina_docs_safe_content;
+alter table public.lumina_docs
+  add constraint lumina_docs_safe_content check (
+    public.lumina_is_safe_markdown(title)
+    and public.lumina_is_safe_markdown(subtitle)
+    and public.lumina_is_safe_markdown(summary)
+    and public.lumina_is_safe_markdown(content)
+  );
 
 alter table public.lumina_docs enable row level security;
 
@@ -238,7 +266,7 @@ security invoker
 set search_path = public, extensions
 as $$
   with q as (
-    select nullif(trim(coalesce(p_query, '')), '') as term
+    select nullif(left(trim(coalesce(p_query, '')), 120), '') as term
   ),
   matched as (
     select
@@ -335,12 +363,26 @@ create table if not exists public.lumina_posts (
   constraint lumina_posts_summary_length check (char_length(summary) <= 600),
   constraint lumina_posts_content_length check (char_length(content) <= 250000),
   constraint lumina_posts_cover_url_safe check (
-    cover_image_url is null or cover_image_url ~ '^https?://'
+    cover_image_url is null or cover_image_url ~ '^https://'
+  ),
+  constraint lumina_posts_safe_content check (
+    public.lumina_is_safe_markdown(title)
+    and public.lumina_is_safe_markdown(summary)
+    and public.lumina_is_safe_markdown(content)
   )
 );
 
 alter table public.lumina_posts
   add column if not exists status public.lumina_post_status not null default 'published';
+
+alter table public.lumina_posts
+  drop constraint if exists lumina_posts_safe_content;
+alter table public.lumina_posts
+  add constraint lumina_posts_safe_content check (
+    public.lumina_is_safe_markdown(title)
+    and public.lumina_is_safe_markdown(summary)
+    and public.lumina_is_safe_markdown(content)
+  );
 
 alter table public.lumina_posts enable row level security;
 
@@ -489,7 +531,7 @@ security invoker
 set search_path = public, extensions
 as $$
   with q as (
-    select nullif(trim(coalesce(p_query, '')), '') as term
+    select nullif(left(trim(coalesce(p_query, '')), 120), '') as term
   ),
   matched as (
     select
@@ -586,11 +628,16 @@ security definer
 set search_path = public
 as $$
 declare
+  v_slug text := left(trim(coalesce(p_slug, '')), 140);
   v_count bigint;
 begin
+  if v_slug = '' or v_slug !~ '^[a-z0-9]+(?:-[a-z0-9]+)*$' then
+    return 0;
+  end if;
+
   update public.lumina_posts
      set view_count = view_count + 1
-   where slug = trim(coalesce(p_slug, ''))
+   where slug = v_slug
      and published = true
      and status = 'published'
   returning view_count into v_count;
@@ -791,9 +838,14 @@ set search_path = public
 as $$
 declare
   v_platform text := lower(trim(coalesce(p_platform, 'windows')));
+  v_url text := left(trim(coalesce(p_download_url, '')), 500);
 begin
   if v_platform not in ('windows', 'macos', 'linux', 'source') then
     v_platform := 'source';
+  end if;
+
+  if v_url <> '' and v_url !~ '^https://(github\.com/Saboor-Hamedi/lumina/|objects\.githubusercontent\.com/)' then
+    v_url := 'https://github.com/Saboor-Hamedi/lumina/releases/latest';
   end if;
 
   insert into public.lumina_downloads (platform, installer_format, version, download_url)
@@ -801,7 +853,7 @@ begin
     v_platform,
     left(trim(coalesce(p_installer_format, '')), 40),
     left(trim(coalesce(p_version, '')), 40),
-    left(trim(coalesce(p_download_url, '')), 500)
+    v_url
   );
 end;
 $$;
